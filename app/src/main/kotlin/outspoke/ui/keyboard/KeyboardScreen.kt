@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -74,8 +75,14 @@ fun KeyboardScreen(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            // Wrap to content height so the keyboard panel does not expand beyond
+            // its natural size. navigationBarsPadding() adds the nav-bar height at
+            // the bottom, which (a) pushes buttons above the nav bar and (b) extends
+            // the background colour to cover the nav-bar area.
             .wrapContentHeight()
             .background(MaterialTheme.colorScheme.background)
+            // Push content above the navigation bar so buttons are never hidden behind it.
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
@@ -96,7 +103,7 @@ fun KeyboardScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // ── Bottom row: 5 buttons with TalkButton centred ────────────────────
         // Left and right groups each have weight(1f) so the centre button stays

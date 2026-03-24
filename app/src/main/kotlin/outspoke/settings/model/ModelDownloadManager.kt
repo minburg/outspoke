@@ -8,101 +8,89 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 
 private const val TAG = "ModelDownloadManager"
 
-private const val BASE_URL =
-    "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main"
-
 /**
- * Each entry describes one file that must be downloaded.
- * The INT8 quantized encoder + decoder/joint are used for on-device inference.
+ * Downloads all files for a given [ModelInfo] and saves them to the directory managed by
+ * [ModelStorageManager].
  *
- * [sha256] is the expected lowercase hex SHA-256 of the file contents.
- * Set to `null` to skip hash verification for that file (e.g. small JSON/text files
- * that may be updated independently of the model weights).
- */
-private data class ModelFile(
-    val filename: String,
-    /** Rough fraction of total download size — used to weight aggregate progress. */
-    val sizeFraction: Float,
-    /** Expected SHA-256 hex digest, or `null` to skip verification. */
-    val sha256: String? = null,
-) {
-    val url: String get() = "$BASE_URL/$filename"
-}
-
-private val MODEL_FILES = listOf(
-    ModelFile(
-        filename     = "encoder-model.int8.onnx",
-        sizeFraction = 0.70f,
-        // Obtain from: sha256sum encoder-model.int8.onnx  (or HuggingFace LFS metadata)
-        sha256       = "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09",
-    ),
-    ModelFile(
-        filename     = "decoder_joint-model.int8.onnx",
-        sizeFraction = 0.19f,
-        sha256       = "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70",
-    ),
-    ModelFile(
-        filename     = "nemo128.onnx",
-        sizeFraction = 0.06f,
-        sha256       = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f",
-    ),
-    ModelFile(
-        filename     = "config.json",
-        sizeFraction = 0.01f,
-        sha256       = null,
-    ),
-    ModelFile(
-        filename     = "vocab.txt",
-        sizeFraction = 0.04f,
-        sha256       = null,
-    ),
-)
-
-/**
- * Downloads all Parakeet-V3 ONNX model files from Hugging Face and saves them to
- * the directory managed by [ModelStorageManager].
+ * Supports two download modes:
+ *  - [DownloadSource.Files]      — individual files are streamed, SHA-256 verified, and
+ *                                  atomically renamed on success.
+ *  - [DownloadSource.ZipArchive] — a single ZIP archive is downloaded, optionally SHA-256
+ *                                  verified, extracted, and a [INSTALLED_MARKER] file is
+ *                                  written so [ModelStorageManager.isModelReady] can confirm
+ *                                  the installation.
  *
- * Each file is first streamed to a `.tmp` file next to the final target, then the
- * SHA-256 hash is verified (when [ModelFile.sha256] is non-null), and finally the
- * file is atomically renamed on success so a partial download never leaves a corrupt file.
- *
- * Progress is reported as an aggregate [0.0, 1.0] fraction weighted by [ModelFile.sizeFraction].
- * The returned [Flow] must be collected on an IO-capable dispatcher.
+ * Progress is reported as an aggregate [0.0, 1.0] fraction.
  * Network / IO failures are re-thrown so the calling ViewModel can surface a Snackbar.
+ * The returned [Flow] must be collected on an IO-capable dispatcher.
  */
 class ModelDownloadManager(
     private val client: OkHttpClient = OkHttpClient(),
 ) {
 
-    fun download(context: Context): Flow<ModelState> = flow {
-        val modelDir = ModelStorageManager.getModelDir(context)
+    fun download(context: Context, modelInfo: ModelInfo): Flow<ModelState> = flow {
+        val modelDir = ModelStorageManager.getModelDir(context, modelInfo.id)
         modelDir.mkdirs()
 
-        // Offset into the [0,1] progress range already completed by previous files.
+        val success = when (val source = modelInfo.source) {
+            is DownloadSource.Files      -> downloadFiles(modelDir, source)      { emit(it) }
+            is DownloadSource.ZipArchive -> downloadZip(modelDir, source) { emit(it) }
+        }
+
+        if (!success) {
+            emit(ModelState.Corrupted)
+            return@flow
+        }
+
+        if (ModelStorageManager.isModelReady(context, modelInfo)) {
+            Log.d(TAG, "All model files installed for ${modelInfo.id}")
+            emit(ModelState.Ready)
+        } else {
+            Log.e(TAG, "Download finished but isModelReady=false for ${modelInfo.id}")
+            emit(ModelState.Corrupted)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Individual-file download
+    // -------------------------------------------------------------------------
+
+    /**
+     * Downloads each file in [source] sequentially, reporting weighted aggregate progress
+     * via [onProgress].
+     *
+     * @return `true` on full success; `false` if any SHA-256 digest mismatched (the caller
+     *         will then emit [ModelState.Corrupted]).
+     */
+    private suspend fun downloadFiles(
+        modelDir: File,
+        source: DownloadSource.Files,
+        onProgress: suspend (ModelState) -> Unit,
+    ): Boolean {
         var completedWeight = 0f
 
-        for (modelFile in MODEL_FILES) {
-            val finalFile = File(modelDir, modelFile.filename)
-            val tempFile  = File(modelDir, "${modelFile.filename}.tmp")
+        for (remoteFile in source.files) {
+            val finalFile = File(modelDir, remoteFile.filename)
+            val tempFile  = File(modelDir, "${remoteFile.filename}.tmp")
 
             try {
-                val request = Request.Builder().url(modelFile.url).build()
+                val request  = Request.Builder().url(remoteFile.url(source.baseUrl)).build()
                 val response = client.newCall(request).execute()
 
                 if (!response.isSuccessful) {
                     throw RuntimeException(
-                        "HTTP ${response.code} downloading ${modelFile.filename}: ${response.message}"
+                        "HTTP ${response.code} downloading ${remoteFile.filename}: ${response.message}"
                     )
                 }
 
                 val body = response.body
-                    ?: throw RuntimeException("Empty response body for ${modelFile.filename}")
-                val totalBytes = body.contentLength() // -1 if server omits Content-Length
+                    ?: throw RuntimeException("Empty response body for ${remoteFile.filename}")
+                val totalBytes = body.contentLength()
 
-                // Stream to temp file while computing SHA-256 in one pass.
                 val digest = MessageDigest.getInstance("SHA-256")
 
                 body.byteStream().use { input ->
@@ -116,49 +104,169 @@ class ModelDownloadManager(
                             bytesRead += n
                             if (totalBytes > 0) {
                                 val fileProgress = bytesRead.toFloat() / totalBytes
-                                val overall = completedWeight + fileProgress * modelFile.sizeFraction
-                                emit(ModelState.Downloading(overall.coerceIn(0f, 1f)))
+                                val overall = completedWeight + fileProgress * remoteFile.sizeFraction
+                                onProgress(ModelState.Downloading(overall.coerceIn(0f, 1f)))
                             }
                         }
                     }
                 }
 
-                // Verify SHA-256 when an expected hash is provided.
-                if (modelFile.sha256 != null) {
+                if (remoteFile.sha256 != null) {
                     val actual = digest.digest().toHexString()
-                    if (!actual.equals(modelFile.sha256, ignoreCase = true)) {
+                    if (!actual.equals(remoteFile.sha256, ignoreCase = true)) {
                         tempFile.delete()
-                        Log.e(TAG, "SHA-256 mismatch for ${modelFile.filename}: expected=${modelFile.sha256} actual=$actual")
-                        emit(ModelState.Corrupted)
-                        return@flow
+                        Log.e(
+                            TAG,
+                            "SHA-256 mismatch for ${remoteFile.filename}: " +
+                            "expected=${remoteFile.sha256} actual=$actual",
+                        )
+                        return false
                     }
-                    Log.d(TAG, "SHA-256 verified for ${modelFile.filename}")
+                    Log.d(TAG, "SHA-256 verified for ${remoteFile.filename}")
                 }
 
                 // Atomic rename — only replaces the final file after a fully verified download.
                 tempFile.renameTo(finalFile)
-                Log.d(TAG, "Saved ${modelFile.filename} (${finalFile.length()} bytes)")
+                Log.d(TAG, "Saved ${remoteFile.filename} (${finalFile.length()} bytes)")
 
             } catch (e: Exception) {
-                tempFile.delete() // Remove any partial temp file
+                tempFile.delete()
                 throw e
             }
 
-            completedWeight += modelFile.sizeFraction
+            completedWeight += remoteFile.sizeFraction
         }
 
-        // Final check: all required files must now be present.
-        if (ModelStorageManager.isModelReady(context)) {
-            Log.d(TAG, "All model files installed successfully")
-            emit(ModelState.Ready)
-        } else {
-            Log.e(TAG, "Download finished but isModelReady() returned false")
-            emit(ModelState.Corrupted)
+        return true
+    }
+
+    // -------------------------------------------------------------------------
+    // ZIP archive download
+    // -------------------------------------------------------------------------
+
+    /**
+     * Downloads the ZIP from [source], optionally verifies its SHA-256, extracts all
+     * entries into [modelDir], and writes a [INSTALLED_MARKER] marker on success.
+     *
+     * Progress is reported in the range [0.0, 0.9] during the download phase;
+     * the remaining 10 % covers extraction.
+     *
+     * @return `true` on full success; `false` if the archive hash mismatched.
+     */
+    private suspend fun downloadZip(
+        modelDir: File,
+        source: DownloadSource.ZipArchive,
+        onProgress: suspend (ModelState) -> Unit,
+    ): Boolean {
+        val zipTemp = File(modelDir, "download.zip.tmp")
+
+        try {
+            val request  = Request.Builder().url(source.url).build()
+            val response = client.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                throw RuntimeException(
+                    "HTTP ${response.code} downloading ZIP: ${response.message}"
+                )
+            }
+
+            val body = response.body
+                ?: throw RuntimeException("Empty response body for ZIP archive")
+            val totalBytes = body.contentLength()
+
+            val digest = if (source.sha256 != null) MessageDigest.getInstance("SHA-256") else null
+
+            // Stream ZIP to temp file, reporting progress at 0–90 %.
+            body.byteStream().use { input ->
+                zipTemp.outputStream().use { output ->
+                    val buffer = ByteArray(32 * 1024)
+                    var bytesRead = 0L
+                    var n: Int
+                    while (input.read(buffer).also { n = it } != -1) {
+                        output.write(buffer, 0, n)
+                        digest?.update(buffer, 0, n)
+                        bytesRead += n
+                        if (totalBytes > 0) {
+                            onProgress(
+                                ModelState.Downloading(
+                                    (bytesRead.toFloat() / totalBytes * 0.9f).coerceIn(0f, 0.9f)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Verify archive integrity before extracting.
+            if (source.sha256 != null && digest != null) {
+                val actual = digest.digest().toHexString()
+                if (!actual.equals(source.sha256, ignoreCase = true)) {
+                    zipTemp.delete()
+                    Log.e(TAG, "SHA-256 mismatch for ZIP archive")
+                    return false
+                }
+                Log.d(TAG, "SHA-256 verified for ZIP archive")
+            }
+
+            onProgress(ModelState.Downloading(0.92f))
+            extractZip(zipFile = zipTemp, destDir = modelDir)
+            zipTemp.delete()
+
+            // Write installation marker — checked by isModelReady() for ZIP-based models.
+            File(modelDir, INSTALLED_MARKER).writeText("ok")
+            Log.d(TAG, "ZIP extracted and installed to $modelDir")
+
+        } catch (e: Exception) {
+            zipTemp.delete()
+            throw e
         }
+
+        return true
+    }
+
+    /**
+     * Extracts all entries from [zipFile] into [destDir].
+     * Validates each resolved path to guard against zip-slip path-traversal attacks.
+     */
+    private fun extractZip(zipFile: File, destDir: File) {
+        val canonicalDest = destDir.canonicalPath
+        ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                // Normalise separators and strip leading slashes.
+                val name    = entry.name.replace('\\', '/').trimStart('/')
+                val outFile = File(destDir, name)
+
+                // Prevent zip-slip: every resolved path must be under destDir.
+                val outCanonical = outFile.canonicalPath
+                require(
+                    outCanonical == canonicalDest ||
+                    outCanonical.startsWith(canonicalDest + File.separator)
+                ) { "Zip entry escapes target directory: $name" }
+
+                if (entry.isDirectory) {
+                    outFile.mkdirs()
+                } else {
+                    outFile.parentFile?.mkdirs()
+                    outFile.outputStream().use { out -> zis.copyTo(out) }
+                    Log.d(TAG, "Extracted: $name (${outFile.length()} bytes)")
+                }
+
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Marker file written by [downloadZip] after successful extraction.
+         * [ModelStorageManager.isModelReady] checks for this file in ZIP-based models.
+         */
+        const val INSTALLED_MARKER = ".installed"
     }
 }
 
-/** Converts a `ByteArray` to a lowercase hex string. */
+/** Converts a [ByteArray] to a lowercase hex string. */
 private fun ByteArray.toHexString(): String =
     joinToString("") { "%02x".format(it) }
-

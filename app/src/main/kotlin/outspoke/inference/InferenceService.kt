@@ -13,11 +13,15 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import dev.brgr.outspoke.R
+import dev.brgr.outspoke.settings.model.ModelId
+import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
+import dev.brgr.outspoke.settings.preferences.AppPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,13 +37,12 @@ private const val NOTIFICATION_ID = 1001
  * Responsibilities:
  *  - Show a persistent low-priority notification so Android keeps the process alive
  *    while the keyboard is active
- *  - Load the [SpeechEngine] on startup (background coroutine on [Dispatchers.Default])
- *  - Expose [InferenceRepository] to bound clients (the IME service) via [InferenceBinder]
+ *  - Observe [AppPreferences.selectedModelId] and load the appropriate [SpeechEngine]
+ *    via [SpeechEngineFactory] whenever the selection changes
+ *  - Watch the `models/` directory for file-system changes so the engine auto-reloads
+ *    after a download completes and auto-unloads when model files are deleted
+ *  - Expose [InferenceRepository] to bound clients (the IME) via [InferenceBinder]
  *  - Cleanly close the engine on [onDestroy]
- *
- * Lifecycle:
- *  `startForegroundService` → `onCreate` (load model) → `onBind` → …
- *  → `unbindService` → (OS decides to stop) → `onDestroy` (close engine)
  */
 class InferenceService : LifecycleService() {
 
@@ -47,15 +50,18 @@ class InferenceService : LifecycleService() {
     // Engine state
     // -------------------------------------------------------------------------
 
-    private val engine: SpeechEngine = ParakeetEngine()
-    private val repository by lazy { InferenceRepository(engine) }
+    /** The currently loaded engine, or `null` while loading / unloaded. */
+    @Volatile private var currentEngine: SpeechEngine? = null
 
-    /** Mutex preventing concurrent [loadEngine] calls from racing on the load/loaded check. */
+    /** Repository wrapping [currentEngine]. Rebuilt each time the engine changes. */
+    @Volatile private var currentRepository: InferenceRepository? = null
+
+    /** Mutex preventing concurrent [reloadForModel] calls from racing. */
     private val engineLoadMutex = Mutex()
 
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Unloaded)
 
-    /** Observable loading / runtime state. Observed by the IME (Step 29). */
+    /** Observable loading / runtime state observed by the IME. */
     val engineState: StateFlow<EngineState> = _engineState.asStateFlow()
 
     // -------------------------------------------------------------------------
@@ -63,7 +69,8 @@ class InferenceService : LifecycleService() {
     // -------------------------------------------------------------------------
 
     inner class InferenceBinder : Binder() {
-        fun getRepository(): InferenceRepository = repository
+        /** Returns the active [InferenceRepository], or `null` while the engine is loading. */
+        fun getRepository(): InferenceRepository? = currentRepository
         fun getEngineState(): StateFlow<EngineState> = engineState
     }
 
@@ -89,12 +96,16 @@ class InferenceService : LifecycleService() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
         )
 
-        Log.d(TAG, "Service created — loading engine")
+        Log.d(TAG, "Service created — observing selected model preference")
+
+        // Observe the selected model preference and reload the engine whenever it changes.
         lifecycleScope.launch(Dispatchers.Default) {
-            loadEngine()
+            AppPreferences(applicationContext).selectedModelId.collect { modelId ->
+                reloadForModel(modelId)
+            }
         }
-        // Watch for model file changes so the engine auto-unloads on deletion
-        // and auto-reloads when the companion app finishes a download.
+
+        // Watch the models/ root directory to detect external changes (e.g. download complete).
         startModelWatcher()
     }
 
@@ -103,34 +114,77 @@ class InferenceService : LifecycleService() {
         modelFileObserver = null
         currentWatchDir = null
         super.onDestroy()
-        engine.close()
+        currentEngine?.close()
+        currentEngine = null
+        currentRepository = null
         Log.d(TAG, "Service destroyed — engine closed")
     }
 
     // -------------------------------------------------------------------------
-    // Model directory watcher
+    // Engine loading
     // -------------------------------------------------------------------------
 
     /**
-     * Watches the closest existing ancestor of the model directory so we detect
-     * both deletion (from the companion app) and installation (download complete).
+     * Closes any existing engine and loads a fresh one for [modelId].
+     * Always called inside [engineLoadMutex] to serialise concurrent invocations.
+     */
+    private suspend fun reloadForModel(modelId: ModelId) {
+        engineLoadMutex.withLock {
+            // Close the current engine before replacing it.
+            currentEngine?.let { engine ->
+                engine.close()
+                Log.d(TAG, "Previous engine closed before reload")
+            }
+            currentEngine = null
+            currentRepository = null
+
+            if (!ModelStorageManager.isModelReady(applicationContext, modelId)) {
+                Log.w(TAG, "Model $modelId files not present — engine stays Unloaded")
+                _engineState.value = EngineState.Unloaded
+                updateNotification("Model not downloaded — open Outspoke to download")
+                return
+            }
+
+            _engineState.value = EngineState.Loading
+            updateNotification("Loading transcription engine…")
+
+            try {
+                val engine  = SpeechEngineFactory.create(modelId)
+                val modelDir = ModelStorageManager.getModelDir(applicationContext, modelId)
+                engine.load(modelDir)
+                currentEngine     = engine
+                currentRepository = InferenceRepository(engine)
+                _engineState.value = EngineState.Ready
+                updateNotification("Outspoke ready (${ModelRegistry[modelId].displayName})")
+                Log.d(TAG, "Engine loaded successfully for $modelId")
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: "Unknown error"
+                Log.e(TAG, "Engine load failed for $modelId: $msg", e)
+                _engineState.value = EngineState.Error(msg)
+                updateNotification("Engine failed to load: $msg")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Models directory watcher
+    // -------------------------------------------------------------------------
+
+    /**
+     * Watches the `models/` root directory so we detect both deletion and installation of
+     * model files for any model — triggering an engine reload for the selected model.
      *
-     * The observer is only recreated when the watched directory actually changes —
-     * this prevents creating thousands of short-lived observer objects during a download
-     * that produces many CREATE/CLOSE_WRITE events in quick succession.
+     * The observer is only recreated when the watched directory actually changes.
      */
     private var modelFileObserver: FileObserver? = null
     private var currentWatchDir: File? = null
 
     private fun startModelWatcher() {
         val context = applicationContext
-        val modelDir = ModelStorageManager.getModelDir(context)
+        // Watch the models/ root; fall back to filesDir if models/ doesn't exist yet.
+        val modelsRoot = ModelStorageManager.getModelsRoot(context).also { it.mkdirs() }
+        val watchDir = if (modelsRoot.exists()) modelsRoot else context.filesDir
 
-        // Walk up to the first ancestor that exists.
-        val watchDir = sequenceOf(modelDir, modelDir.parentFile, context.filesDir)
-            .firstOrNull { it != null && it.exists() } ?: return
-
-        // Skip recreating the observer if we are already watching the right directory.
         if (watchDir == currentWatchDir) return
 
         modelFileObserver?.stopWatching()
@@ -139,7 +193,6 @@ class InferenceService : LifecycleService() {
         modelFileObserver = object : FileObserver(watchDir, ALL_EVENTS) {
             override fun onEvent(event: Int, path: String?) {
                 val mask = event and ALL_EVENTS
-                // React on any delete, create, or completed-write event.
                 if (mask and (DELETE or DELETE_SELF or MOVED_FROM or
                               CREATE or MOVED_TO or CLOSE_WRITE) != 0) {
                     onModelDirectoryChanged()
@@ -151,64 +204,28 @@ class InferenceService : LifecycleService() {
     }
 
     /**
-     * Called (from a FileObserver background thread) whenever something changes
-     * in the model directory hierarchy. Dispatches reactions on [Dispatchers.Default].
+     * Called (on a FileObserver background thread) whenever anything changes under the
+     * `models/` directory. Checks whether the selected model's readiness changed and
+     * reloads or unloads the engine accordingly.
      */
     private fun onModelDirectoryChanged() {
         lifecycleScope.launch(Dispatchers.Default) {
             val context = applicationContext
-            val isReady = ModelStorageManager.isModelReady(context)
+            val selectedModelId = AppPreferences(context).selectedModelId.first()
+            val isReady = ModelStorageManager.isModelReady(context, selectedModelId)
             val currentState = _engineState.value
 
             when {
                 !isReady && currentState == EngineState.Ready -> {
-                    // Model was deleted while the engine was running.
-                    Log.w(TAG, "Model files removed — transitioning to Unloaded")
-                    engine.close()
-                    _engineState.value = EngineState.Unloaded
-                    updateNotification("Model not downloaded — open Outspoke to download")
-                    // Re-watch so we can detect re-installation.
+                    Log.w(TAG, "Selected model files removed — unloading engine")
+                    reloadForModel(selectedModelId) // will detect !isReady and set Unloaded
                     startModelWatcher()
                 }
                 isReady && currentState == EngineState.Unloaded -> {
-                    // Model was installed (download completed) while the engine was idle.
-                    Log.d(TAG, "Model files appeared — reloading engine")
-                    loadEngine()
-                    // Restart the watcher on the (now existing) model directory.
+                    Log.d(TAG, "Selected model files appeared — loading engine")
+                    reloadForModel(selectedModelId)
                     startModelWatcher()
                 }
-            }
-        }
-    }
-
-    private suspend fun loadEngine() {
-        engineLoadMutex.withLock {
-            // Guard against a concurrent call that already completed loading.
-            if (engine.isLoaded) return
-
-            val context = applicationContext
-
-            if (!ModelStorageManager.isModelReady(context)) {
-                Log.w(TAG, "Model files not present — engine stays Unloaded")
-                _engineState.value = EngineState.Unloaded
-                updateNotification("Model not downloaded — open Outspoke to download")
-                return
-            }
-
-            _engineState.value = EngineState.Loading
-            updateNotification("Loading transcription engine…")
-
-            try {
-                val modelDir = ModelStorageManager.getModelDir(context)
-                engine.load(modelDir)
-                _engineState.value = EngineState.Ready
-                updateNotification("Outspoke ready")
-                Log.d(TAG, "Engine loaded successfully")
-            } catch (e: Exception) {
-                val msg = e.localizedMessage ?: "Unknown error"
-                Log.e(TAG, "Engine load failed: $msg", e)
-                _engineState.value = EngineState.Error(msg)
-                updateNotification("Engine failed to load: $msg")
             }
         }
     }

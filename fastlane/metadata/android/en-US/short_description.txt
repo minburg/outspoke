@@ -1,0 +1,2 @@
+On-device speech-to-text keyboard powered by Parakeet — no cloud, no tracking.
+

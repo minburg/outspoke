@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,7 +32,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
@@ -117,11 +122,7 @@ private fun ListeningIndicator() {
 @Composable
 private fun ProcessingIndicator(partial: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(16.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        GradientArcSpinner(modifier = Modifier.size(16.dp))
         if (partial.isNotEmpty()) {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -178,11 +179,7 @@ private fun EngineLoadingIndicator(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            GradientArcSpinner(modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = message,
@@ -203,6 +200,57 @@ private fun EngineLoadingIndicator(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Gradient arc spinner
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Indeterminate spinner that draws a 270° arc rotating continuously.
+ *
+ * The arc is painted with a sweep gradient that fades from transparent at the tail,
+ * blends through [MaterialTheme.colorScheme.tertiary] in the middle, and reaches full
+ * [MaterialTheme.colorScheme.primary] at the head — giving a comet-tail appearance.
+ * Both the gradient colours and the arc react to theme changes at runtime.
+ */
+@Composable
+private fun GradientArcSpinner(
+    modifier: Modifier = Modifier,
+    strokeWidth: Dp = 2.dp,
+) {
+    val head = MaterialTheme.colorScheme.primary
+    val mid  = MaterialTheme.colorScheme.tertiary
+
+    val infiniteTransition = rememberInfiniteTransition(label = "arcSpinnerRotation")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue  = 360f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "arcSpinnerAngle",
+    )
+
+    Canvas(modifier = modifier) {
+        val strokePx = strokeWidth.toPx()
+        rotate(rotation) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    0f    to head.copy(alpha = 0f),      // tail  — fully transparent
+                    0.55f to mid.copy(alpha = 0.65f),    // mid   — tertiary, half-visible
+                    0.75f to head,                       // head  — full primary
+                    1f    to head.copy(alpha = 0f),      // close — fade to transparent so the
+                                                         //         seam at 360°/0° is invisible
+                ),
+                startAngle = 0f,
+                sweepAngle = 270f,
+                useCenter  = false,
+                style      = Stroke(width = strokePx, cap = StrokeCap.Round),
+            )
         }
     }
 }
@@ -246,5 +294,3 @@ private fun StatusEngineLoadingPreview() {
         StatusIndicator(uiState = KeyboardUiState.EngineLoading("Loading transcription engine…"))
     }
 }
-
-

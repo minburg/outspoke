@@ -50,6 +50,13 @@ class KeyboardViewModel(
     val triggerMode: StateFlow<String> = appPreferences.triggerMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, "HOLD")
 
+    /**
+     * VAD sensitivity in [0.0, 1.0]. Collected eagerly so the value is always available
+     * as a snapshot when recording starts — no suspend context required.
+     */
+    val vadSensitivity: StateFlow<Float> = appPreferences.vadSensitivity
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+
     // -------------------------------------------------------------------------
     // Engine state (Step 29)
     // -------------------------------------------------------------------------
@@ -163,7 +170,8 @@ class KeyboardViewModel(
                 if (repo == null) {
                     // Inference repo not yet bound — capture for amplitude feedback only.
                     Log.w(TAG, "No InferenceRepository — capturing audio without transcription")
-                    audioCaptureManager.startCapture().collect { /* amplitude updated internally */ }
+                    audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f)
+                        .collect { /* amplitude updated internally */ }
                     // Flow completed naturally (stopCapture called); no inference to wait for.
                     _uiState.value = KeyboardUiState.Idle
                     return@launch
@@ -171,7 +179,7 @@ class KeyboardViewModel(
 
                 // Pipe audio through the inference engine on Dispatchers.Default.
                 // TranscriptResult emissions drive both the UI and text injection.
-                repo.transcribe(audioCaptureManager.startCapture())
+                repo.transcribe(audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f))
                     .collect { result ->
                         when (result) {
                             is TranscriptResult.Partial -> {
@@ -219,15 +227,21 @@ class KeyboardViewModel(
     fun onRecordStop() {
         // Always reset continuous mode when recording stops from any code path.
         _isContinuousMode.value = false
-        // Signal natural flow completion — AudioCaptureManager's read loop exits on the next
-        // 40 ms cycle, InferenceRepository runs a final inference on the accumulated buffer,
-        // and emits TranscriptResult.Final which transitions the UI to Idle and commits text.
+
+        // Cancel the coroutine immediately — this prevents any in-flight inference from
+        // completing and calling textInjector?.commitFinal(), which would inject text into
+        // the focused field even though the user explicitly pressed Stop.
+        captureJob?.cancel()
+        captureJob = null
+
+        // Release the microphone regardless.
         audioCaptureManager.stopCapture()
 
-        // If there is no active capture (engine not ready, double-tap, etc.) go Idle now.
-        if (captureJob?.isActive != true) {
-            _uiState.value = KeyboardUiState.Idle
-        }
+        // Clear any composing (underlined) text without committing it — the user chose to
+        // discard this recording session.
+        textInjector?.clear()
+
+        _uiState.value = KeyboardUiState.Idle
     }
 
     /**

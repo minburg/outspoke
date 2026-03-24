@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.AbstractComposeView
+import androidx.core.view.ViewCompat
+import androidx.core.view.doOnAttach
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistryOwner
@@ -40,6 +42,9 @@ class ImeComposeView(
         setViewTreeLifecycleOwner(lifecycleOwner)
         setViewTreeViewModelStoreOwner(viewModelStoreOwner)
         setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner)
+        // Once the view is attached to the IME window, request a fresh inset dispatch so
+        // that Compose's LocalWindowInsets (and hence navigationBarsPadding()) is populated.
+        doOnAttach { ViewCompat.requestApplyInsets(this) }
     }
 
     /** Replace the hosted composable content. Safe to call before or after attachment. */

@@ -8,8 +8,10 @@ import android.inputmethodservice.InputMethodService
 import android.os.IBinder
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -87,7 +89,7 @@ class OutspokeInputMethodService :
             val b = binder as InferenceService.InferenceBinder
             inferenceBinder = b
 
-            // Step 28 — wire InferenceRepository to the ViewModel
+            // Step 28 — wire InferenceRepository to the ViewModel (may be null while loading).
             keyboardViewModel.setInferenceRepository(b.getRepository())
 
             // Step 29 — forward engine state changes to the ViewModel
@@ -181,9 +183,26 @@ class OutspokeInputMethodService :
     // IME view
     // -------------------------------------------------------------------------
 
-    /** Height of the keyboard panel in pixels — 25 % of the screen height. */
+    /**
+     * Height of the navigation bar in pixels, or 0 when gesture navigation is active.
+     * Computed lazily using [WindowManager.currentWindowMetrics] (API 30+).
+     */
+    private val navBarHeightPx: Int by lazy {
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        wm.currentWindowMetrics.windowInsets
+            .getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+    }
+
+    /**
+     * Total height of the keyboard panel in pixels.
+     * = 25 % of the usable screen height (above the navigation bar) + the navigation bar itself,
+     * so the visible content area is always 25 % of the space the user can actually see.
+     */
     private val keyboardHeightPx: Int by lazy {
-        (resources.displayMetrics.heightPixels * 0.25f).toInt()
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val screenHeight = wm.currentWindowMetrics.bounds.height()
+        val usableHeight = screenHeight - navBarHeightPx
+        (usableHeight * 0.25f).toInt() + navBarHeightPx
     }
 
     override fun onCreateInputView(): View {
@@ -199,6 +218,10 @@ class OutspokeInputMethodService :
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 keyboardHeightPx,
             )
+            // Request that window insets be re-dispatched once the view is attached to the
+            // window. This ensures Compose's LocalWindowInsets is populated so that
+            // navigationBarsPadding() inside KeyboardScreen works correctly.
+            ViewCompat.requestApplyInsets(view)
             view.setKeyboardContent {
                 OutspokeKeyboardTheme {
                     KeyboardScreen(
@@ -244,7 +267,11 @@ class OutspokeInputMethodService :
      */
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
-        // Content and visible regions start at the very top of our keyboard window.
+        // Content and visible regions start at the very top of our keyboard window (Y = 0).
+        // This tells the framework to push the focused app up by the full keyboardHeightPx,
+        // so the app's bottom edge sits exactly at the top of the keyboard panel.
+        // keyboardHeightPx already accounts for the nav-bar area, so the app is never
+        // partially covered regardless of whether 3-button or gesture navigation is active.
         outInsets.contentTopInsets = 0
         outInsets.visibleTopInsets = 0
         // Make the entire window frame touchable — prevents tap-through to the app below.

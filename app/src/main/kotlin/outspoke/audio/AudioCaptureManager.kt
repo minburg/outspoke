@@ -106,7 +106,7 @@ class AudioCaptureManager(private val context: Context) {
      */
     // Permission is checked manually via PermissionHelper before AudioRecord is created.
     @SuppressLint("MissingPermission")
-    fun startCapture(): Flow<AudioChunk> = channelFlow {
+    fun startCapture(vadSensitivity: Float = 0f): Flow<AudioChunk> = channelFlow {
         if (!PermissionHelper.hasRecordPermission(context)) {
             throw SecurityException(
                 "RECORD_AUDIO permission is not granted. " +
@@ -115,6 +115,9 @@ class AudioCaptureManager(private val context: Context) {
         }
 
         stopRequested = false   // reset for this capture session
+
+        // Only create a filter when sensitivity > 0; null means pass-through (VAD disabled).
+        val vad: VadFilter? = if (vadSensitivity > 0f) VadFilter(vadSensitivity) else null
 
         val minBufferBytes = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
@@ -147,8 +150,11 @@ class AudioCaptureManager(private val context: Context) {
                 when {
                     read > 0 -> {
                         val chunk = AudioChunk(samples = buffer.copyOf(read))
-                        _amplitude.value = normaliseAmplitude(calculateRms(chunk.samples))
-                        send(chunk)
+                        val rms = calculateRms(chunk.samples)
+                        _amplitude.value = normaliseAmplitude(rms)
+
+                        val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
+                        for (c in toSend) send(c)
                     }
                     read == AudioRecord.ERROR_DEAD_OBJECT -> {
                         // Hardware-level error — the audio subsystem was taken away.
@@ -163,6 +169,8 @@ class AudioCaptureManager(private val context: Context) {
                 }
             }
         } finally {
+            // Reset VAD state; hangover frames were already emitted during the read loop.
+            vad?.flush()
             recorder.stop()
             recorder.release()
             _amplitude.value = 0f

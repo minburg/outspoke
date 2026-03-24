@@ -50,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.brgr.outspoke.audio.PermissionHelper
+import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
 
 /**
@@ -87,7 +88,7 @@ fun HomeScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 isImeEnabled = isOutspokeImeEnabled(context)
                 hasMicPermission = PermissionHelper.hasRecordPermission(context)
-                isModelReady = ModelStorageManager.isModelReady(context)
+                isModelReady = ModelRegistry.all.any { ModelStorageManager.isModelReady(context, it) }
             }
         }
         lifecycle.addObserver(observer)
@@ -142,8 +143,8 @@ fun HomeScreen(
             iconTint = if (isModelReady) MaterialTheme.colorScheme.primary
                        else MaterialTheme.colorScheme.error,
             title = if (isModelReady) "Model ready" else "Model not downloaded",
-            subtitle = if (isModelReady) "Parakeet-V3 is installed and ready."
-                       else "Download the transcription model to use the keyboard.",
+            subtitle = if (isModelReady) "A transcription model is installed and ready."
+                       else "Download a transcription model to use the keyboard.",
             actionLabel = "Download",
             action = if (!isModelReady) onNavigateToModel else null,
         )

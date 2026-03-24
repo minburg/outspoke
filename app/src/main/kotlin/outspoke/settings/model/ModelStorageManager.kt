@@ -4,46 +4,56 @@ import android.content.Context
 import java.io.File
 
 /**
- * Manages the location and lifecycle of the on-device Parakeet-V3 ONNX model files.
+ * Manages on-disk locations and lifecycle for all on-device speech recognition models.
  *
- * The model is split into several files that all live under:
- *   `<filesDir>/models/parakeet-v3/`
+ * Each model lives in its own sub-directory:
+ *   `<filesDir>/models/<ModelId.storageDirName>/`
  *
  * All paths are within `context.filesDir` — no external-storage permission is required.
  */
 object ModelStorageManager {
 
-    const val MODEL_DIR = "models/parakeet-v3"
+    private const val MODELS_ROOT = "models"
 
-    /** Every file that must be present and non-empty for the model to be considered ready. */
-    val REQUIRED_FILES = listOf(
-        "encoder-model.int8.onnx",
-        "decoder_joint-model.int8.onnx",
-        "nemo128.onnx",
-        "config.json",
-        "vocab.txt",
-    )
+    /** Returns the root `models/` directory that contains all per-model sub-directories. */
+    fun getModelsRoot(context: Context): File =
+        File(context.filesDir, MODELS_ROOT)
 
-    /** Returns the directory that holds all model files. */
-    fun getModelDir(context: Context): File =
-        File(context.filesDir, MODEL_DIR)
+    /** Returns the directory that holds all files for [modelId]. */
+    fun getModelDir(context: Context, modelId: ModelId = ModelId.DEFAULT): File =
+        File(getModelsRoot(context), modelId.storageDirName)
 
-    /** Returns the [File] for a specific [filename] inside the model directory. */
-    fun getFilePath(context: Context, filename: String): File =
-        File(getModelDir(context), filename)
+    /** Returns the [File] for a specific [filename] inside [modelId]'s directory. */
+    fun getFilePath(context: Context, modelId: ModelId, filename: String): File =
+        File(getModelDir(context, modelId), filename)
 
     /**
-     * Returns `true` only when every file in [REQUIRED_FILES] exists and has a non-zero size.
+     * Returns `true` only when every file in [modelInfo]'s [ModelInfo.requiredFiles] list
+     * exists and has a non-zero size.
      */
-    fun isModelReady(context: Context): Boolean =
-        REQUIRED_FILES.all { filename ->
-            val file = getFilePath(context, filename)
+    fun isModelReady(context: Context, modelInfo: ModelInfo): Boolean =
+        modelInfo.requiredFiles.all { filename ->
+            val file = getFilePath(context, modelInfo.id, filename)
             file.exists() && file.length() > 0
         }
 
-    /** Deletes the entire model directory tree from internal storage. */
-    fun deleteModel(context: Context) {
-        getModelDir(context).deleteRecursively()
-    }
-}
+    /** Convenience overload — looks up [ModelInfo] from [ModelRegistry]. */
+    fun isModelReady(context: Context, modelId: ModelId): Boolean =
+        isModelReady(context, ModelRegistry[modelId])
 
+    /**
+     * Legacy no-arg overload that checks the default [ModelId.DEFAULT] model.
+     * Kept for call-sites that have not yet been updated.
+     */
+    fun isModelReady(context: Context): Boolean =
+        isModelReady(context, ModelId.DEFAULT)
+
+    /** Deletes the entire model directory for [modelId] from internal storage. */
+    fun deleteModel(context: Context, modelId: ModelId) {
+        getModelDir(context, modelId).deleteRecursively()
+    }
+
+    /** Legacy no-arg overload — deletes the default model. */
+    fun deleteModel(context: Context): Unit =
+        deleteModel(context, ModelId.DEFAULT)
+}
