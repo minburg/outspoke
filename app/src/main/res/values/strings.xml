@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Outspoke</string>
+    <string name="ime_name">Outspoke Voice Keyboard</string>
+    <string name="subtype_en">English (US) — Voice</string>
+</resources>
