@@ -137,7 +137,7 @@ fun HomeScreen(
             } else null,
         )
 
-        // 3. Model downloaded
+        // 3. Model downloaded — always show an action so the model screen stays reachable
         StatusRow(
             icon = if (isModelReady) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
             iconTint = if (isModelReady) MaterialTheme.colorScheme.primary
@@ -145,8 +145,8 @@ fun HomeScreen(
             title = if (isModelReady) "Model ready" else "Model not downloaded",
             subtitle = if (isModelReady) "A transcription model is installed and ready."
                        else "Download a transcription model to use the keyboard.",
-            actionLabel = "Download",
-            action = if (!isModelReady) onNavigateToModel else null,
+            actionLabel = if (isModelReady) "Manage" else "Download",
+            action = onNavigateToModel,
         )
 
         Spacer(Modifier.height(8.dp))

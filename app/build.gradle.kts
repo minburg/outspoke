@@ -63,8 +63,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     // LifecycleService for InferenceService
     implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    // ONNX Runtime for on-device Parakeet inference
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    // ONNX Runtime — 1.21+ required for GroupQueryAttention with 11 inputs (Voxtral encoder)
+    // 1.24.3 also ships 16 KB-aligned native libs needed for Android 15+ devices
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

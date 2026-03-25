@@ -7,15 +7,18 @@ package dev.brgr.outspoke.settings.model
 private const val PARAKEET_BASE =
     "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main"
 
-// TODO: Verify the exact file names by browsing
-//       https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/tree/main/onnx
-//       and update the RemoteFile list + requiredFiles below accordingly.
+// ONNX model files are under /onnx/; tokenizer + config files are at the repo root.
 private const val VOXTRAL_BASE =
     "https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/resolve/main/onnx"
+private const val VOXTRAL_ROOT =
+    "https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/resolve/main"
 
-// Whisper Small INT8 is a single ZIP archive — no baseUrl needed.
-private const val WHISPER_ZIP_URL =
-    "https://huggingface.co/DocWolle/whisperOnnx/resolve/main/whisper_small_int8.zip"
+// Whisper Large v3 Turbo INT8 — same onnx-community export format as Voxtral.
+// ONNX files live under /onnx/; tokenizer.json is at the repo root.
+private const val WHISPER_TURBO_BASE =
+    "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/onnx"
+private const val WHISPER_TURBO_ROOT =
+    "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main"
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -34,9 +37,15 @@ data class RemoteFile(
     val filename: String,
     val sizeFraction: Float,
     val sha256: String? = null,
+    /**
+     * When set, this exact URL is used instead of `"$baseUrl/$filename"`.
+     * Use this for files that live at a different path than the model's [DownloadSource.Files.baseUrl]
+     * (e.g. tokenizer files at the HuggingFace repo root when ONNX files are under `/onnx/`).
+     */
+    val urlOverride: String? = null,
 ) {
-    /** Constructs the full download URL from the given [baseUrl]. */
-    fun url(baseUrl: String): String = "$baseUrl/$filename"
+    /** Returns [urlOverride] if set, otherwise constructs `"$baseUrl/$filename"`. */
+    fun url(baseUrl: String): String = urlOverride ?: "$baseUrl/$filename"
 }
 
 /** Describes how a model's files are obtained from a remote server. */
@@ -96,7 +105,8 @@ data class ModelInfo(
  */
 object ModelRegistry {
 
-    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperSmall)
+//    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
+    val all: List<ModelInfo> = listOf(parakeetV3, whisperLargeV3Turbo) // for now removed voxtralMini as I could not get it to run on-device within reasonable resource limits
 
     private val byId: Map<ModelId, ModelInfo> = all.associateBy { it.id }
 
@@ -146,48 +156,86 @@ private val parakeetV3 = ModelInfo(
     ),
 )
 
-// NOTE: File names below are based on the standard onnx-community export convention.
-// TODO: Confirm exact names from the repo and add SHA-256 hashes before production use.
-//       This is a 4 GB+ model — suitable only for high-end devices with ample storage.
+// Q4-quantised variant: audio_encoder_q4 (661 MB) + embed_tokens_q4 (258 MB)
+//                       + decoder_model_merged_q4 (~2.3 GB) + tokenizer.json
+// Total ≈ 3 300 MB — suitable only for high-end devices with ≥ 6 GB RAM.
+@Suppress("unused")
 private val voxtralMini = ModelInfo(
     id = ModelId.VOXTRAL_MINI,
-    displayName = "Voxtral Mini 4B",
+    displayName = "Voxtral Mini 4B (Q4)",
     description = "Mistral-based multilingual speech model from onnx-community. " +
-                  "Very large (~4 GB) — requires a high-end device with ample storage.",
-    approximateSizeMb = 4_000,
+                  "Q4-quantised (~3.3 GB) — requires a high-end device with ample storage.",
+    approximateSizeMb = 3_300,
     source = DownloadSource.Files(
         baseUrl = VOXTRAL_BASE,
         files = listOf(
-            RemoteFile(filename = "encoder_model.onnx",          sizeFraction = 0.28f, sha256 = null),
-            RemoteFile(filename = "decoder_model_merged.onnx",   sizeFraction = 0.58f, sha256 = null),
-            RemoteFile(filename = "config.json",                 sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "generation_config.json",      sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "tokenizer.json",              sizeFraction = 0.04f, sha256 = null),
-            RemoteFile(filename = "tokenizer_config.json",       sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "vocab.json",                  sizeFraction = 0.04f, sha256 = null),
-            RemoteFile(filename = "merges.txt",                  sizeFraction = 0.03f, sha256 = null),
+            // Audio encoder: .onnx header + single .onnx_data sidecar
+            RemoteFile(filename = "audio_encoder_q4.onnx",              sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "audio_encoder_q4.onnx_data",         sizeFraction = 0.20f, sha256 = null),
+            // Token embedding table
+            RemoteFile(filename = "embed_tokens_q4.onnx",               sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "embed_tokens_q4.onnx_data",          sizeFraction = 0.08f, sha256 = null),
+            // Merged decoder: header + two data shards
+            RemoteFile(filename = "decoder_model_merged_q4.onnx",       sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "decoder_model_merged_q4.onnx_data",  sizeFraction = 0.61f, sha256 = null),
+            RemoteFile(filename = "decoder_model_merged_q4.onnx_data_1",sizeFraction = 0.08f, sha256 = null),
+            // Tokenizer + config — these live at the repo ROOT, not under /onnx/
+            RemoteFile(filename = "tokenizer.json",      sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/tokenizer.json"),
+            RemoteFile(filename = "tokenizer_config.json", sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/tokenizer_config.json"),
+            RemoteFile(filename = "generation_config.json", sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/generation_config.json"),
         ),
     ),
     requiredFiles = listOf(
-        "encoder_model.onnx",
-        "decoder_model_merged.onnx",
+        "audio_encoder_q4.onnx",
+        "audio_encoder_q4.onnx_data",
+        "embed_tokens_q4.onnx",
+        "embed_tokens_q4.onnx_data",
+        "decoder_model_merged_q4.onnx",
+        "decoder_model_merged_q4.onnx_data",
         "tokenizer.json",
     ),
 )
 
-// TODO: Verify the exact file names inside whisper_small_int8.zip and update
-//       WhisperEngine.kt accordingly. Add the ZIP's SHA-256 hash once confirmed.
-private val whisperSmall = ModelInfo(
-    id = ModelId.WHISPER_SMALL,
-    displayName = "Whisper Small INT8",
-    description = "OpenAI Whisper Small, INT8-quantised. " +
-                  "Good multilingual support (~250 MB). Distributed as a ZIP archive.",
-    approximateSizeMb = 250,
-    source = DownloadSource.ZipArchive(
-        url    = WHISPER_ZIP_URL,
-        sha256 = null, // TODO: fill in once the ZIP's SHA-256 is verified
+// Whisper Large v3 Turbo INT8 — real file sizes (verified via HuggingFace API):
+//   encoder_model_int8.onnx          644 822 094 B ≈ 615 MB
+//   decoder_model_merged_int8.onnx   439 936 716 B ≈ 420 MB  (merged branches + full vocab table)
+//   tokenizer.json                     2 480 617 B ≈   2 MB
+//   Total                                          ≈ 1 037 MB ≈ 1.1 GB
+// Same onnx-community optimum export format → tensor names match WhisperEngine directly.
+private val whisperLargeV3Turbo = ModelInfo(
+    id = ModelId.WHISPER_SMALL,   // reuses existing ModelId slot
+    displayName = "Whisper Large-v3 Turbo (INT8)",
+    description = "OpenAI Whisper Large-v3 encoder with a 2-layer turbo decoder. " +
+                  "Near-Large-v3 accuracy, multilingual, INT8-quantised (~1.1 GB).",
+    approximateSizeMb = 1_037,
+    source = DownloadSource.Files(
+        baseUrl = WHISPER_TURBO_BASE,
+        files = listOf(
+            RemoteFile(
+                filename     = "encoder_model_int8.onnx",
+                sizeFraction = 0.593f,
+                sha256       = null,
+            ),
+            RemoteFile(
+                filename     = "decoder_model_merged_int8.onnx",
+                sizeFraction = 0.405f,
+                sha256       = null,
+            ),
+            RemoteFile(
+                filename     = "tokenizer.json",
+                sizeFraction = 0.002f,
+                sha256       = null,
+                urlOverride  = "$WHISPER_TURBO_ROOT/tokenizer.json",
+            ),
+        ),
     ),
-    // The .installed marker is written by ModelDownloadManager after successful ZIP extraction.
-    requiredFiles = listOf(".installed"),
+    requiredFiles = listOf(
+        "encoder_model_int8.onnx",
+        "decoder_model_merged_int8.onnx",
+        "tokenizer.json",
+    ),
 )
 

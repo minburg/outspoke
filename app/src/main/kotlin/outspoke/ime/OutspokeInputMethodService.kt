@@ -89,13 +89,22 @@ class OutspokeInputMethodService :
             val b = binder as InferenceService.InferenceBinder
             inferenceBinder = b
 
-            // Step 28 — wire InferenceRepository to the ViewModel (may be null while loading).
+            // Eagerly wire the repository — will be null if the engine is still loading,
+            // but the collect block below re-fetches it once the engine becomes Ready.
             keyboardViewModel.setInferenceRepository(b.getRepository())
 
-            // Step 29 — forward engine state changes to the ViewModel
+            // Forward every engine-state change to the ViewModel and keep the repository
+            // reference in sync.  The repository is only non-null when the engine is Ready;
+            // any other transition (Unloaded, Loading, Error) means inference is unavailable.
             lifecycleScope.launch {
                 b.getEngineState().collect { state ->
                     keyboardViewModel.setEngineState(state)
+                    // Re-fetch the repository on every state change so that a transition
+                    // from Loading → Ready (which happens after the initial bind) correctly
+                    // wires the newly created InferenceRepository into the ViewModel.
+                    keyboardViewModel.setInferenceRepository(
+                        if (state == EngineState.Ready) b.getRepository() else null
+                    )
                 }
             }
 
