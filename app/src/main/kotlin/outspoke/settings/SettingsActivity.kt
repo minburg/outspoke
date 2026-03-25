@@ -31,6 +31,7 @@ import dev.brgr.outspoke.settings.screens.HomeScreen
 import dev.brgr.outspoke.settings.screens.ModelScreen
 import dev.brgr.outspoke.settings.screens.PreferencesScreen
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
+import androidx.compose.ui.tooling.preview.Preview
 
 /** Entry-point for the Outspoke companion / settings app (the launcher icon). */
 class SettingsActivity : ComponentActivity() {
@@ -130,6 +131,19 @@ private fun SettingsNavHost(navController: NavHostController) {
                 PreferencesScreen()
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+/** Shows the Home screen inside the full nav scaffold (top bar + nav structure). */
+@Preview(showBackground = true, name = "Settings · Home")
+@Composable
+private fun SettingsNavHostPreview() {
+    OutspokeTheme {
+        SettingsNavHost(navController = rememberNavController())
     }
 }
 

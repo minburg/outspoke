@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -52,6 +53,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
+import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
  * The home / dashboard screen of the Outspoke companion app.
@@ -95,6 +97,27 @@ fun HomeScreen(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
+    HomeScreenContent(
+        isImeEnabled           = isImeEnabled,
+        hasMicPermission       = hasMicPermission,
+        isModelReady           = isModelReady,
+        onOpenImeSettings      = { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
+        onRequestMicPermission = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+        onNavigateToModel      = onNavigateToModel,
+        onNavigateToPreferences = onNavigateToPreferences,
+    )
+}
+
+@Composable
+private fun HomeScreenContent(
+    isImeEnabled: Boolean,
+    hasMicPermission: Boolean,
+    isModelReady: Boolean,
+    onOpenImeSettings: () -> Unit,
+    onRequestMicPermission: () -> Unit,
+    onNavigateToModel: () -> Unit,
+    onNavigateToPreferences: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -117,9 +140,7 @@ fun HomeScreen(
             subtitle = if (isImeEnabled) "Outspoke is in the keyboard list."
                        else "Add Outspoke in system keyboard settings.",
             actionLabel = "Open Settings",
-            action = if (!isImeEnabled) {
-                { context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
-            } else null,
+            action = if (!isImeEnabled) onOpenImeSettings else null,
         )
 
         // 2. Microphone permission
@@ -132,9 +153,7 @@ fun HomeScreen(
             subtitle = if (hasMicPermission) "Audio is processed entirely on-device."
                        else "Tap to grant microphone access.",
             actionLabel = "Grant Permission",
-            action = if (!hasMicPermission) {
-                { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-            } else null,
+            action = if (!hasMicPermission) onRequestMicPermission else null,
         )
 
         // 3. Model downloaded — always show an action so the model screen stays reachable
@@ -222,6 +241,88 @@ private fun StatusRow(
                 TextButton(onClick = action) { Text(actionLabel) }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+@Preview(showBackground = true, name = "Home · Nothing Set Up")
+@Composable
+private fun HomeScreenNothingSetupPreview() {
+    OutspokeTheme {
+        HomeScreenContent(
+            isImeEnabled            = false,
+            hasMicPermission        = false,
+            isModelReady            = false,
+            onOpenImeSettings       = {},
+            onRequestMicPermission  = {},
+            onNavigateToModel       = {},
+            onNavigateToPreferences = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Home · All Ready")
+@Composable
+private fun HomeScreenAllReadyPreview() {
+    OutspokeTheme {
+        HomeScreenContent(
+            isImeEnabled            = true,
+            hasMicPermission        = true,
+            isModelReady            = true,
+            onOpenImeSettings       = {},
+            onRequestMicPermission  = {},
+            onNavigateToModel       = {},
+            onNavigateToPreferences = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Home · Partial Setup (IME done, no mic, no model)")
+@Composable
+private fun HomeScreenPartialSetupPreview() {
+    OutspokeTheme {
+        HomeScreenContent(
+            isImeEnabled            = true,
+            hasMicPermission        = false,
+            isModelReady            = false,
+            onOpenImeSettings       = {},
+            onRequestMicPermission  = {},
+            onNavigateToModel       = {},
+            onNavigateToPreferences = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Status Row · Done (no action)")
+@Composable
+private fun StatusRowDonePreview() {
+    OutspokeTheme {
+        StatusRow(
+            icon        = Icons.Default.CheckCircle,
+            iconTint    = androidx.compose.ui.graphics.Color.Unspecified,
+            title       = "Keyboard enabled",
+            subtitle    = "Outspoke is in the keyboard list.",
+            actionLabel = "Open Settings",
+            action      = null,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Status Row · Pending (with action)")
+@Composable
+private fun StatusRowPendingPreview() {
+    OutspokeTheme {
+        StatusRow(
+            icon        = Icons.Default.Warning,
+            iconTint    = androidx.compose.ui.graphics.Color.Unspecified,
+            title       = "Keyboard not enabled",
+            subtitle    = "Add Outspoke in system keyboard settings.",
+            actionLabel = "Open Settings",
+            action      = {},
+        )
     }
 }
 

@@ -45,12 +45,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.brgr.outspoke.settings.model.DownloadSource
+import dev.brgr.outspoke.settings.model.ModelId
 import dev.brgr.outspoke.settings.model.ModelInfo
 import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelState
 import dev.brgr.outspoke.settings.model.ModelViewModel
+import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
  * Displays the full model catalog — one card per registered model — and allows the user
@@ -73,41 +77,66 @@ fun ModelScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                Text(
-                    text = "Speech Recognition Models",
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Download a model and tap \"Set as Active\" to use it for transcription. " +
-                           "Only one model is loaded at a time.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        ModelListContent(
+            modelStates   = modelStates,
+            selectedModel = selectedModel,
+            modifier      = Modifier.padding(padding),
+            onDownload    = { viewModel.startDownload(it) },
+            onCancel      = { viewModel.cancelDownload(it) },
+            onDelete      = { viewModel.deleteModel(it) },
+            onRetry       = { viewModel.startDownload(it) },
+            onSelect      = { viewModel.selectModel(it) },
+        )
+    }
+}
 
-            items(ModelRegistry.all, key = { it.id.name }) { modelInfo ->
-                val state      = modelStates[modelInfo.id] ?: ModelState.NotDownloaded
-                val isSelected = selectedModel == modelInfo.id
-                ModelCard(
-                    modelInfo  = modelInfo,
-                    state      = state,
-                    isSelected = isSelected,
-                    onDownload = { viewModel.startDownload(modelInfo.id) },
-                    onCancel   = { viewModel.cancelDownload(modelInfo.id) },
-                    onDelete   = { viewModel.deleteModel(modelInfo.id) },
-                    onRetry    = { viewModel.startDownload(modelInfo.id) },
-                    onSelect   = { viewModel.selectModel(modelInfo.id) },
-                )
-            }
+// ---------------------------------------------------------------------------
+// Stateless list content
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ModelListContent(
+    modelStates: Map<ModelId, ModelState>,
+    selectedModel: ModelId?,
+    onDownload: (ModelId) -> Unit,
+    onCancel: (ModelId) -> Unit,
+    onDelete: (ModelId) -> Unit,
+    onRetry: (ModelId) -> Unit,
+    onSelect: (ModelId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text(
+                text = "Speech Recognition Models",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Download a model and tap \"Set as Active\" to use it for transcription. " +
+                       "Only one model is loaded at a time.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        items(ModelRegistry.all, key = { it.id.name }) { modelInfo ->
+            val state      = modelStates[modelInfo.id] ?: ModelState.NotDownloaded
+            val isSelected = selectedModel == modelInfo.id
+            ModelCard(
+                modelInfo  = modelInfo,
+                state      = state,
+                isSelected = isSelected,
+                onDownload = { onDownload(modelInfo.id) },
+                onCancel   = { onCancel(modelInfo.id) },
+                onDelete   = { onDelete(modelInfo.id) },
+                onRetry    = { onRetry(modelInfo.id) },
+                onSelect   = { onSelect(modelInfo.id) },
+            )
         }
     }
 }
@@ -350,3 +379,146 @@ private fun DeleteConfirmDialog(
         },
     )
 }
+
+// ---------------------------------------------------------------------------
+// Preview sample data
+// ---------------------------------------------------------------------------
+
+private val previewModelSmall = ModelInfo(
+    id                = ModelId.PARAKEET_V3,
+    displayName       = "Parakeet-V3 (Default)",
+    description       = "Fast and compact English on-device ASR. Recommended for most devices.",
+    approximateSizeMb = 300,
+    source            = DownloadSource.ZipArchive("https://example.com"),
+    requiredFiles     = listOf("model.onnx"),
+)
+
+private val previewModelLarge = ModelInfo(
+    id                = ModelId.WHISPER_SMALL,
+    displayName       = "Whisper Large-v3 Turbo (INT8)",
+    description       = "OpenAI Whisper Large-v3 with a turbo decoder. Multilingual, INT8 (~1.1 GB).",
+    approximateSizeMb = 1_037,
+    source            = DownloadSource.ZipArchive("https://example.com"),
+    requiredFiles     = listOf("encoder.onnx", "decoder.onnx"),
+)
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+@Preview(showBackground = true, name = "Model Screen · Mixed States")
+@Composable
+private fun ModelListContentPreview() {
+    OutspokeTheme {
+        ModelListContent(
+            modelStates = mapOf(
+                ModelId.PARAKEET_V3  to ModelState.Ready,
+                ModelId.WHISPER_SMALL to ModelState.NotDownloaded,
+            ),
+            selectedModel = ModelId.PARAKEET_V3,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Model Card · Not Downloaded")
+@Composable
+private fun ModelCardNotDownloadedPreview() {
+    OutspokeTheme {
+        ModelCard(
+            modelInfo  = previewModelSmall,
+            state      = ModelState.NotDownloaded,
+            isSelected = false,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Model Card · Downloading 45%")
+@Composable
+private fun ModelCardDownloadingPreview() {
+    OutspokeTheme {
+        ModelCard(
+            modelInfo  = previewModelLarge,
+            state      = ModelState.Downloading(0.45f),
+            isSelected = false,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Model Card · Ready (selected)")
+@Composable
+private fun ModelCardReadySelectedPreview() {
+    OutspokeTheme {
+        ModelCard(
+            modelInfo  = previewModelSmall,
+            state      = ModelState.Ready,
+            isSelected = true,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Model Card · Ready (not selected)")
+@Composable
+private fun ModelCardReadyNotSelectedPreview() {
+    OutspokeTheme {
+        ModelCard(
+            modelInfo  = previewModelLarge,
+            state      = ModelState.Ready,
+            isSelected = false,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Model Card · Corrupted")
+@Composable
+private fun ModelCardCorruptedPreview() {
+    OutspokeTheme {
+        ModelCard(
+            modelInfo  = previewModelSmall,
+            state      = ModelState.Corrupted,
+            isSelected = false,
+            onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Action · Not Downloaded")
+@Composable
+private fun NotDownloadedActionsPreview() {
+    OutspokeTheme { NotDownloadedActions(onDownload = {}) }
+}
+
+@Preview(showBackground = true, name = "Action · Downloading 70%")
+@Composable
+private fun DownloadingActionsPreview() {
+    OutspokeTheme { DownloadingActions(progress = 0.7f, onCancel = {}) }
+}
+
+@Preview(showBackground = true, name = "Action · Ready (selected)")
+@Composable
+private fun ReadyActionsSelectedPreview() {
+    OutspokeTheme { ReadyActions(isSelected = true, onSelect = {}, onDelete = {}) }
+}
+
+@Preview(showBackground = true, name = "Action · Ready (not selected)")
+@Composable
+private fun ReadyActionsNotSelectedPreview() {
+    OutspokeTheme { ReadyActions(isSelected = false, onSelect = {}, onDelete = {}) }
+}
+
+@Preview(showBackground = true, name = "Action · Corrupted")
+@Composable
+private fun CorruptedActionsPreview() {
+    OutspokeTheme { CorruptedActions(onRetry = {}) }
+}
+
+@Preview(showBackground = true, name = "Delete Confirm Dialog")
+@Composable
+private fun DeleteConfirmDialogPreview() {
+    OutspokeTheme { DeleteConfirmDialog(onConfirm = {}, onDismiss = {}) }
+}
+

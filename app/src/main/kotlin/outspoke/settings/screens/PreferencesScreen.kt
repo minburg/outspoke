@@ -18,23 +18,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.brgr.outspoke.settings.preferences.PreferencesViewModel
+import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
  * User-configurable keyboard preferences backed by [PreferencesViewModel] / DataStore.
  *
  * Settings persist across process restarts.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreferencesScreen(
     viewModel: PreferencesViewModel = viewModel(),
 ) {
-    val triggerMode by viewModel.triggerMode.collectAsState()
+    val triggerMode    by viewModel.triggerMode.collectAsState()
     val vadSensitivity by viewModel.vadSensitivity.collectAsState()
 
+    PreferencesContent(
+        triggerMode           = triggerMode,
+        vadSensitivity        = vadSensitivity,
+        onTriggerModeChange   = viewModel::setTriggerMode,
+        onVadSensitivityChange = viewModel::setVadSensitivity,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PreferencesContent(
+    triggerMode: String,
+    vadSensitivity: Float,
+    onTriggerModeChange: (String) -> Unit,
+    onVadSensitivityChange: (Float) -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,14 +75,14 @@ fun PreferencesScreen(
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = triggerMode == "HOLD",
-                    onClick = { viewModel.setTriggerMode("HOLD") },
+                    onClick = { onTriggerModeChange("HOLD") },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) {
                     Text("Hold to Talk")
                 }
                 SegmentedButton(
                     selected = triggerMode == "TAP_TOGGLE",
-                    onClick = { viewModel.setTriggerMode("TAP_TOGGLE") },
+                    onClick = { onTriggerModeChange("TAP_TOGGLE") },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) {
                     Text("Tap to Toggle")
@@ -99,7 +116,7 @@ fun PreferencesScreen(
             )
             Slider(
                 value = vadSensitivity,
-                onValueChange = viewModel::setVadSensitivity,
+                onValueChange = onVadSensitivityChange,
                 valueRange = 0f..1f,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -111,6 +128,36 @@ fun PreferencesScreen(
                 Text("Aggressive", style = MaterialTheme.typography.labelSmall)
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+@Preview(showBackground = true, name = "Preferences · Hold / VAD Off")
+@Composable
+private fun PreferencesHoldVadOffPreview() {
+    OutspokeTheme {
+        PreferencesContent(
+            triggerMode            = "HOLD",
+            vadSensitivity         = 0f,
+            onTriggerModeChange    = {},
+            onVadSensitivityChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Preferences · Tap Toggle / VAD 60%")
+@Composable
+private fun PreferencesTapToggleHighVadPreview() {
+    OutspokeTheme {
+        PreferencesContent(
+            triggerMode            = "TAP_TOGGLE",
+            vadSensitivity         = 0.6f,
+            onTriggerModeChange    = {},
+            onVadSensitivityChange = {},
+        )
     }
 }
 

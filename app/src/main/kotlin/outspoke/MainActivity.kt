@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
@@ -232,3 +233,56 @@ private fun PermanentlyDeniedContent(onOpenSettings: () -> Unit) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+
+@Preview(showBackground = true, name = "Mic Permission · Granted")
+@Composable
+private fun GrantedContentPreview() {
+    OutspokeTheme {
+        Scaffold { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) { GrantedContent() }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Mic Permission · Rationale")
+@Composable
+private fun RationaleContentPreview() {
+    OutspokeTheme {
+        Scaffold { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) { RationaleContent(onGrant = {}) }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Mic Permission · Permanently Denied")
+@Composable
+private fun PermanentlyDeniedContentPreview() {
+    OutspokeTheme {
+        Scaffold { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) { PermanentlyDeniedContent(onOpenSettings = {}) }
+        }
+    }
+}
+
