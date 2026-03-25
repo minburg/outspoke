@@ -388,7 +388,7 @@ private val previewModelSmall = ModelInfo(
     id                = ModelId.PARAKEET_V3,
     displayName       = "Parakeet-V3 (Default)",
     description       = "Fast and compact English on-device ASR. Recommended for most devices.",
-    approximateSizeMb = 300,
+    approximateSizeMb = 700,
     source            = DownloadSource.ZipArchive("https://example.com"),
     requiredFiles     = listOf("model.onnx"),
 )

@@ -106,7 +106,7 @@ data class ModelInfo(
 object ModelRegistry {
 
 //    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
-    val all: List<ModelInfo> = listOf(parakeetV3, whisperLargeV3Turbo) // for now removed voxtralMini as I could not get it to run on-device within reasonable resource limits
+    val all: List<ModelInfo> = listOf(parakeetV3) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
 
     private val byId: Map<ModelId, ModelInfo> = all.associateBy { it.id }
 
@@ -124,7 +124,7 @@ private val parakeetV3 = ModelInfo(
     displayName = "Parakeet-V3 (Default)",
     description = "NeMo TDT model optimised for English on-device ASR. " +
                   "Fast and compact — the recommended choice for most devices.",
-    approximateSizeMb = 300,
+    approximateSizeMb = 700,
     source = DownloadSource.Files(
         baseUrl = PARAKEET_BASE,
         files = listOf(
