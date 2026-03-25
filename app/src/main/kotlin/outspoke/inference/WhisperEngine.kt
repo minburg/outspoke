@@ -1,5 +1,6 @@
 package dev.brgr.outspoke.inference
 
+import ai.onnxruntime.OnnxJavaType
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -8,6 +9,7 @@ import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import org.json.JSONObject
 import java.io.File
+import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import java.util.concurrent.locks.ReentrantLock
@@ -21,7 +23,7 @@ private const val TAG = "WhisperEngine"
 private const val SAMPLE_RATE   = 16_000
 private const val N_FFT         = 400        // 25 ms window @ 16 kHz
 private const val HOP_LENGTH    = 160        // 10 ms hop → 100 frames / sec
-private const val N_MELS        = 80         // Whisper uses 80 mel bins (not 128)
+private const val N_MELS        = 128        // Whisper large-v3/turbo uses 128 mel bins (v1/v2/small/medium use 80)
 private const val MAX_SAMPLES   = 480_000    // 30 s @ 16 kHz
 private const val TARGET_FRAMES = 3_000      // 30 s × 100 fps
 
@@ -42,7 +44,7 @@ private const val MAX_NEW_TOKENS = 448
  *
  * Inference pipeline:
  *  1. Normalise 16-bit PCM to float32 [-1, 1]
- *  2. Compute Whisper log-mel spectrogram → [1, 80, 3 000]
+ *  2. Compute Whisper log-mel spectrogram → [1, 128, 3 000]
  *  3. Encoder: mel → hidden states [1, 1 500, D]  (D = 1 280 for large models)
  *  4. Decoder phase 1 (use_cache_branch=0): feed SOT prefix, yield first token
  *  5. Decoder phase 2 (use_cache_branch=1): greedy autoregressive loop
@@ -56,7 +58,7 @@ class WhisperEngine : SpeechEngine {
         const val TOKENIZER_JSON   = "tokenizer.json"
 
         // Encoder tensor names
-        const val ENC_IN_FEATURES = "input_features"    // FLOAT [1, 80, 3000]
+        const val ENC_IN_FEATURES = "input_features"    // FLOAT [1, 128, 3000]
         const val ENC_OUT_HIDDEN  = "last_hidden_state" // FLOAT [1, 1500, D]
 
         // Decoder tensor names
@@ -71,8 +73,8 @@ class WhisperEngine : SpeechEngine {
         const val TOKEN_ENGLISH       = 50259  // <|en|>
         const val TOKEN_TRANSCRIBE    = 50359  // <|transcribe|>
         const val TOKEN_NO_TIMESTAMPS = 50363  // <|notimestamps|>
-        // Any token ID >= TOKEN_EOT is a Whisper control / special token
-        const val TOKEN_SPECIAL_START = TOKEN_EOT
+        // Any token ID >= TOKEN_EOT is a Whisper control / special token — kept for reference
+        // but resolved dynamically via findTokenId() at load time.
     }
 
     private var env: OrtEnvironment? = null
@@ -84,6 +86,14 @@ class WhisperEngine : SpeechEngine {
 
     /** Vocabulary indexed by token ID. */
     private var vocabulary: Array<String> = emptyArray()
+
+    // Special token IDs resolved dynamically from the loaded vocabulary.
+    // Hardcoded values are only fallbacks for models where the token string is absent.
+    private var tokenSot          = TOKEN_SOT
+    private var tokenEnglish      = TOKEN_ENGLISH
+    private var tokenTranscribe   = TOKEN_TRANSCRIBE
+    private var tokenNoTimestamps = TOKEN_NO_TIMESTAMPS
+    private var tokenEot          = TOKEN_EOT
 
     /** Mel filterbank matrix [N_MELS × (N_FFT/2+1)], built once at load time. */
     private var melFilters: FloatArray = FloatArray(0)
@@ -133,6 +143,16 @@ class WhisperEngine : SpeechEngine {
         if (tokenizerFile.exists()) {
             vocabulary = loadVocabulary(tokenizerFile)
             Log.d(TAG, "Vocabulary loaded: ${vocabulary.size} tokens")
+
+            // Resolve special token IDs from the actual vocabulary — they shift between
+            // model sizes (large-v3 added more languages, pushing task tokens up by one).
+            tokenSot          = findTokenId("<|startoftranscript|>", TOKEN_SOT)
+            tokenEnglish      = findTokenId("<|en|>",                TOKEN_ENGLISH)
+            tokenTranscribe   = findTokenId("<|transcribe|>",        TOKEN_TRANSCRIBE)
+            tokenNoTimestamps = findTokenId("<|notimestamps|>",      TOKEN_NO_TIMESTAMPS)
+            tokenEot          = findTokenId("<|endoftext|>",         TOKEN_EOT)
+            Log.d(TAG, "Token IDs: SOT=$tokenSot EN=$tokenEnglish " +
+                       "TRANSCRIBE=$tokenTranscribe NO_TS=$tokenNoTimestamps EOT=$tokenEot")
         } else {
             Log.w(TAG, "$TOKENIZER_JSON not found — detokenisation will be unavailable")
         }
@@ -377,10 +397,76 @@ class WhisperEngine : SpeechEngine {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
+     * Runs a single decoder forward pass with `[SOT]` and empty KV cache, then
+     * argmaxes over the language token range to detect the spoken language.
+     *
+     * Language tokens occupy the contiguous range `[tokenEnglish, tokenTranscribe - 2]`
+     * (50259–50357 for large-v3 / large-v3-turbo; 99 languages total).
+     *
+     * @return The detected language token ID (e.g. 50259 for English, 50265 for Dutch).
+     */
+    private fun detectLanguage(
+        env: OrtEnvironment,
+        session: OrtSession,
+        encHiddenShape: LongArray,
+        encHiddenData: FloatArray,
+    ): Int {
+        val inputs = mutableMapOf<String, OnnxTensor>()
+        try {
+            inputs[DEC_IN_INPUT_IDS] = OnnxTensor.createTensor(
+                env,
+                LongBuffer.wrap(longArrayOf(tokenSot.toLong())),
+                longArrayOf(1L, 1L),
+            )
+            inputs[DEC_IN_ENCODER_HIDDEN] = OnnxTensor.createTensor(
+                env,
+                FloatBuffer.wrap(encHiddenData),
+                encHiddenShape,
+            )
+            inputs[DEC_IN_USE_CACHE_BRANCH] = createBoolTensor(env, false)
+            addZeroKvInputs(env, session, session.inputNames.toSet(), inputs)
+
+            val result = session.run(inputs)
+            try {
+                val logitsTensor = result.get(DEC_OUT_LOGITS)
+                    .orElseThrow { RuntimeException("No logits during language detection") }
+                    as OnnxTensor
+                val vocabSize = logitsTensor.info.shape[2].toInt()
+                val logits = FloatArray(vocabSize)  // seq_len=1, batch=1
+                logitsTensor.floatBuffer.rewind()
+                logitsTensor.floatBuffer.get(logits)
+
+                // Language tokens are contiguous: tokenEnglish .. tokenTranscribe-2
+                val langFirst = tokenEnglish
+                val langLast  = tokenTranscribe - 2
+                var bestLang  = langFirst
+                var bestLogit = if (langFirst < vocabSize) logits[langFirst] else Float.NEGATIVE_INFINITY
+                for (id in langFirst + 1..langLast) {
+                    if (id >= vocabSize) break
+                    val v = logits[id]
+                    if (v > bestLogit) { bestLogit = v; bestLang = id }
+                }
+                Log.d(TAG, "detectLanguage: token=$bestLang (${vocabulary.getOrNull(bestLang)})")
+                return bestLang
+            } finally {
+                result.close()
+            }
+        } finally {
+            inputs.values.forEach { it.close() }
+        }
+    }
+
+    /**
      * Runs the `decoder_model_merged` autoregressively using its two-branch design:
      *
+     * **Language detection** (pre-pass):
+     * Feeds `[SOT]` with an empty KV cache and argmaxes over the language token range
+     * (50259–50357) to auto-detect the spoken language.  The KV cache from this pass
+     * is discarded immediately — it is only ~1 token, so the cost is negligible compared
+     * to the encoder.
+     *
      * **Phase 1** (`use_cache_branch = 0`):
-     * Feeds the 4-token Whisper prefix `[SOT, EN, TRANSCRIBE, NO_TIMESTAMPS]`.
+     * Feeds the 4-token Whisper prefix `[SOT, LANG, TRANSCRIBE, NO_TIMESTAMPS]`.
      * Returns `logits [1, 4, vocab]` — the last position yields the first real token.
      * Both decoder and encoder cross-attention KV caches are populated.
      *
@@ -400,15 +486,19 @@ class WhisperEngine : SpeechEngine {
         val outputNames = session.outputNames.toList()
 
         // Copy encoder hidden state once — reused as input every decoder step
-        val encHiddenShape = encoderHidden.info.shape   // [1, 1500, D]
+        val encHiddenShape = encoderHidden.info.shape
         val encHiddenData  = FloatArray(encoderHidden.floatBuffer.remaining())
         encoderHidden.floatBuffer.rewind()
         encoderHidden.floatBuffer.get(encHiddenData)
 
-        // Whisper SOT prompt prefix
+        // Auto-detect language from a cheap throwaway decoder pass before building the
+        // real SOT prefix.  This replaces the previous hardcoded <|en|> token.
+        val detectedLang = detectLanguage(env, session, encHiddenShape, encHiddenData)
+
+        // Build the SOT prefix from dynamically resolved token IDs
         val prefixIds = longArrayOf(
-            TOKEN_SOT.toLong(), TOKEN_ENGLISH.toLong(),
-            TOKEN_TRANSCRIBE.toLong(), TOKEN_NO_TIMESTAMPS.toLong(),
+            tokenSot.toLong(), detectedLang.toLong(),
+            tokenTranscribe.toLong(), tokenNoTimestamps.toLong(),
         )
         val prefixLen = prefixIds.size
 
@@ -431,11 +521,8 @@ class WhisperEngine : SpeechEngine {
                     FloatBuffer.wrap(encHiddenData),
                     encHiddenShape,
                 )
-                firstInputs[DEC_IN_USE_CACHE_BRANCH] = OnnxTensor.createTensor(
-                    env,
-                    LongBuffer.wrap(longArrayOf(0L)),
-                    longArrayOf(1L),
-                )
+                // use_cache_branch is tensor(bool) in this export
+                firstInputs[DEC_IN_USE_CACHE_BRANCH] = createBoolTensor(env, false)
                 // Empty KV cache: past_seq=0 for every rank-4 KV slot
                 addZeroKvInputs(env, session, session.inputNames.toSet(), firstInputs)
 
@@ -464,7 +551,7 @@ class WhisperEngine : SpeechEngine {
                 // Collect all present.* → past_key_values.*
                 collectKvTensors(prevResult, outputNames, kvCache)
 
-                if (firstToken >= TOKEN_SPECIAL_START) {
+                if (firstToken >= tokenEot) {
                     Log.d(TAG, "greedyDecode: first generated token is special ($firstToken) — empty result")
                     return emptyList()
                 }
@@ -485,11 +572,7 @@ class WhisperEngine : SpeechEngine {
                             FloatBuffer.wrap(encHiddenData),
                             encHiddenShape,
                         )
-                        genInputs[DEC_IN_USE_CACHE_BRANCH] = OnnxTensor.createTensor(
-                            env,
-                            LongBuffer.wrap(longArrayOf(1L)),
-                            longArrayOf(1L),
-                        )
+                        genInputs[DEC_IN_USE_CACHE_BRANCH] = createBoolTensor(env, true)
                         // KV-cache tensors are owned by prevResult; do NOT close them here
                         for ((name, tensor) in kvCache) genInputs[name] = tensor
 
@@ -515,7 +598,7 @@ class WhisperEngine : SpeechEngine {
                                 "generated=$generated (${vocabulary.getOrNull(generated)})")
 
                         // Stop on EOT or any other Whisper control token
-                        if (generated >= TOKEN_SPECIAL_START) {
+                        if (generated >= tokenEot) {
                             Log.d(TAG, "greedyDecode: stop token $generated at step $step")
                             break
                         }
@@ -658,6 +741,18 @@ class WhisperEngine : SpeechEngine {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
+     * Creates a 1-element `tensor(bool)`.
+     *
+     * ORT exposes a public `createTensor(env, ByteBuffer, long[], OnnxJavaType)` overload.
+     * Passing `OnnxJavaType.BOOL` with a single-byte ByteBuffer (0 = false, 1 = true)
+     * produces the correct `tensor(bool)` type without reflection.
+     */
+    private fun createBoolTensor(env: OrtEnvironment, value: Boolean): OnnxTensor {
+        val buf = ByteBuffer.wrap(byteArrayOf(if (value) 1 else 0))
+        return OnnxTensor.createTensor(env, buf, longArrayOf(1L), OnnxJavaType.BOOL)
+    }
+
+    /**
      * Deep-copies [source]'s float data into a new [OnnxTensor] with the same shape,
      * allowing the parent [OrtSession.Result] to be closed before the data is read.
      */
@@ -675,5 +770,20 @@ class WhisperEngine : SpeechEngine {
         session.inputNames.forEach { n -> Log.d(TAG, "  [$n] ${session.inputInfo[n]}") }
         Log.d(TAG, "=== $label outputs ===")
         session.outputNames.forEach { n -> Log.d(TAG, "  [$n] ${session.outputInfo[n]}") }
+    }
+
+    /**
+     * Finds the token ID for [token] by scanning the loaded vocabulary.
+     * Returns [default] with a warning log when the token is not present.
+     */
+    private fun findTokenId(token: String, default: Int): Int {
+        val id = vocabulary.indexOfFirst { it == token }
+        return if (id >= 0) {
+            Log.d(TAG, "findTokenId: '$token' → $id")
+            id
+        } else {
+            Log.w(TAG, "findTokenId: '$token' not found — using default $default")
+            default
+        }
     }
 }

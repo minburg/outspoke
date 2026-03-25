@@ -3,50 +3,62 @@ package dev.brgr.outspoke.inference
 import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 
 private const val TAG = "InferenceRepository"
 private const val SAMPLE_RATE = 16_000
 
 /** Minimum audio before the first partial inference is emitted (1 s). */
-private const val MIN_SAMPLES = SAMPLE_RATE              // 16 000
+private const val MIN_SAMPLES = SAMPLE_RATE
 
-/** Emit a fresh partial inference every time this many new samples arrive (1 s).
- *  Keeping the stride at 1 s rather than 500 ms halves the re-encoding work as the
- *  window grows — the encoder must re-process the full accumulated buffer on every
- *  partial, so a longer stride noticeably reduces CPU/thermal pressure for longer
- *  recordings without meaningfully hurting perceived latency. */
-private const val STRIDE_SAMPLES = SAMPLE_RATE           // 16 000
+/** Emit a fresh partial inference every time this many new samples arrive (1 s). */
+private const val STRIDE_SAMPLES = SAMPLE_RATE
 
-/** Maximum audio context kept in the rolling window (30 s).
- *  8 s was too tight for natural dictation; 30 s covers virtually any single utterance
- *  while staying within manageable encoder memory. */
-private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30  // 480 000
+/** Maximum audio context kept in the rolling window (30 s). */
+private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30
 
 /**
- * Bridges the audio capture pipeline to the [ParakeetEngine] with a sliding-window
- * buffering strategy:
+ * Bridges the audio capture pipeline to any [SpeechEngine] with a sliding-window
+ * buffering strategy.
  *
- *  - Raw 40 ms chunks from [AudioCaptureManager] are accumulated in a rolling window.
- *  - A [TranscriptResult.Partial] is emitted every [STRIDE_SAMPLES] once at least
- *    [MIN_SAMPLES] of audio are buffered, giving progressive UI feedback.
- *  - When the upstream flow completes normally (i.e. the user releases the record button
- *    via [AudioCaptureManager.stopCapture]), a final inference is run on the complete
- *    buffer and a [TranscriptResult.Final] is emitted to commit the text.
- *  - The window is capped at [MAX_WINDOW_SAMPLES] to bound memory; older audio is
- *    dropped from the front when the cap is exceeded.
+ * Key design decisions:
+ *
+ * **No backpressure on the audio producer.**
+ * The upstream audio flow is buffered with [Channel.UNLIMITED] so the AudioRecord
+ * hardware thread is *never* suspended while inference is running.  Without this,
+ * the hardware AudioRecord buffer (≈ 120 ms) overflows within one inference pass and
+ * audio is silently dropped.
+ *
+ * **Non-blocking inference.**
+ * Stride-based partial inferences are launched in a child coroutine so the
+ * `audio.collect` loop continues uninterrupted.  The engine's internal `tryLock`
+ * ensures only one inference runs at a time — any stride that fires while a previous
+ * inference is in flight returns [TranscriptResult.Partial] with empty text and is
+ * silently discarded.
+ *
+ * **Definitive final inference.**
+ * When the upstream flow completes (user releases the record button), any in-flight
+ * partial inference is joined, then a single final inference is run on the complete
+ * accumulated window and emitted as [TranscriptResult.Final].
  */
 class InferenceRepository(private val engine: SpeechEngine) {
 
-    fun transcribe(audio: Flow<AudioChunk>): Flow<TranscriptResult> = flow {
-        // Rolling window stored as a deque of ShortArrays to avoid O(n) prepend on slide.
-        val window = ArrayDeque<ShortArray>()
+    fun transcribe(audio: Flow<AudioChunk>): Flow<TranscriptResult> = channelFlow {
+        val window      = ArrayDeque<ShortArray>()
         var windowSamples = 0
         var strideAccum   = 0
+        // All launched stride coroutines — most return instantly (tryLock miss), but
+        // the one that actually acquired the lock runs for the full inference duration.
+        // We must join ALL of them so the engine lock is free before the final pass.
+        val partialJobs = mutableListOf<Job>()
 
-        /** Merge all buffered chunks into a single AudioChunk for the engine. */
         fun buildChunk(): AudioChunk {
             val merged = ShortArray(windowSamples)
             var pos = 0
@@ -54,7 +66,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
             return AudioChunk(merged)
         }
 
-        audio.collect { incoming ->
+        // Buffer without backpressure so the AudioRecord hardware thread is NEVER
+        // suspended regardless of how long inference takes.  Each chunk is 1 280 B;
+        // a full 30 s recording is 750 chunks ≈ 960 KB — well within budget.
+        audio.buffer(Channel.UNLIMITED).collect { incoming ->
             window.addLast(incoming.samples)
             windowSamples += incoming.samples.size
             strideAccum   += incoming.samples.size
@@ -64,35 +79,41 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 windowSamples -= window.removeFirst().size
             }
 
-            // Emit a partial result every STRIDE_SAMPLES once we have minimum context.
+            // Fire partial inference every stride once minimum context is available.
+            // Inference runs in a child coroutine so this collect loop is never blocked.
+            // If inference is already running, the engine's tryLock returns Partial("")
+            // immediately; we discard that and let the in-flight inference finish.
             if (windowSamples >= MIN_SAMPLES && strideAccum >= STRIDE_SAMPLES) {
                 strideAccum = 0
-                val result = engine.transcribe(buildChunk())
-                Log.d(TAG, "Partial inference on ${"%.2f".format(windowSamples / SAMPLE_RATE.toFloat())}s: $result")
-                // Always emit as Partial during active recording — the engine returns Final
-                // for any non-blank result, but committing mid-session would inject the
-                // growing window text repeatedly and trigger "character limit reached" toasts.
-                // Only the end-of-stream result (below) is promoted to Final.
-                emit(
-                    when (result) {
+                val chunk = buildChunk()
+                partialJobs += launch {
+                    val result = engine.transcribe(chunk)
+                    val sec = "%.2f".format(chunk.samples.size / SAMPLE_RATE.toFloat())
+                    Log.d(TAG, "Partial inference on ${sec}s: $result")
+                    if (result is TranscriptResult.Partial && result.text.isBlank()) return@launch
+                    send(when (result) {
                         is TranscriptResult.Final -> TranscriptResult.Partial(result.text)
                         else -> result
-                    }
-                )
+                    })
+                }
             }
         }
 
-        // Flow completed naturally (stopCapture() was called) — run final inference on
-        // the full accumulated buffer and always emit Final so the ViewModel commits.
+        // Flow completed — user released the record button.
+        // Join ALL partial jobs so the engine lock is free before the final pass.
+        // Most return instantly (tryLock miss); the one that acquired the lock may
+        // still be running — without joining it, the final inference would hit a
+        // held lock, return Partial(""), and commit empty text to the input field.
+        partialJobs.joinAll()
+
         if (windowSamples > 0) {
             val result = engine.transcribe(buildChunk())
-            Log.d(TAG, "Final inference on ${"%.2f".format(windowSamples / SAMPLE_RATE.toFloat())}s: $result")
-            emit(
-                when (result) {
-                    is TranscriptResult.Partial -> TranscriptResult.Final(result.text)
-                    else                        -> result
-                }
-            )
+            val sec = "%.2f".format(windowSamples / SAMPLE_RATE.toFloat())
+            Log.d(TAG, "Final inference on ${sec}s: $result")
+            send(when (result) {
+                is TranscriptResult.Partial -> TranscriptResult.Final(result.text)
+                else -> result
+            })
         }
     }.flowOn(Dispatchers.Default)
 }

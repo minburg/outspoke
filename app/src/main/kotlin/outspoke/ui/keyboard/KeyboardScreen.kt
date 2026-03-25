@@ -133,9 +133,9 @@ fun KeyboardScreen(
             Spacer(modifier = Modifier.width(8.dp))
 
             // Centre: talk button
-            // isListening is true for both Listening AND Processing: audio capture runs
-            // through the entire recording session; Processing just means inference has
-            // already started emitting partial results while audio is still flowing.
+            // isListening is true for Listening and Processing (mic active, audio flowing).
+            // Transcribing means audio has stopped but the engine is still working — mic off,
+            // button disabled until the Final result arrives and the state returns to Idle.
             TalkButton(
                 isListening = uiState is KeyboardUiState.Listening ||
                               uiState is KeyboardUiState.Processing,
@@ -145,7 +145,8 @@ fun KeyboardScreen(
                 onRecordStop = onRecordStop,
                 onContinuousModeEnabled = onContinuousModeEnabled,
                 enabled = uiState !is KeyboardUiState.EngineLoading &&
-                          uiState !is KeyboardUiState.Error,
+                          uiState !is KeyboardUiState.Error &&
+                          uiState !is KeyboardUiState.Transcribing,
             )
 
             Spacer(modifier = Modifier.width(8.dp))

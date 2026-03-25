@@ -43,11 +43,12 @@ import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /**
- * Crossfades between five distinct visual states driven by [uiState].
+ * Crossfades between six distinct visual states driven by [uiState].
  *
  * - [KeyboardUiState.Idle]          → small grey mic icon
  * - [KeyboardUiState.Listening]     → pulsing filled circle (accent colour)
  * - [KeyboardUiState.Processing]    → spinner + partial transcript text
+ * - [KeyboardUiState.Transcribing]  → spinner + "Transcribing…" label (mic off, engine busy)
  * - [KeyboardUiState.Error]         → warning icon + error message + "Open Outspoke" action
  * - [KeyboardUiState.EngineLoading] → spinner + loading message + "Open Outspoke" action
  *
@@ -71,6 +72,7 @@ fun StatusIndicator(
             is KeyboardUiState.Idle          -> IdleIndicator()
             is KeyboardUiState.Listening     -> ListeningIndicator()
             is KeyboardUiState.Processing    -> ProcessingIndicator(partial = state.partial)
+            is KeyboardUiState.Transcribing  -> TranscribingIndicator()
             is KeyboardUiState.Error         -> ErrorIndicator(
                 message = state.message,
                 onOpenCompanionApp = onOpenCompanionApp,
@@ -132,6 +134,21 @@ private fun ProcessingIndicator(partial: String) {
                 maxLines = 1,
             )
         }
+    }
+}
+
+/** Shown after the mic stops while the engine is still running its final inference pass. */
+@Composable
+private fun TranscribingIndicator() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        GradientArcSpinner(modifier = Modifier.size(16.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Transcribing…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
 }
 
@@ -276,6 +293,14 @@ private fun StatusListeningPreview() {
 private fun StatusProcessingPreview() {
     OutspokeKeyboardTheme {
         StatusIndicator(uiState = KeyboardUiState.Processing("The quick brown fox…"))
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun StatusTranscribingPreview() {
+    OutspokeKeyboardTheme {
+        StatusIndicator(uiState = KeyboardUiState.Transcribing)
     }
 }
 

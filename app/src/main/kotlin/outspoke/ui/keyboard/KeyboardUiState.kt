@@ -14,6 +14,16 @@ sealed class KeyboardUiState {
      */
     data class Processing(val partial: String) : KeyboardUiState()
 
+    /**
+     * Audio capture has ended; the engine is running its final (definitive) inference
+     * pass over the complete recording.  The mic button is idle but the talk button is
+     * disabled while we wait for the transcript.  No partial text is available yet.
+     *
+     * This state exists to distinguish "engine working, mic off" (e.g. Whisper's
+     * 10-20 s final decode) from "engine working, mic on" ([Processing]).
+     */
+    object Transcribing : KeyboardUiState()
+
     /** Something went wrong. [message] is a user-facing description. */
     data class Error(val message: String) : KeyboardUiState()
 

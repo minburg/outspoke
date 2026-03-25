@@ -228,20 +228,22 @@ class KeyboardViewModel(
         // Always reset continuous mode when recording stops from any code path.
         _isContinuousMode.value = false
 
-        // Cancel the coroutine immediately — this prevents any in-flight inference from
-        // completing and calling textInjector?.commitFinal(), which would inject text into
-        // the focused field even though the user explicitly pressed Stop.
-        captureJob?.cancel()
-        captureJob = null
-
-        // Release the microphone regardless.
+        // Stop the microphone — this terminates the upstream audio flow, which causes
+        // InferenceRepository to finish collecting audio and run its definitive final
+        // inference pass.  We intentionally do NOT cancel captureJob here: slow engines
+        // like Whisper can take 10-20 s to produce the Final result after audio ends,
+        // and cancelling the job before it is collected means commitFinal() is never
+        // called and no text is injected.  The job self-terminates once it collects
+        // TranscriptResult.Final (or Failure).
         audioCaptureManager.stopCapture()
 
-        // Clear any composing (underlined) text without committing it — the user chose to
-        // discard this recording session.
-        textInjector?.clear()
-
-        _uiState.value = KeyboardUiState.Idle
+        // Switch to Transcribing so the UI clearly signals "mic off, engine still working".
+        // The collect loop in onRecordStart() will transition back to Idle (and commit
+        // the text) once Final arrives.
+        if (_uiState.value is KeyboardUiState.Listening ||
+            _uiState.value is KeyboardUiState.Processing) {
+            _uiState.value = KeyboardUiState.Transcribing
+        }
     }
 
     /**
@@ -257,7 +259,9 @@ class KeyboardViewModel(
             // Commit the last partial transcript so no text is lost on app-switch.
             textInjector?.commitFinal(currentState.partial)
         } else {
-            // Remove any composing span left in the editor without committing.
+            // Transcribing (no partial yet) or any other state — remove any composing span
+            // without committing. If the engine was still running its final pass it will be
+            // cancelled; that partial audio is lost, which is acceptable on input-field change.
             textInjector?.clear()
         }
         // Cancel the capture coroutine immediately — don't wait for the audio loop to drain.
