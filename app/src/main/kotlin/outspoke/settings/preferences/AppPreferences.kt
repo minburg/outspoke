@@ -71,4 +71,23 @@ class AppPreferences(private val context: Context) {
     suspend fun setSelectedModelId(modelId: ModelId) {
         context.dataStore.edit { prefs -> prefs[keySelectedModelId] = modelId.name }
     }
+
+    // -------------------------------------------------------------------------
+    // Whisper language selection
+    // -------------------------------------------------------------------------
+
+    private val keyWhisperLanguage = stringPreferencesKey("whisper_language")
+
+    /**
+     * BCP-47 language tag for Whisper decoding, or `"auto"` for automatic detection.
+     * Supported values: `"auto"`, `"en"`, `"de"`, `"nl"`.
+     * Defaults to `"auto"`.
+     */
+    val whisperLanguage: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[keyWhisperLanguage] ?: "auto"
+    }
+
+    suspend fun setWhisperLanguage(tag: String) {
+        context.dataStore.edit { prefs -> prefs[keyWhisperLanguage] = tag }
+    }
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.lerp
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 import kotlin.math.exp
 import kotlin.math.pow
@@ -50,7 +51,8 @@ fun WaveformBar(
         label = "waveformAmplitude",
     )
 
-    val barColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
+    val barColorOne = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+    val barColorTwo  = MaterialTheme.colorScheme.primary
 
     Canvas(
         modifier = modifier
@@ -61,7 +63,8 @@ fun WaveformBar(
             amplitude    = animatedAmplitude,
             barWidthPx   = barWidth.toPx(),
             barSpacingPx = barSpacing.toPx(),
-            barColor     = barColor,
+            barColorOne     = barColorOne,
+            barColorTwo     = barColorTwo,
         )
     }
 }
@@ -74,7 +77,8 @@ private fun DrawScope.drawBars(
     amplitude: Float,
     barWidthPx: Float,
     barSpacingPx: Float,
-    barColor: androidx.compose.ui.graphics.Color,
+    barColorOne: androidx.compose.ui.graphics.Color,
+    barColorTwo: androidx.compose.ui.graphics.Color,
 ) {
     val maxHeightPx = size.height
     val stride = barWidthPx + barSpacingPx
@@ -95,6 +99,10 @@ private fun DrawScope.drawBars(
         val barHeight = maxHeightPx * heightFraction
         val left = index * stride
         val top  = (maxHeightPx - barHeight) / 2f
+
+        // Interpolate colour: edges → barColorOne, centre → barColorTwo,
+        // using the same gaussian envelope that drives bar height.
+        val barColor = lerp(barColorOne, barColorTwo, gaussianEnvelope)
 
         drawRoundRect(
             color        = barColor,

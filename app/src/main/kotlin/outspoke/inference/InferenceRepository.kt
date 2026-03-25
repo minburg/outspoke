@@ -15,6 +15,28 @@ import kotlinx.coroutines.launch
 private const val TAG = "InferenceRepository"
 private const val SAMPLE_RATE = 16_000
 
+// ── Transcript post-processing ────────────────────────────────────────────────
+
+private val LEADING_DOTS_RE  = Regex("""^\.+\s*""")
+private val TRAILING_DOTS_RE = Regex("""\.{2,}$""")
+
+/**
+ * Removes common model artefacts from a raw transcript:
+ *  - Leading dots / ellipsis: `"...Hello"` → `"Hello"`, `". world"` → `"world"`
+ *  - Trailing multiple dots: `"Hello..."` → `"Hello."`, `"Hello.."` → `"Hello."`
+ *  - Strings that contain no alphanumeric content (e.g. `"..."`, `"."`) are
+ *    discarded entirely — a lone period is never a useful transcript.
+ */
+internal fun String.cleanTranscript(): String {
+    if (isBlank()) return ""
+    val s = this
+        .replace(LEADING_DOTS_RE, "")   // strip leading dots + optional space
+        .replace(TRAILING_DOTS_RE, ".") // reduce trailing 2+ dots to a single dot
+        .trim()
+    // If nothing meaningful remains (no letters or digits), discard the whole string.
+    return if (s.none { it.isLetterOrDigit() }) "" else s
+}
+
 /** Minimum audio before the first partial inference is emitted (1 s). */
 private const val MIN_SAMPLES = SAMPLE_RATE
 
@@ -49,6 +71,18 @@ private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30
  * accumulated window and emitted as [TranscriptResult.Final].
  */
 class InferenceRepository(private val engine: SpeechEngine) {
+
+    /**
+     * Forwards a language tag to the underlying engine.
+     * No-op for engines that do not support language selection (Parakeet, Voxtral).
+     */
+    fun setLanguage(tag: String) = engine.setLanguage(tag)
+
+    /**
+     * Forwards a language constraint set to the underlying engine.
+     * No-op for engines that do not support language selection (Parakeet, Voxtral).
+     */
+    fun setLanguageConstraints(tags: List<String>) = engine.setLanguageConstraints(tags)
 
     fun transcribe(audio: Flow<AudioChunk>): Flow<TranscriptResult> = channelFlow {
         val window      = ArrayDeque<ShortArray>()
@@ -90,11 +124,14 @@ class InferenceRepository(private val engine: SpeechEngine) {
                     val result = engine.transcribe(chunk)
                     val sec = "%.2f".format(chunk.samples.size / SAMPLE_RATE.toFloat())
                     Log.d(TAG, "Partial inference on ${sec}s: $result")
-                    if (result is TranscriptResult.Partial && result.text.isBlank()) return@launch
-                    send(when (result) {
-                        is TranscriptResult.Final -> TranscriptResult.Partial(result.text)
+                    // Normalise the text — strip leading/trailing dot artefacts.
+                    val cleaned = when (result) {
+                        is TranscriptResult.Partial -> result.copy(text = result.text.cleanTranscript())
+                        is TranscriptResult.Final   -> TranscriptResult.Partial(result.text.cleanTranscript())
                         else -> result
-                    })
+                    }
+                    if (cleaned is TranscriptResult.Partial && cleaned.text.isBlank()) return@launch
+                    send(cleaned)
                 }
             }
         }
@@ -110,10 +147,13 @@ class InferenceRepository(private val engine: SpeechEngine) {
             val result = engine.transcribe(buildChunk())
             val sec = "%.2f".format(windowSamples / SAMPLE_RATE.toFloat())
             Log.d(TAG, "Final inference on ${sec}s: $result")
-            send(when (result) {
-                is TranscriptResult.Partial -> TranscriptResult.Final(result.text)
+            // Normalise the text — strip leading/trailing dot artefacts.
+            val cleaned = when (result) {
+                is TranscriptResult.Partial -> TranscriptResult.Final(result.text.cleanTranscript())
+                is TranscriptResult.Final   -> result.copy(text = result.text.cleanTranscript())
                 else -> result
-            })
+            }
+            send(cleaned)
         }
     }.flowOn(Dispatchers.Default)
 }

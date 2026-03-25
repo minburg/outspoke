@@ -31,6 +31,31 @@ interface SpeechEngine {
     fun transcribe(chunk: AudioChunk): TranscriptResult
 
     /**
+     * Sets the active language for inference.
+     *
+     * [tag] is a BCP-47 language tag (e.g. `"en"`, `"de"`, `"nl"`) or `"auto"` to let the
+     * engine detect the language automatically.  Engines that do not support language selection
+     * (Parakeet, Voxtral) may leave this as a no-op.
+     *
+     * Thread-safe; may be called at any time, including between [transcribe] calls.
+     */
+    fun setLanguage(tag: String) { /* no-op by default */ }
+
+    /**
+     * Restricts automatic language detection to a subset of BCP-47 tags.
+     *
+     * When [tags] is non-empty and the active language is `"auto"`, the engine will only
+     * consider these languages during detection instead of the full ~100-language vocabulary.
+     * This dramatically improves reliability when the user only ever speaks 2–4 languages:
+     * the model's cross-attention correctly encodes the language; the constraint just stops
+     * it picking an adjacent token (e.g. Spanish = 50262) over the intended one (English = 50259)
+     * due to a tiny logit difference on short clips.
+     *
+     * No-op for engines that do not support language selection.
+     */
+    fun setLanguageConstraints(tags: List<String>) { /* no-op by default */ }
+
+    /**
      * Releases all native ONNX sessions and frees memory.
      * Safe to call even if [load] was never invoked.
      */

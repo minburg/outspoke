@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.SubdirectoryArrowLeft
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.keyboard.components.KeyboardActionButton
+import dev.brgr.outspoke.ui.keyboard.components.LanguageSelector
 import dev.brgr.outspoke.ui.keyboard.components.StatusIndicator
 import dev.brgr.outspoke.ui.keyboard.components.TalkButton
 import dev.brgr.outspoke.ui.keyboard.components.WaveformBar
@@ -47,12 +49,17 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * @param amplitude              Normalised RMS amplitude [0.0, 1.0].
  * @param isContinuous           `true` when continuous (locked) recording mode is active.
  * @param triggerMode            `"HOLD"` (default) or `"TAP_TOGGLE"`.
+ * @param isWhisperEngine        `true` when the active engine is a Whisper variant — controls
+ *                               visibility of the language selector row.
+ * @param whisperLanguage        Currently selected Whisper language tag (`"auto"`, `"en"`, …).
+ * @param onWhisperLanguageSelected Called when the user taps a language pill.
  * @param onRecordStart          Callback fired when the user presses the talk button.
  * @param onRecordStop           Callback fired when the user releases / stops recording.
  * @param onContinuousModeEnabled Callback fired when the drag-up lock threshold is crossed.
  * @param onDeleteChar           Delete the character immediately before the cursor.
  * @param onDeleteWord           Delete backward to the previous word boundary.
  * @param onDeleteAll            Delete all text in the current editor.
+ * @param onNewline              Insert a newline at the current cursor position.
  * @param onSwitchKeyboard       Switches the active IME back to the previous keyboard.
  * @param onOpenCompanionApp     Opens the Outspoke companion app (e.g. to grant permission or download the model).
  */
@@ -62,41 +69,68 @@ fun KeyboardScreen(
     amplitude: Float,
     isContinuous: Boolean,
     triggerMode: String,
+    isWhisperEngine: Boolean,
+    whisperLanguage: String,
+    onWhisperLanguageSelected: (String) -> Unit,
     onRecordStart: () -> Unit,
     onRecordStop: () -> Unit,
     onContinuousModeEnabled: () -> Unit,
     onDeleteChar: () -> Unit,
     onDeleteWord: () -> Unit,
     onDeleteAll: () -> Unit,
+    onNewline: () -> Unit,
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
             // Wrap to content height so the keyboard panel does not expand beyond
             // its natural size. navigationBarsPadding() adds the nav-bar height at
             // the bottom, which (a) pushes buttons above the nav bar and (b) extends
             // the background colour to cover the nav-bar area.
-            .wrapContentHeight()
-            .background(MaterialTheme.colorScheme.background)
+            .wrapContentHeight().background(MaterialTheme.colorScheme.background)
             // Push content above the navigation bar so buttons are never hidden behind it.
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        // ── Top section: status + waveform ───────────────────────────────────
+        // ── Top section: status + (optional) language selector + waveform ──────
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusIndicator(
-                uiState = uiState,
-                onOpenCompanionApp = onOpenCompanionApp,
-                modifier = Modifier.wrapContentWidth(),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(modifier = Modifier.weight(1f)) {}
+
+                Spacer(modifier = Modifier.width(8.dp))
+                StatusIndicator(
+                    uiState = uiState,
+                    onOpenCompanionApp = onOpenCompanionApp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(modifier = Modifier.weight(1f)) {
+                    KeyboardActionButton(
+                        icon = Icons.Filled.Keyboard,
+                        contentDescription = "Switch keyboard",
+                        onClick = onSwitchKeyboard,
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    )
+                }
+            }
+
+            // Language selector — only shown for Whisper models and when the engine
+            // is actually ready (hide during loading / error states).
+            if (isWhisperEngine && uiState !is KeyboardUiState.EngineLoading && uiState !is KeyboardUiState.Error) {
+                LanguageSelector(
+                    selectedLanguage = whisperLanguage,
+                    onLanguageSelected = onWhisperLanguageSelected,
+                )
+            }
             WaveformBar(
                 amplitude = amplitude,
                 modifier = Modifier.wrapContentWidth(),
@@ -137,21 +171,18 @@ fun KeyboardScreen(
             // Transcribing means audio has stopped but the engine is still working — mic off,
             // button disabled until the Final result arrives and the state returns to Idle.
             TalkButton(
-                isListening = uiState is KeyboardUiState.Listening ||
-                              uiState is KeyboardUiState.Processing,
+                isListening = uiState is KeyboardUiState.Listening || uiState is KeyboardUiState.Processing,
                 isContinuous = isContinuous,
                 triggerMode = triggerMode,
                 onRecordStart = onRecordStart,
                 onRecordStop = onRecordStop,
                 onContinuousModeEnabled = onContinuousModeEnabled,
-                enabled = uiState !is KeyboardUiState.EngineLoading &&
-                          uiState !is KeyboardUiState.Error &&
-                          uiState !is KeyboardUiState.Transcribing,
+                enabled = uiState !is KeyboardUiState.EngineLoading && uiState !is KeyboardUiState.Error && uiState !is KeyboardUiState.Transcribing,
             )
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Right group: [Delete Char] ──────── [Switch Keyboard]
+            // Right group: [Delete Char] ──── [Switch Keyboard]
             Box(modifier = Modifier.weight(1f)) {
                 // Adjacent-right: delete single character
                 KeyboardActionButton(
@@ -160,13 +191,14 @@ fun KeyboardScreen(
                     onClick = onDeleteChar,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
-                // Far-right: switch back to previous keyboard
+                // Centre-right: insert newline
                 KeyboardActionButton(
-                    icon = Icons.Filled.Keyboard,
-                    contentDescription = "Switch keyboard",
-                    onClick = onSwitchKeyboard,
+                    icon = Icons.Filled.SubdirectoryArrowLeft,
+                    contentDescription = "New line",
+                    onClick = onNewline,
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
+
             }
         }
     }
@@ -182,24 +214,30 @@ fun KeyboardScreen(
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
 ) {
-    val uiState      by viewModel.uiState.collectAsState()
-    val amplitude    by viewModel.amplitude.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val amplitude by viewModel.amplitude.collectAsState()
     val isContinuous by viewModel.isContinuousMode.collectAsState()
-    val triggerMode  by viewModel.triggerMode.collectAsState()
+    val triggerMode by viewModel.triggerMode.collectAsState()
+    val isWhisperEngine by viewModel.isWhisperEngine.collectAsState()
+    val whisperLanguage by viewModel.whisperLanguage.collectAsState()
 
     KeyboardScreen(
-        uiState               = uiState,
-        amplitude             = amplitude,
-        isContinuous          = isContinuous,
-        triggerMode           = triggerMode,
-        onRecordStart         = viewModel::onRecordStart,
-        onRecordStop          = viewModel::onRecordStop,
+        uiState = uiState,
+        amplitude = amplitude,
+        isContinuous = isContinuous,
+        triggerMode = triggerMode,
+        isWhisperEngine = isWhisperEngine,
+        whisperLanguage = whisperLanguage,
+        onWhisperLanguageSelected = viewModel::setWhisperLanguage,
+        onRecordStart = viewModel::onRecordStart,
+        onRecordStop = viewModel::onRecordStop,
         onContinuousModeEnabled = viewModel::onContinuousModeEnabled,
-        onDeleteChar          = viewModel::deleteChar,
-        onDeleteWord          = viewModel::deleteWord,
-        onDeleteAll           = viewModel::deleteAll,
-        onSwitchKeyboard      = onSwitchKeyboard,
-        onOpenCompanionApp    = onOpenCompanionApp,
+        onDeleteChar = viewModel::deleteChar,
+        onDeleteWord = viewModel::deleteWord,
+        onDeleteAll = viewModel::deleteAll,
+        onNewline = viewModel::newline,
+        onSwitchKeyboard = onSwitchKeyboard,
+        onOpenCompanionApp = onOpenCompanionApp,
     )
 }
 
@@ -212,22 +250,28 @@ private fun KeyboardScreenPreviewScaffold(
     uiState: KeyboardUiState,
     amplitude: Float = 0f,
     isContinuous: Boolean = false,
+    isWhisperEngine: Boolean = false,
+    whisperLanguage: String = "auto",
 ) {
     OutspokeKeyboardTheme {
         Box(modifier = Modifier.height(220.dp)) {
             KeyboardScreen(
-                uiState               = uiState,
-                amplitude             = amplitude,
-                isContinuous          = isContinuous,
-                triggerMode           = "HOLD",
-                onRecordStart         = {},
-                onRecordStop          = {},
+                uiState = uiState,
+                amplitude = amplitude,
+                isContinuous = isContinuous,
+                triggerMode = "HOLD",
+                isWhisperEngine = isWhisperEngine,
+                whisperLanguage = whisperLanguage,
+                onWhisperLanguageSelected = {},
+                onRecordStart = {},
+                onRecordStop = {},
                 onContinuousModeEnabled = {},
-                onDeleteChar          = {},
-                onDeleteWord          = {},
-                onDeleteAll           = {},
-                onSwitchKeyboard      = {},
-                onOpenCompanionApp    = {},
+                onDeleteChar = {},
+                onDeleteWord = {},
+                onDeleteAll = {},
+                onNewline = {},
+                onSwitchKeyboard = {},
+                onOpenCompanionApp = {},
             )
         }
     }
@@ -237,6 +281,16 @@ private fun KeyboardScreenPreviewScaffold(
 @Composable
 private fun KeyboardScreenIdlePreview() {
     KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle)
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun KeyboardScreenWhisperIdlePreview() {
+    KeyboardScreenPreviewScaffold(
+        uiState = KeyboardUiState.Idle,
+        isWhisperEngine = true,
+        whisperLanguage = "de",
+    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)

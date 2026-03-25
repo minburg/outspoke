@@ -50,6 +50,10 @@ class TextInjector(
      * If the editor does not support composing text this is a no-op — the full
      * transcript will be delivered via [commitFinal] when the utterance ends.
      * Duplicate calls with the same [text] value are skipped to reduce binder overhead.
+     *
+     * If the user has an active text selection when the first partial arrives,
+     * [setComposingText] will replace that selection — this is standard Android IME
+     * behaviour and is handled automatically by the framework.
      */
     fun setPartial(text: String) {
         if (!supportsComposing || text == lastPartial) return
@@ -58,14 +62,25 @@ class TextInjector(
     }
 
     /**
-     * Commit [text] as final, confirmed text, replacing any composing span.
+     * Commit [text] as final, confirmed text, replacing any composing span or
+     * currently active selection.
      *
      * Safe to call even if no composing span is currently set.
      */
     fun commitFinal(text: String) {
         lastPartial = ""
+        // commitText replaces both any composing span and any active selection.
         inputConnection.commitText(text, 1)
         inputConnection.finishComposingText()
+    }
+
+    /**
+     * Insert a newline character at the current cursor position, replacing any
+     * active selection.
+     */
+    fun sendNewline() {
+        lastPartial = ""
+        inputConnection.commitText("\n", 1)
     }
 
     /**
@@ -84,17 +99,39 @@ class TextInjector(
     // Deletion helpers
     // -------------------------------------------------------------------------
 
-    /** Delete the single character immediately before the cursor. */
+    /**
+     * Returns `true` when the editor currently has a non-collapsed text selection.
+     * Used by delete helpers to decide whether to delete the selection or fall back
+     * to the regular cursor-based deletion.
+     */
+    private fun hasActiveSelection(): Boolean =
+        inputConnection.getSelectedText(0)?.isNotEmpty() == true
+
+    /**
+     * Delete the active selection if one exists, otherwise delete the single
+     * character immediately before the cursor.
+     */
     fun deleteChar() {
+        if (hasActiveSelection()) {
+            // Replace the selection with nothing — equivalent to the Delete key
+            // behaviour on desktop editors when text is selected.
+            inputConnection.commitText("", 1)
+            return
+        }
         inputConnection.deleteSurroundingText(1, 0)
     }
 
     /**
-     * Delete backward until (but not including) the last space before the cursor,
-     * effectively removing the last word.  Trailing whitespace is skipped first,
-     * then word characters are consumed, so "Hello world " → "Hello ".
+     * Delete the active selection if one exists, otherwise delete backward until
+     * (but not including) the last space before the cursor, effectively removing
+     * the last word.  Trailing whitespace is skipped first, then word characters
+     * are consumed, so "Hello world " → "Hello ".
      */
     fun deleteWord() {
+        if (hasActiveSelection()) {
+            inputConnection.commitText("", 1)
+            return
+        }
         val before = inputConnection.getTextBeforeCursor(200, 0) ?: return
         if (before.isEmpty()) return
 

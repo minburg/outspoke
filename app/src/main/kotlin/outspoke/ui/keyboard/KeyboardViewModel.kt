@@ -9,13 +9,16 @@ import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
 import dev.brgr.outspoke.inference.TranscriptResult
+import dev.brgr.outspoke.settings.model.ModelId
 import dev.brgr.outspoke.settings.preferences.AppPreferences
+import dev.brgr.outspoke.ui.keyboard.components.WHISPER_LANGUAGE_OPTIONS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -58,6 +61,34 @@ class KeyboardViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     // -------------------------------------------------------------------------
+    // Whisper language selection
+    // -------------------------------------------------------------------------
+
+    /**
+     * `true` when the currently selected model is a Whisper variant.
+     * Used to conditionally show the language selector in the keyboard UI.
+     */
+    val isWhisperEngine: StateFlow<Boolean> = appPreferences.selectedModelId
+        .map { it.name.startsWith("WHISPER") }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * Currently selected Whisper language tag: `"auto"`, `"en"`, `"de"`, or `"nl"`.
+     * Collected eagerly so the selector always reflects the saved value on first draw.
+     */
+    val whisperLanguage: StateFlow<String> = appPreferences.whisperLanguage
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "auto")
+
+    /**
+     * Persists [tag] to preferences and immediately forwards it to the loaded engine.
+     * Safe to call at any time — the engine's [setLanguage] is thread-safe.
+     */
+    fun setWhisperLanguage(tag: String) {
+        inferenceRepository?.setLanguage(tag)
+        viewModelScope.launch { appPreferences.setWhisperLanguage(tag) }
+    }
+
+    // -------------------------------------------------------------------------
     // Engine state (Step 29)
     // -------------------------------------------------------------------------
 
@@ -94,6 +125,14 @@ class KeyboardViewModel(
     /** Set by [OutspokeInputMethodService] when the service binding is established. */
     fun setInferenceRepository(repo: InferenceRepository?) {
         inferenceRepository = repo
+        // Apply the persisted language tag immediately.
+        repo?.setLanguage(whisperLanguage.value)
+        // Constrain auto-detection to only the languages shown in the selector.
+        // "Auto" then means "detect from EN/DE/ES" instead of "any of ~100 languages",
+        // which eliminates false picks like ES (50262) beating EN (50259) by a tiny margin.
+        repo?.setLanguageConstraints(
+            WHISPER_LANGUAGE_OPTIONS.filter { (tag, _) -> tag != "auto" }.map { (tag, _) -> tag }
+        )
     }
 
     // -------------------------------------------------------------------------
@@ -143,6 +182,11 @@ class KeyboardViewModel(
     /** Delete all text in the current editor field. */
     fun deleteAll() {
         textInjector?.deleteAll()
+    }
+
+    /** Insert a newline at the current cursor position, replacing any active selection. */
+    fun newline() {
+        textInjector?.sendNewline()
     }
 
     // -------------------------------------------------------------------------

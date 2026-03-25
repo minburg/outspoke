@@ -98,6 +98,35 @@ class WhisperEngine : SpeechEngine {
     /** Mel filterbank matrix [N_MELS × (N_FFT/2+1)], built once at load time. */
     private var melFilters: FloatArray = FloatArray(0)
 
+    /**
+     * BCP-47 language tag controlling decoder behaviour.
+     *
+     * `"auto"` → run [detectLanguage] on every inference call (unreliable for very short clips).
+     * Any other value (e.g. `"en"`, `"de"`, `"es"`) → look up `<|tag|>` in the vocabulary and
+     * use it as the fixed language token, skipping language detection entirely.
+     *
+     * Updated by [setLanguage]; thread-safe via [Volatile].
+     */
+    @Volatile private var languageTag: String = "auto"
+
+    override fun setLanguage(tag: String) {
+        languageTag = tag
+        Log.d(TAG, "setLanguage: $tag")
+    }
+
+    /**
+     * BCP-47 tags to restrict auto-detection to (e.g. `["en", "de", "es"]`).
+     * Empty list = unconstrained — searches all ~100 language tokens, which is unreliable
+     * for short clips because adjacent tokens like EN (50259) and ES (50262) can have nearly
+     * identical logits.  Set via [setLanguageConstraints].
+     */
+    @Volatile private var constrainedTags: List<String> = emptyList()
+
+    override fun setLanguageConstraints(tags: List<String>) {
+        constrainedTags = tags
+        Log.d(TAG, "setLanguageConstraints: $tags")
+    }
+
     /** Hann window of length N_FFT, computed at construction time. */
     private val hannWindow: FloatArray = FloatArray(N_FFT) { i ->
         (0.5 * (1.0 - cos(2.0 * PI * i / N_FFT))).toFloat()
@@ -184,6 +213,14 @@ class WhisperEngine : SpeechEngine {
             return try {
                 val e = env!!
 
+                // Whisper requires at least 2 s of audio for reliable output.
+                // A 1-second clip produces hallucinated single-word results that immediately
+                // hit EOT — return Partial so the caller doesn't commit garbage as Final.
+                if (chunk.samples.size < SAMPLE_RATE * 2) {
+                    Log.d(TAG, "transcribe: clip too short (${chunk.samples.size} samples) — returning Partial")
+                    return TranscriptResult.Partial("")
+                }
+
                 // 1. Normalise 16-bit PCM to float32 in [-1, 1]
                 val samples = normalisePcm(chunk.samples)
 
@@ -194,12 +231,18 @@ class WhisperEngine : SpeechEngine {
                 val encoderHidden = encodeAudio(e, enc, melFeatures)
 
                 // 4. Autoregressive decoder
-                val tokenIds = greedyDecode(e, dec, encoderHidden)
+                val tokenIds = greedyDecode(e, dec, encoderHidden, chunk.samples.size)
                 encoderHidden.close()
 
                 // 5. Detokenise
                 val text = detokenize(tokenIds)
-                if (text.isBlank()) TranscriptResult.Partial("") else TranscriptResult.Final(text)
+                // A single-token output that hits EOT immediately is almost always a
+                // hallucination from insufficient audio — treat it as tentative.
+                when {
+                    text.isBlank()     -> TranscriptResult.Partial("")
+                    tokenIds.size <= 1 -> TranscriptResult.Partial(text)
+                    else               -> TranscriptResult.Final(text)
+                }
             } catch (ex: Exception) {
                 Log.e(TAG, "transcribe() failed", ex)
                 TranscriptResult.Failure(ex)
@@ -403,13 +446,21 @@ class WhisperEngine : SpeechEngine {
      * Language tokens occupy the contiguous range `[tokenEnglish, tokenTranscribe - 2]`
      * (50259–50357 for large-v3 / large-v3-turbo; 99 languages total).
      *
-     * @return The detected language token ID (e.g. 50259 for English, 50265 for Dutch).
+     * @param candidateTokenIds When non-empty, the argmax is restricted to only these token
+     *                          IDs.  Passing a small set (e.g. EN + DE + ES) makes detection
+     *                          far more reliable than searching across all ~100 languages,
+     *                          because adjacent tokens like ES (50262) can no longer steal the
+     *                          win from EN (50259) on a tiny logit margin.
+     *                          Pass an empty array to search the full language range (unreliable
+     *                          on short clips).
+     * @return The detected language token ID (e.g. 50259 for English, 50261 for German).
      */
     private fun detectLanguage(
         env: OrtEnvironment,
         session: OrtSession,
         encHiddenShape: LongArray,
         encHiddenData: FloatArray,
+        candidateTokenIds: IntArray = intArrayOf(),
     ): Int {
         val inputs = mutableMapOf<String, OnnxTensor>()
         try {
@@ -432,21 +483,38 @@ class WhisperEngine : SpeechEngine {
                     .orElseThrow { RuntimeException("No logits during language detection") }
                     as OnnxTensor
                 val vocabSize = logitsTensor.info.shape[2].toInt()
-                val logits = FloatArray(vocabSize)  // seq_len=1, batch=1
+                val logits = FloatArray(vocabSize)
                 logitsTensor.floatBuffer.rewind()
                 logitsTensor.floatBuffer.get(logits)
 
-                // Language tokens are contiguous: tokenEnglish .. tokenTranscribe-2
-                val langFirst = tokenEnglish
-                val langLast  = tokenTranscribe - 2
-                var bestLang  = langFirst
-                var bestLogit = if (langFirst < vocabSize) logits[langFirst] else Float.NEGATIVE_INFINITY
-                for (id in langFirst + 1..langLast) {
-                    if (id >= vocabSize) break
+                // Build the search set: explicit candidates or the full language token range.
+                val candidates: IntArray = if (candidateTokenIds.isNotEmpty()) {
+                    candidateTokenIds.filter { it in 0 until vocabSize }.toIntArray()
+                } else {
+                    val first = tokenEnglish
+                    val last  = minOf(tokenTranscribe - 2, vocabSize - 1)
+                    if (last >= first) IntArray(last - first + 1) { first + it } else intArrayOf()
+                }
+
+                if (candidates.isEmpty()) {
+                    Log.w(TAG, "detectLanguage: no valid candidates — falling back to English")
+                    return tokenEnglish
+                }
+
+                var bestLang  = candidates[0]
+                var bestLogit = logits[bestLang]
+                for (id in candidates.drop(1)) {
                     val v = logits[id]
                     if (v > bestLogit) { bestLogit = v; bestLang = id }
                 }
-                Log.d(TAG, "detectLanguage: token=$bestLang (${vocabulary.getOrNull(bestLang)})")
+
+                // Log the confidence gap (top minus second-best).
+                // A gap < 1.0 signals an uncertain detection; > 3.0 is confident.
+                val secondBest = candidates.filter { it != bestLang }
+                    .maxOfOrNull { logits[it] } ?: Float.NEGATIVE_INFINITY
+                val gap = bestLogit - secondBest
+                Log.d(TAG, "detectLanguage: token=$bestLang " +
+                    "(${vocabulary.getOrNull(bestLang)}) gap=${"%.2f".format(gap)}")
                 return bestLang
             } finally {
                 result.close()
@@ -482,6 +550,7 @@ class WhisperEngine : SpeechEngine {
         env: OrtEnvironment,
         session: OrtSession,
         encoderHidden: OnnxTensor,
+        sampleCount: Int,
     ): List<Int> {
         val outputNames = session.outputNames.toList()
 
@@ -491,9 +560,42 @@ class WhisperEngine : SpeechEngine {
         encoderHidden.floatBuffer.rewind()
         encoderHidden.floatBuffer.get(encHiddenData)
 
-        // Auto-detect language from a cheap throwaway decoder pass before building the
-        // real SOT prefix.  This replaces the previous hardcoded <|en|> token.
-        val detectedLang = detectLanguage(env, session, encHiddenShape, encHiddenData)
+        // Resolve the language token.
+        //
+        // Forced tag (e.g. "en", "de"): vocabulary lookup, no decoder pre-pass needed.
+        //
+        // "auto" with constraints (the normal case when the LanguageSelector is visible):
+        //   - Resolve each constrained tag to a token ID once.
+        //   - If the clip is < 2 s there is not enough phoneme signal for reliable detection;
+        //     fall back to the first constrained option to avoid picking an adjacent token
+        //     (e.g. ES=50262 beats EN=50259 by 0.1 logit on a short clip → hallucination).
+        //   - Otherwise run detectLanguage() restricted to those candidate token IDs.
+        //
+        // "auto" unconstrained: full ~100-language range — still supported but not recommended.
+        val detectedLang = if (languageTag != "auto") {
+            findTokenId("<|$languageTag|>", tokenEnglish).also {
+                Log.d(TAG, "greedyDecode: forced language=$languageTag → token=$it")
+            }
+        } else {
+            val candidates = if (constrainedTags.isNotEmpty()) {
+                constrainedTags.mapNotNull { tag ->
+                    val id = findTokenId("<|$tag|>", -1)
+                    if (id < 0) { Log.w(TAG, "greedyDecode: unknown constraint '$tag'"); null }
+                    else id
+                }.toIntArray()
+            } else {
+                intArrayOf()  // empty = full language range inside detectLanguage()
+            }
+
+            val minSamplesForDetect = SAMPLE_RATE * 2  // 2 s of speech minimum
+            if (sampleCount < minSamplesForDetect && candidates.isNotEmpty()) {
+                Log.d(TAG, "greedyDecode: clip too short ($sampleCount samples) — " +
+                    "skipping detection, using ${constrainedTags.first()}")
+                candidates[0]
+            } else {
+                detectLanguage(env, session, encHiddenShape, encHiddenData, candidates)
+            }
+        }
 
         // Build the SOT prefix from dynamically resolved token IDs
         val prefixIds = longArrayOf(
@@ -560,6 +662,14 @@ class WhisperEngine : SpeechEngine {
                 // ── Phase 2: autoregressive loop — use_cache_branch=1 ────────
                 var currentToken = firstToken
                 for (step in 0 until MAX_NEW_TOKENS - 1) {
+                    // Guard against the ONNX KV-cache reshape crash that occurs when the
+                    // accumulated sequence length exceeds the model's internal tiling boundary
+                    // (~448 tokens). Stop well below that limit.
+                    if (hypothesis.size >= 400) {
+                        Log.w(TAG, "greedyDecode: hit token safety cap — stopping")
+                        break
+                    }
+
                     val genInputs = mutableMapOf<String, OnnxTensor>()
                     try {
                         genInputs[DEC_IN_INPUT_IDS] = OnnxTensor.createTensor(
@@ -604,6 +714,12 @@ class WhisperEngine : SpeechEngine {
                         }
 
                         hypothesis.add(generated)
+                        // Abort immediately if a bigram/trigram cycle has locked in — this
+                        // prevents multi-second CPU burns and the downstream ORT reshape crash.
+                        if (hasRepetitionLoop(hypothesis)) {
+                            Log.w(TAG, "greedyDecode: repetition loop detected at step $step — aborting")
+                            return emptyList()
+                        }
                         currentToken = generated
 
                     } finally {
@@ -739,6 +855,46 @@ class WhisperEngine : SpeechEngine {
     // ─────────────────────────────────────────────────────────────────────────
     // Utilities
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns true when the tail of [tokens] shows a repeating bigram cycle.
+     *
+     * A sliding window of [windowSize] tokens is inspected.  If the last 4 tokens
+     * form a 2-token pattern (A B A B …) that has repeated at least [maxRepeats] times
+     * consecutively, the decoder has fallen into an infinite loop and should be stopped.
+     *
+     * This is a well-known Whisper greedy-decoder failure mode on ambiguous / silent audio.
+     */
+    private fun hasRepetitionLoop(
+        tokens: List<Int>,
+        windowSize: Int = 30,
+        maxRepeats: Int = 5,
+    ): Boolean {
+        if (tokens.size < windowSize) return false
+        val window = tokens.takeLast(windowSize)
+        if (window.size < 4) return false
+
+        val a = window[window.size - 1]
+        val b = window[window.size - 2]
+        val c = window[window.size - 3]
+        val d = window[window.size - 4]
+
+        // Detected a 2-token cycle candidate (a == c, b == d → pattern: …b a b a)
+        if (a == c && b == d) {
+            var repeats = 0
+            var i = window.size - 1
+            while (i >= 1) {
+                if (window[i] == a && window[i - 1] == b) {
+                    repeats++
+                    i -= 2
+                } else {
+                    break
+                }
+            }
+            if (repeats >= maxRepeats) return true
+        }
+        return false
+    }
 
     /**
      * Creates a 1-element `tensor(bool)`.
