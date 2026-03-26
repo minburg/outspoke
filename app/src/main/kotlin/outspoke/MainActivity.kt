@@ -3,10 +3,10 @@ package dev.brgr.outspoke
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,11 +19,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 class MainActivity : ComponentActivity() {
@@ -57,7 +57,7 @@ private enum class MicPermissionState {
 
 @Composable
 private fun MicPermissionScreen(resumeCount: Int) {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current ?: return
 
     var permState by remember {
         val alreadyGranted = ContextCompat.checkSelfPermission(
@@ -112,7 +112,7 @@ private fun MicPermissionScreen(resumeCount: Int) {
                         activity.startActivity(
                             Intent(
                                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.parse("package:${activity.packageName}"),
+                                "package:${activity.packageName}".toUri(),
                             )
                         )
                     },
