@@ -7,14 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dev.brgr.outspoke.settings.preferences.AppPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 private const val TAG = "ModelViewModel"
@@ -34,10 +27,6 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
     private val downloadManager = ModelDownloadManager()
     private val prefs = AppPreferences(application)
 
-    // -------------------------------------------------------------------------
-    // Per-model download / ready state
-    // -------------------------------------------------------------------------
-
     private val _modelStates = MutableStateFlow<Map<ModelId, ModelState>>(
         // Eagerly check on-disk state so the UI is correct on first render.
         ModelRegistry.all.associate { info ->
@@ -50,23 +39,11 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
     )
     val modelStates: StateFlow<Map<ModelId, ModelState>> = _modelStates.asStateFlow()
 
-    // -------------------------------------------------------------------------
-    // Selected model
-    // -------------------------------------------------------------------------
-
     private val _selectedModelId = MutableStateFlow(ModelId.DEFAULT)
     val selectedModelId: StateFlow<ModelId> = _selectedModelId.asStateFlow()
 
-    // -------------------------------------------------------------------------
-    // One-shot error messages (shown as Snackbars)
-    // -------------------------------------------------------------------------
-
     private val _errorMessage = MutableSharedFlow<String>(replay = 0)
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
-
-    // -------------------------------------------------------------------------
-    // Active download jobs — one per model at most
-    // -------------------------------------------------------------------------
 
     private val downloadJobs = mutableMapOf<ModelId, Job>()
 
@@ -76,10 +53,6 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
             _selectedModelId.value = prefs.selectedModelId.first()
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
 
     /** Starts downloading [modelId] if it is not already being downloaded. */
     fun startDownload(modelId: ModelId) {

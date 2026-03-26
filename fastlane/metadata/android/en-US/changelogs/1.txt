@@ -1,0 +1,8 @@
+Initial release (v0.1.0).
+
+On-device speech-to-text keyboard using the Parakeet ASR model - all transcription runs locally on your phone, nothing is sent anywhere.
+
+The model (~700 MB) downloads once over Wi-Fi and is stored on your device. No internet connection needed after that.
+
+Works in any app that accepts keyboard input. Requires Android 14.
+

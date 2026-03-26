@@ -12,8 +12,6 @@ data class AudioChunk(
     val sampleRate: Int = 16_000,
     val timestampMs: Long = System.currentTimeMillis(),
 ) {
-    // ShortArray does not implement equals/hashCode structurally in Kotlin, so we override
-    // them here to ensure two chunks with the same PCM content are considered equal.
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AudioChunk) return false

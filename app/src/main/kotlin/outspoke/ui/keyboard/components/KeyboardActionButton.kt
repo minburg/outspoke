@@ -53,10 +53,6 @@ fun KeyboardActionButton(
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-// Previews
-// -------------------------------------------------------------------------------------------------
-
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardActionButtonAllPreview() {

@@ -1,9 +1,5 @@
 package dev.brgr.outspoke.settings.model
 
-// ---------------------------------------------------------------------------
-// Base URLs
-// ---------------------------------------------------------------------------
-
 private const val PARAKEET_BASE =
     "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main"
 
@@ -19,10 +15,6 @@ private const val WHISPER_TURBO_BASE =
     "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/onnx"
 private const val WHISPER_TURBO_ROOT =
     "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main"
-
-// ---------------------------------------------------------------------------
-// Data types
-// ---------------------------------------------------------------------------
 
 /**
  * Describes one file to download as part of a [DownloadSource.Files] source.
@@ -93,10 +85,6 @@ data class ModelInfo(
     val requiredFiles: List<String>,
 )
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
-
 /**
  * Central registry of all supported speech recognition models.
  *
@@ -114,10 +102,6 @@ object ModelRegistry {
     operator fun get(id: ModelId): ModelInfo =
         byId[id] ?: error("ModelRegistry: unknown ModelId $id")
 }
-
-// ---------------------------------------------------------------------------
-// Model definitions
-// ---------------------------------------------------------------------------
 
 private val parakeetV3 = ModelInfo(
     id = ModelId.PARAKEET_V3,

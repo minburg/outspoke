@@ -22,10 +22,6 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  */
 class AppPreferences(private val context: Context) {
 
-    // -------------------------------------------------------------------------
-    // Trigger mode
-    // -------------------------------------------------------------------------
-
     private val keyTriggerMode = stringPreferencesKey("trigger_mode")
 
     /** `"HOLD"` or `"TAP_TOGGLE"`. Defaults to `"HOLD"`. */
@@ -37,10 +33,6 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[keyTriggerMode] = mode }
     }
 
-    // -------------------------------------------------------------------------
-    // VAD sensitivity
-    // -------------------------------------------------------------------------
-
     private val keyVadSensitivity = floatPreferencesKey("vad_sensitivity")
 
     /** VAD aggressiveness in [0.0, 1.0]. Defaults to 0.0 (disabled). */
@@ -51,10 +43,6 @@ class AppPreferences(private val context: Context) {
     suspend fun setVadSensitivity(value: Float) {
         context.dataStore.edit { prefs -> prefs[keyVadSensitivity] = value }
     }
-
-    // -------------------------------------------------------------------------
-    // Selected model
-    // -------------------------------------------------------------------------
 
     private val keySelectedModelId = stringPreferencesKey("selected_model_id")
 
@@ -71,10 +59,6 @@ class AppPreferences(private val context: Context) {
     suspend fun setSelectedModelId(modelId: ModelId) {
         context.dataStore.edit { prefs -> prefs[keySelectedModelId] = modelId.name }
     }
-
-    // -------------------------------------------------------------------------
-    // Whisper language selection
-    // -------------------------------------------------------------------------
 
     private val keyWhisperLanguage = stringPreferencesKey("whisper_language")
 

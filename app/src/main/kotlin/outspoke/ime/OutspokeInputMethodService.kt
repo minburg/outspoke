@@ -12,14 +12,7 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import androidx.core.view.ViewCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
@@ -29,12 +22,11 @@ import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceService
 import dev.brgr.outspoke.settings.preferences.AppPreferences
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 import dev.brgr.outspoke.ui.keyboard.ImeComposeView
 import dev.brgr.outspoke.ui.keyboard.KeyboardScreen
 import dev.brgr.outspoke.ui.keyboard.KeyboardViewModel
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import kotlinx.coroutines.launch
 
 private const val TAG = "OutspokeIME"
 
@@ -49,37 +41,27 @@ class OutspokeInputMethodService :
     ViewModelStoreOwner,
     SavedStateRegistryOwner {
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
+    // -- Lifecycle
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
-    // -------------------------------------------------------------------------
-    // ViewModel store
-    // -------------------------------------------------------------------------
+    // -- ViewModel store
 
     private val store = ViewModelStore()
     override val viewModelStore: ViewModelStore get() = store
 
-    // -------------------------------------------------------------------------
-    // Saved state
-    // -------------------------------------------------------------------------
+    // -- Saved state
 
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
-    // -------------------------------------------------------------------------
-    // ViewModel instances
-    // -------------------------------------------------------------------------
+    // -- ViewModel instances
 
     private lateinit var keyboardViewModel: KeyboardViewModel
 
-    // -------------------------------------------------------------------------
-    // InferenceService binding
-    // -------------------------------------------------------------------------
+    // -- InferenceService binding
 
     /** Non-null while the service is bound and the engine is available. */
     private var inferenceBinder: InferenceService.InferenceBinder? = null
@@ -89,19 +71,11 @@ class OutspokeInputMethodService :
             val b = binder as InferenceService.InferenceBinder
             inferenceBinder = b
 
-            // Eagerly wire the repository — will be null if the engine is still loading,
-            // but the collect block below re-fetches it once the engine becomes Ready.
             keyboardViewModel.setInferenceRepository(b.getRepository())
 
-            // Forward every engine-state change to the ViewModel and keep the repository
-            // reference in sync.  The repository is only non-null when the engine is Ready;
-            // any other transition (Unloaded, Loading, Error) means inference is unavailable.
             lifecycleScope.launch {
                 b.getEngineState().collect { state ->
                     keyboardViewModel.setEngineState(state)
-                    // Re-fetch the repository on every state change so that a transition
-                    // from Loading → Ready (which happens after the initial bind) correctly
-                    // wires the newly created InferenceRepository into the ViewModel.
                     keyboardViewModel.setInferenceRepository(
                         if (state == EngineState.Ready) b.getRepository() else null
                     )
@@ -121,22 +95,14 @@ class OutspokeInputMethodService :
 
     private fun inferenceServiceIntent() = Intent(this, InferenceService::class.java)
 
-    // -------------------------------------------------------------------------
-    // Service lifecycle → Compose lifecycle mapping
-    // -------------------------------------------------------------------------
+    // -- Service lifecycle → Compose lifecycle mapping
 
     override fun onCreate() {
-        // SavedState must be attached and restored before super.onCreate() so the
-        // registry is ready for any component that reads it during initialisation.
         savedStateRegistryController.performAttach()
         savedStateRegistryController.performRestore(null)
         super.onCreate()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
 
-        // Compose's WindowRecomposer looks for ViewTreeLifecycleOwner on the *root view*
-        // of the IME window (the LinearLayout parent added by InputMethodService), not on
-        // the ComposeView itself. We must tag the window's decorView so the walk-up search
-        // succeeds when the keyboard is first shown.
         window?.window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(this)
             decorView.setViewTreeViewModelStoreOwner(this)
@@ -151,8 +117,6 @@ class OutspokeInputMethodService :
             ),
         )[KeyboardViewModel::class.java]
 
-        // Start the inference engine as a foreground service so it survives the
-        // IME going to background, and bind so we can access InferenceRepository.
         startForegroundService(inferenceServiceIntent())
         bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
         Log.d(TAG, "InferenceService start + bind requested")
@@ -179,8 +143,6 @@ class OutspokeInputMethodService :
     }
 
     override fun onDestroy() {
-        // Unbind but do NOT stop the service — let the OS manage it so the model
-        // stays loaded across brief keyboard hide/show cycles.
         unbindService(inferenceServiceConnection)
         inferenceBinder = null
         super.onDestroy()
@@ -188,9 +150,7 @@ class OutspokeInputMethodService :
         store.clear()
     }
 
-    // -------------------------------------------------------------------------
-    // IME view
-    // -------------------------------------------------------------------------
+    // -- IME view
 
     /**
      * Height of the navigation bar in pixels, or 0 when gesture navigation is active.
@@ -221,32 +181,22 @@ class OutspokeInputMethodService :
             viewModelStoreOwner = this,
             savedStateRegistryOwner = this,
         ).also { view ->
-            // Pin the view to exactly the keyboard height so Compose doesn't try to
-            // fill the entire IME window.
             view.layoutParams = android.view.ViewGroup.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 keyboardHeightPx,
             )
-            // Request that window insets be re-dispatched once the view is attached to the
-            // window. This ensures Compose's LocalWindowInsets is populated so that
-            // navigationBarsPadding() inside KeyboardScreen works correctly.
             ViewCompat.requestApplyInsets(view)
             view.setKeyboardContent {
                 OutspokeKeyboardTheme {
                     KeyboardScreen(
                         viewModel = keyboardViewModel,
                         onSwitchKeyboard = {
-                            // switchToPreviousInputMethod() returns false if there is no
-                            // previous IME recorded (e.g. first launch). Fall back to the
-                            // system IME picker dialog so the user is never left stranded.
                             if (!switchToPreviousInputMethod()) {
                                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
                                     .showInputMethodPicker()
                             }
                         },
                         onOpenCompanionApp = {
-                            // IME is a Service — must add NEW_TASK so Android allows
-                            // launching an Activity from a non-Activity context.
                             startActivity(
                                 PermissionHelper.requestPermissionIntent()
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -276,21 +226,13 @@ class OutspokeInputMethodService :
      */
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
-        // Content and visible regions start at the very top of our keyboard window (Y = 0).
-        // This tells the framework to push the focused app up by the full keyboardHeightPx,
-        // so the app's bottom edge sits exactly at the top of the keyboard panel.
-        // keyboardHeightPx already accounts for the nav-bar area, so the app is never
-        // partially covered regardless of whether 3-button or gesture navigation is active.
         outInsets.contentTopInsets = 0
         outInsets.visibleTopInsets = 0
-        // Make the entire window frame touchable — prevents tap-through to the app below.
         outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        // Build a fresh TextInjector for this input session.
-        // currentInputConnection is guaranteed non-null here by the IME framework.
         val connection = currentInputConnection ?: return
         keyboardViewModel.setTextInjector(
             TextInjector(connection, attribute ?: EditorInfo())
@@ -300,11 +242,7 @@ class OutspokeInputMethodService :
 
     override fun onFinishInput() {
         super.onFinishInput()
-        // Step 30: commit any in-progress partial composing text as final before the
-        // InputConnection is torn down, then cancel the capture job. This ensures no
-        // underlined composing text is left behind when the user switches apps.
         keyboardViewModel.commitPartialAndStop()
-        // Safe to null the injector now — all writes to the InputConnection are done.
         keyboardViewModel.setTextInjector(null)
     }
 }

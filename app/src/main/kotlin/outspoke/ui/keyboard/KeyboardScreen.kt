@@ -1,18 +1,7 @@
 package dev.brgr.outspoke.ui.keyboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
@@ -27,11 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.brgr.outspoke.ui.keyboard.components.KeyboardActionButton
-import dev.brgr.outspoke.ui.keyboard.components.LanguageSelector
-import dev.brgr.outspoke.ui.keyboard.components.StatusIndicator
-import dev.brgr.outspoke.ui.keyboard.components.TalkButton
-import dev.brgr.outspoke.ui.keyboard.components.WaveformBar
+import dev.brgr.outspoke.ui.keyboard.components.*
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /**
@@ -240,10 +225,6 @@ fun KeyboardScreen(
         onOpenCompanionApp = onOpenCompanionApp,
     )
 }
-
-// -------------------------------------------------------------------------------------------------
-// Previews
-// -------------------------------------------------------------------------------------------------
 
 @Composable
 private fun KeyboardScreenPreviewScaffold(

@@ -1,5 +1,6 @@
 package dev.brgr.outspoke.ui.keyboard
 
+// Fixed Imports (Kotlin Extension Functions)
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -15,11 +16,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.doOnAttach
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
-import androidx.savedstate.SavedStateRegistryOwner
-
-// Fixed Imports (Kotlin Extension Functions)
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
@@ -63,10 +62,6 @@ class ImeComposeView(
         content()
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Previews — render KeyboardScreen directly (ImeComposeView.Content() is a passthrough lambda)
-// -------------------------------------------------------------------------------------------------
 
 @Composable
 private fun ImePreviewScaffold(

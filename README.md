@@ -1,8 +1,8 @@
 # Outspoke
 
-**On-device, privacy-first speech-to-text keyboard for Android**
+A privacy-focused speech-to-text keyboard(IME) for Android. Speech recognition runs entirely on-device — no internet needed after the initial model download, no account, no data leaving your phone.
 
-Outspoke is a system keyboard (IME) that turns your voice into text entirely on your device — no cloud, no account, no data leaving your phone. It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference.
+It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference.
 
 > **Status:** Early development / pre-release. Expect rough edges.
 
@@ -12,10 +12,10 @@ Outspoke is a system keyboard (IME) that turns your voice into text entirely on 
 
 - 🔒 **Fully offline after setup** — audio is never transmitted anywhere
 - 🎙️ **Real-time transcription** — progressive partial results while you speak
-- ⌨️ **Works in any app** — injects text via Android's standard `InputConnection` API
-- 🧠 **State-of-the-art model** — Parakeet-TDT 0.6B v3 (INT8 quantized, ~700 MB)
-- 🔇 **Voice Activity Detection** — energy-threshold VAD suppresses silence automatically
-- 🛠️ **Configurable trigger modes** — hold-to-talk or tap-to-toggle
+- **Works in any app** — injects text via Android's standard `InputConnection` API
+- 🧠 **Parakeet-TDT 0.6B v3** — INT8 quantized, ~700 MB, runs on mid-range hardware
+- **Voice Activity Detection** — energy-threshold VAD suppresses silence automatically
+- **Configurable trigger modes** — hold-to-talk or tap-to-toggle
 - 📦 **No Google Play Services, no telemetry, no analytics**
 
 ---
@@ -46,7 +46,7 @@ Outspoke is a system keyboard (IME) that turns your voice into text entirely on 
 
 ## Architecture
 
-Outspoke is structured as a clean layered pipeline. The `SpeechEngine` interface decouples all inference code from the service and audio layers, making it straightforward to add new models in the future.
+Outspoke is structured as a clean layered pipeline. The `SpeechEngine` interface decouples all inference code from the service and audio layers — adding a new backend means implementing that one interface and nothing else.
 
 ```
 ┌─────────────────────────────────┐
@@ -105,7 +105,7 @@ Partial results are emitted every ~1 s over a rolling 30 s window; a final resul
 
 ## Adding a New Model
 
-The `SpeechEngine` interface is the single extension point:
+To add a new model backend, implement the `SpeechEngine` interface:
 
 ```kotlin
 interface SpeechEngine {
@@ -120,7 +120,7 @@ To add, for example, a Whisper or Moonshine backend:
 
 1. Create a new class implementing `SpeechEngine` (e.g. `WhisperEngine`).
 2. Add its model files to `ModelStorageManager.REQUIRED_FILES`.
-3. Inject the new engine into `InferenceService` — the service, repository, and IME layers require **zero changes**.
+3. Register it in `SpeechEngineFactory` and update `ModelStorageManager` with its required files — the repository and IME layers don't need to change.
 
 ---
 
@@ -158,9 +158,9 @@ No permission is used for any purpose beyond what is listed above.
 
 ## Privacy
 
-- **No audio ever leaves the device.** All recognition runs locally via ONNX Runtime.
-- **No analytics, crash reporters, or third-party SDKs** are included.
-- **No accounts or sign-in** of any kind.
+- Audio stays on your device — all recognition runs locally via ONNX Runtime.
+- No analytics, crash reporters, or third-party SDKs are included.
+- No accounts or sign-in of any kind.
 - The only network access is the one-time model download; this can be done manually if preferred (see [manual model installation](../../wiki/Manual-Model-Installation)).
 
 ---

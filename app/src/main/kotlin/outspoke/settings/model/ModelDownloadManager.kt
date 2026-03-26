@@ -2,6 +2,7 @@ package dev.brgr.outspoke.settings.model
 
 import android.content.Context
 import android.util.Log
+import dev.brgr.outspoke.settings.model.ModelDownloadManager.Companion.INSTALLED_MARKER
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import okhttp3.OkHttpClient
@@ -54,10 +55,6 @@ class ModelDownloadManager(
             emit(ModelState.Corrupted)
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Individual-file download
-    // -------------------------------------------------------------------------
 
     /**
      * Downloads each file in [source] sequentially, reporting weighted aggregate progress
@@ -139,10 +136,6 @@ class ModelDownloadManager(
 
         return true
     }
-
-    // -------------------------------------------------------------------------
-    // ZIP archive download
-    // -------------------------------------------------------------------------
 
     /**
      * Downloads the ZIP from [source], optionally verifies its SHA-256, extracts all

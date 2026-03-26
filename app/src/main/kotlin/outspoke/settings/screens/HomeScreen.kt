@@ -7,39 +7,13 @@ import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.brgr.outspoke.audio.PermissionHelper
+import dev.brgr.outspoke.inference.InferenceService
 import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
@@ -82,6 +57,9 @@ fun HomeScreen(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasMicPermission = granted
+        if (granted && ModelStorageManager.isModelReady(context)) {
+            context.startForegroundService(Intent(context, InferenceService::class.java))
+        }
     }
 
     // Refresh all statuses on every ON_RESUME — catches changes made in other apps/settings.
@@ -193,19 +171,11 @@ private fun HomeScreenContent(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Returns `true` if the Outspoke IME appears in the system's enabled-input-methods list. */
 private fun isOutspokeImeEnabled(context: Context): Boolean {
     val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     return imm.enabledInputMethodList.any { it.packageName == context.packageName }
 }
-
-// ---------------------------------------------------------------------------
-// Reusable status row card
-// ---------------------------------------------------------------------------
 
 @Composable
 private fun StatusRow(
@@ -243,10 +213,6 @@ private fun StatusRow(
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Previews
-// ---------------------------------------------------------------------------
 
 @Preview(showBackground = true, name = "Home · Nothing Set Up")
 @Composable

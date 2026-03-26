@@ -4,9 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import dev.brgr.outspoke.audio.PermissionHelper.hasRecordPermission
 
 /**
  * Utility for checking and directing the user to grant [Manifest.permission.RECORD_AUDIO].

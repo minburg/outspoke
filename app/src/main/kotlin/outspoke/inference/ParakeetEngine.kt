@@ -14,9 +14,6 @@ import java.nio.LongBuffer
 private const val TAG = "ParakeetEngine"
 private const val FALLBACK_BLANK_ID = 1024
 
-// ---------------------------------------------------------------------------
-// Tensor name constants — ALL verified from logcat on 2026-03-23
-// ---------------------------------------------------------------------------
 private object Names {
     // nemo128.onnx  ← verified: expected [waveforms, waveforms_lens]
     const val PREP_IN_AUDIO    = "waveforms"
@@ -69,9 +66,6 @@ class ParakeetEngine : SpeechEngine {
     @Volatile override var isLoaded: Boolean = false
         private set
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
 
     /**
      * Creates all ONNX sessions and loads the vocabulary.
@@ -187,10 +181,6 @@ class ParakeetEngine : SpeechEngine {
         isLoaded = false
         Log.d(TAG, "ParakeetEngine closed")
     }
-
-    // -------------------------------------------------------------------------
-    // Pipeline steps
-    // -------------------------------------------------------------------------
 
     /** Converts `ShortArray` PCM to a `FloatArray` in `[-1.0, 1.0]`. Allocation-free on hot path. */
     private fun normalizePcm(pcm: ShortArray): FloatArray {
@@ -407,10 +397,6 @@ class ParakeetEngine : SpeechEngine {
 
         return detokenize(hypothesis)
     }
-
-    // -------------------------------------------------------------------------
-    // Utilities
-    // -------------------------------------------------------------------------
 
     /**
      * Converts token IDs to a string using [vocabulary].

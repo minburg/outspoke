@@ -1,24 +1,13 @@
 package dev.brgr.outspoke.ui.keyboard.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
@@ -84,10 +73,6 @@ fun StatusIndicator(
         }
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Private sub-composables for each state
-// -------------------------------------------------------------------------------------------------
 
 @Composable
 private fun IdleIndicator() {
@@ -221,10 +206,6 @@ private fun EngineLoadingIndicator(
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-// Gradient arc spinner
-// -------------------------------------------------------------------------------------------------
-
 /**
  * Indeterminate spinner that draws a 270° arc rotating continuously.
  *
@@ -271,10 +252,6 @@ private fun GradientArcSpinner(
         }
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Previews — one per state
-// -------------------------------------------------------------------------------------------------
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable

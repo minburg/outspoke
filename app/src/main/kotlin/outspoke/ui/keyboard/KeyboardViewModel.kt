@@ -9,17 +9,11 @@ import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
 import dev.brgr.outspoke.inference.TranscriptResult
-import dev.brgr.outspoke.settings.model.ModelId
 import dev.brgr.outspoke.settings.preferences.AppPreferences
 import dev.brgr.outspoke.ui.keyboard.components.WHISPER_LANGUAGE_OPTIONS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 private const val TAG = "KeyboardViewModel"
@@ -41,10 +35,6 @@ class KeyboardViewModel(
     /** Normalised RMS amplitude [0.0, 1.0] — updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
-    // -------------------------------------------------------------------------
-    // Trigger mode (Step 31)
-    // -------------------------------------------------------------------------
-
     /**
      * `"HOLD"` (default) or `"TAP_TOGGLE"`.
      * Collected eagerly so the TalkButton always has the latest value without
@@ -59,10 +49,6 @@ class KeyboardViewModel(
      */
     val vadSensitivity: StateFlow<Float> = appPreferences.vadSensitivity
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
-
-    // -------------------------------------------------------------------------
-    // Whisper language selection
-    // -------------------------------------------------------------------------
 
     /**
      * `true` when the currently selected model is a Whisper variant.
@@ -88,10 +74,6 @@ class KeyboardViewModel(
         viewModelScope.launch { appPreferences.setWhisperLanguage(tag) }
     }
 
-    // -------------------------------------------------------------------------
-    // Engine state (Step 29)
-    // -------------------------------------------------------------------------
-
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Unloaded)
 
     /** Called by [OutspokeInputMethodService] whenever [InferenceService.engineState] changes. */
@@ -116,10 +98,6 @@ class KeyboardViewModel(
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Inference repository (Step 28)
-    // -------------------------------------------------------------------------
-
     private var inferenceRepository: InferenceRepository? = null
 
     /** Set by [OutspokeInputMethodService] when the service binding is established. */
@@ -135,19 +113,11 @@ class KeyboardViewModel(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Text injection
-    // -------------------------------------------------------------------------
-
     private var textInjector: TextInjector? = null
 
     fun setTextInjector(injector: TextInjector?) {
         textInjector = injector
     }
-
-    // -------------------------------------------------------------------------
-    // Continuous-mode flag
-    // -------------------------------------------------------------------------
 
     private val _isContinuousMode = MutableStateFlow(false)
 
@@ -164,10 +134,6 @@ class KeyboardViewModel(
     fun onContinuousModeEnabled() {
         _isContinuousMode.value = true
     }
-
-    // -------------------------------------------------------------------------
-    // Delete helpers — delegate to TextInjector
-    // -------------------------------------------------------------------------
 
     /** Delete the character immediately before the cursor. */
     fun deleteChar() {
@@ -188,10 +154,6 @@ class KeyboardViewModel(
     fun newline() {
         textInjector?.sendNewline()
     }
-
-    // -------------------------------------------------------------------------
-    // Audio capture → inference (Step 28)
-    // -------------------------------------------------------------------------
 
     private var captureJob: Job? = null
 
@@ -291,8 +253,6 @@ class KeyboardViewModel(
     }
 
     /**
-     * Step 30 — called by [dev.brgr.outspoke.ime.OutspokeInputMethodService.onFinishInput].
-     *
      * Commits any in-progress composing (partial) text as final, then cancels the capture job
      * immediately. Must be called **before** [setTextInjector] is set to null so that the
      * [android.view.inputmethod.InputConnection] is still valid when we write the final text.
@@ -323,10 +283,6 @@ class KeyboardViewModel(
         textInjector = null
         inferenceRepository = null
     }
-
-    // -------------------------------------------------------------------------
-    // Factory
-    // -------------------------------------------------------------------------
 
     class Factory(
         private val audioCaptureManager: AudioCaptureManager,

@@ -38,39 +38,59 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
+}
+
+val abiVersionCodes = mapOf(
+    "armeabi-v7a" to 1,
+    "arm64-v8a"   to 2,
+    "x86"         to 3,
+    "x86_64"      to 4
+)
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val abiFilter = output.filters
+                .firstOrNull {
+                    it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+                }?.identifier
+            val offset = abiVersionCodes[abiFilter] ?: 0
+            output.versionCode.set((android.defaultConfig.versionCode ?: 1) * 10 + offset)
+        }
+    }
 }
 
 dependencies {
-
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation(platform("androidx.compose:compose-bom:2025.01.00"))
+    implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation(platform("androidx.compose:compose-bom:2026.03.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    // Extended icon set — required for Icons.Filled.Mic (not in the core icon set)
     implementation("androidx.compose.material:material-icons-extended")
-    // Settings navigation
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    // DataStore for persisting user preferences
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    // OkHttp for model file downloads
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // LocalLifecycleOwner + collectAsStateWithLifecycle in Compose
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    // LifecycleService for InferenceService
-    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    // ONNX Runtime — 1.21+ required for GroupQueryAttention with 11 inputs (Voxtral encoder)
-    // 1.24.3 also ships 16 KB-aligned native libs needed for Android 15+ devices
+    implementation("androidx.navigation:navigation-compose:2.9.7")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("com.squareup.okhttp3:okhttp:5.3.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.10.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2025.01.00"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.03.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

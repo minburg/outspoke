@@ -1,30 +1,11 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# F-Droid metadata — submit this file as a PR to:
-#   https://gitlab.com/fdroid/fdroiddata
-#   Path in that repo: metadata/dev.brgr.outspoke.yml
-#
-# Read the full submission guide first:
-#   https://f-droid.org/docs/Submitting_to_F-Droid_Quick_Start_Guide/
-#
-# IMPORTANT NOTES FOR QUICK APPROVAL
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. compileSdk 36 may not be available on F-Droid's build server yet.
-#    Check the current supported SDK at https://f-droid.org/docs/Build_Server_Setup/
-#    and lower compileSdk / targetSdk if needed before submitting.
-# 2. Disclose ALL anti-features upfront. Missing disclosures are the #1 cause
-#    of delayed reviews. This app downloads a model file → NonFreeNet.
-# 3. Run `fdroid lint metadata/dev.brgr.outspoke.yml` locally before submitting
-#    (install with: pip install fdroidserver).
-# ─────────────────────────────────────────────────────────────────────────────
-
 Categories:
   - Multimedia
-  - Accessibility
+  - Keyboard & IME
 
-License: GPL-3.0-only   # ← replace with your actual SPDX identifier
+License: GPL-3.0-only
 
 AuthorName: minburg
-AuthorEmail:            # your email or leave blank
+AuthorEmail: dgdf
 SourceCode: https://github.com/minburg/outspoke
 IssueTracker: https://github.com/minburg/outspoke/issues
 Changelog: https://github.com/minburg/outspoke/releases
@@ -45,15 +26,26 @@ Description: |-
 
   Requires Android 14 (API 34) or higher.
 
-# ─── Anti-features ────────────────────────────────────────────────────────────
-# Disclose every anti-feature — reviewers will reject if you miss one.
 AntiFeatures:
   NonFreeNet:
     # The app downloads the Parakeet ONNX model file from an external server
     # on first launch. After that, no network access is required.
     en-US: Downloads the ASR model file from an external server on first use.
 
-# ─── Build ────────────────────────────────────────────────────────────────────
+Repo: https://github.com/minburg/outspoke/releases
+RepoType: git
+
+CurrentVersion: '0.1.0'
+CurrentVersionCode: 1
+
+# SHA-256 fingerprint of the APK signing certificate — no colons, lowercase.
+# Retrieve it with: apksigner verify --print-certs app-release.apk | grep SHA-256
+AllowedAPKSigningKeys: <sha256-fingerprint-of-your-release-signing-key>
+
+# Detects new releases from git tags matching "v<version>" (e.g. v0.2.0).
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+
 Builds:
   - versionName: '0.1.0'
     versionCode: 1
@@ -61,23 +53,3 @@ Builds:
     subdir: app
     gradle:
       - release
-    # Pin the exact Gradle / AGP / JDK versions so F-Droid's build server
-    # produces a reproducible result. Update these when you bump versions.
-    # F-Droid build server currently supports up to JDK 17.
-    prebuild: |
-      # Nothing required — pure Kotlin/Compose, no NDK, no generated assets.
-    build: |
-      # Default `gradle release` is sufficient; override here only if needed.
-
-# ─── Auto-update ──────────────────────────────────────────────────────────────
-# F-Droid will detect new releases from git tags matching this pattern
-# and automatically open a PR to bump versionCode/versionName.
-AutoUpdateMode: Version v%v
-UpdateCheckMode: Tags
-UpdateCheckData:
-  # Tell the checker where versionCode lives in the repo
-  - app/build.gradle.kts
-  - versionCode\s*=\s*(\d+)
-  - app/build.gradle.kts
-  - versionName\s*=\s*"([^"]+)"
-

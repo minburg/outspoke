@@ -15,9 +15,6 @@ import kotlin.math.*
 
 private const val TAG = "VoxtralEngine"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Audio preprocessing — Whisper-compatible log-mel spectrogram parameters
-// ─────────────────────────────────────────────────────────────────────────────
 private const val SAMPLE_RATE   = 16_000
 private const val N_FFT         = 400        // 25 ms analysis window @ 16 kHz
 private const val HOP_LENGTH    = 160        // 10 ms hop → 100 frames / sec
@@ -25,9 +22,6 @@ private const val N_MELS        = 128        // mel frequency bins
 private const val MAX_SAMPLES   = 480_000    // hard cap: 30 s @ 16 kHz
 private const val TARGET_FRAMES = 3_000      // 30 s × 100 fps
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Decoder generation
-// ─────────────────────────────────────────────────────────────────────────────
 private const val MAX_NEW_TOKENS = 448
 
 /**
@@ -125,9 +119,6 @@ class VoxtralEngine : SpeechEngine {
     @Volatile override var isLoaded: Boolean = false
         private set
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Public API
-    // ─────────────────────────────────────────────────────────────────────────
 
     override fun load(modelDir: File) {
         check(!isLoaded) { "Already loaded; call close() before reloading" }
@@ -239,17 +230,9 @@ class VoxtralEngine : SpeechEngine {
         Log.d(TAG, "VoxtralEngine closed")
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 1 — PCM normalisation
-    // ─────────────────────────────────────────────────────────────────────────
-
     /** Converts a 16-bit signed PCM [ShortArray] to float32 normalised to [-1.0, 1.0]. */
     private fun normalisePcm(pcm: ShortArray): FloatArray =
         FloatArray(pcm.size) { i -> pcm[i] / 32_768f }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 2 — Whisper-compatible log-mel spectrogram
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Computes a Whisper-compatible log-mel spectrogram from float32 PCM samples.
@@ -397,10 +380,6 @@ class VoxtralEngine : SpeechEngine {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 3 — audio encoder
-    // ─────────────────────────────────────────────────────────────────────────
-
     /**
      * Wraps [melFeatures] (shape [N_MELS, TARGET_FRAMES]) into an ONNX tensor of
      * shape [1, N_MELS, TARGET_FRAMES], runs [session], and returns a cloned copy
@@ -506,10 +485,6 @@ class VoxtralEngine : SpeechEngine {
             inputs.values.forEach { it.close() }
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 4 — greedy autoregressive decoder
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Runs the decoder autoregressively in two phases:
@@ -858,11 +833,6 @@ class VoxtralEngine : SpeechEngine {
         }
     }
 
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 5 — detokenisation
-    // ─────────────────────────────────────────────────────────────────────────
-
     /**
      * Loads the BPE vocabulary from a Hugging Face `tokenizer.json` file.
      *
@@ -930,10 +900,6 @@ class VoxtralEngine : SpeechEngine {
         }
         return sb.toString().trim()
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Utilities
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Deep-copies [source]'s float data into a new [OnnxTensor] with the same shape,

@@ -2,6 +2,7 @@ package dev.brgr.outspoke.ui.keyboard.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -12,11 +13,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.lerp
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 import kotlin.math.exp
 import kotlin.math.pow
@@ -112,10 +112,6 @@ private fun DrawScope.drawBars(
         )
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Previews
-// -------------------------------------------------------------------------------------------------
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable

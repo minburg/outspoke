@@ -1,19 +1,7 @@
 package dev.brgr.outspoke.settings.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,9 +47,6 @@ private fun PreferencesContent(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
 
-        // -----------------------------------------------------------------------
-        // Trigger mode
-        // -----------------------------------------------------------------------
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = "Trigger Mode",
@@ -92,9 +77,6 @@ private fun PreferencesContent(
 
         HorizontalDivider()
 
-        // -----------------------------------------------------------------------
-        // VAD sensitivity
-        // -----------------------------------------------------------------------
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -131,9 +113,6 @@ private fun PreferencesContent(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Previews
-// ---------------------------------------------------------------------------
 
 @Preview(showBackground = true, name = "Preferences · Hold / VAD Off")
 @Composable

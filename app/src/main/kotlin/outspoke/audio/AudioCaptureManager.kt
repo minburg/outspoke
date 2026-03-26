@@ -6,14 +6,9 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlin.math.sqrt
 
@@ -177,10 +172,6 @@ class AudioCaptureManager(private val context: Context) {
             Log.d(TAG, "AudioRecord stopped and released")
         }
     }.flowOn(Dispatchers.IO)
-
-    // -------------------------------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------------------------------
 
     /**
      * Computes the RMS amplitude of [samples] and normalises it to [0.0, 1.0] relative to

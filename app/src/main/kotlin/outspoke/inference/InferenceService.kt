@@ -46,9 +46,7 @@ private const val NOTIFICATION_ID = 1001
  */
 class InferenceService : LifecycleService() {
 
-    // -------------------------------------------------------------------------
-    // Engine state
-    // -------------------------------------------------------------------------
+    // -- Engine state
 
     /** The currently loaded engine, or `null` while loading / unloaded. */
     @Volatile private var currentEngine: SpeechEngine? = null
@@ -64,9 +62,7 @@ class InferenceService : LifecycleService() {
     /** Observable loading / runtime state observed by the IME. */
     val engineState: StateFlow<EngineState> = _engineState.asStateFlow()
 
-    // -------------------------------------------------------------------------
-    // Binder
-    // -------------------------------------------------------------------------
+    // -- Binder
 
     inner class InferenceBinder : Binder() {
         /** Returns the active [InferenceRepository], or `null` while the engine is loading. */
@@ -81,20 +77,25 @@ class InferenceService : LifecycleService() {
         return binder
     }
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
+    // -- Lifecycle
 
     override fun onCreate() {
         super.onCreate()
 
         createNotificationChannel()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            buildNotification("Loading transcription engine…"),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-        )
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification("Loading transcription engine…"),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "startForeground rejected — app not in eligible foreground state; " +
+                    "stopping service until re-launched from Activity context", e)
+            stopSelf()
+            return
+        }
 
         Log.d(TAG, "Service created — observing selected model preference")
 
@@ -120,9 +121,7 @@ class InferenceService : LifecycleService() {
         Log.d(TAG, "Service destroyed — engine closed")
     }
 
-    // -------------------------------------------------------------------------
-    // Engine loading
-    // -------------------------------------------------------------------------
+    // -- Engine loading
 
     /**
      * Closes any existing engine and loads a fresh one for [modelId].
@@ -166,9 +165,7 @@ class InferenceService : LifecycleService() {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Models directory watcher
-    // -------------------------------------------------------------------------
+    // -- Models directory watcher
 
     /**
      * Watches the `models/` root directory so we detect both deletion and installation of
@@ -230,9 +227,7 @@ class InferenceService : LifecycleService() {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Notification helpers
-    // -------------------------------------------------------------------------
+    // -- Notification helpers
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(

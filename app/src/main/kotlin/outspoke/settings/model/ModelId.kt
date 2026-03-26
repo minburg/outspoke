@@ -1,5 +1,8 @@
 package dev.brgr.outspoke.settings.model
 
+import dev.brgr.outspoke.settings.model.ModelId.Companion.DEFAULT
+
+
 /**
  * Type-safe identifier for every supported on-device speech recognition model.
  *

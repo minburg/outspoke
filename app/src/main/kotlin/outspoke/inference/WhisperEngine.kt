@@ -1,10 +1,6 @@
 package dev.brgr.outspoke.inference
 
-import ai.onnxruntime.OnnxJavaType
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
-import ai.onnxruntime.TensorInfo
+import ai.onnxruntime.*
 import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import org.json.JSONObject
@@ -17,9 +13,6 @@ import kotlin.math.*
 
 private const val TAG = "WhisperEngine"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Audio preprocessing — Whisper standard parameters
-// ─────────────────────────────────────────────────────────────────────────────
 private const val SAMPLE_RATE   = 16_000
 private const val N_FFT         = 400        // 25 ms window @ 16 kHz
 private const val HOP_LENGTH    = 160        // 10 ms hop → 100 frames / sec
@@ -27,9 +20,6 @@ private const val N_MELS        = 128        // Whisper large-v3/turbo uses 128 
 private const val MAX_SAMPLES   = 480_000    // 30 s @ 16 kHz
 private const val TARGET_FRAMES = 3_000      // 30 s × 100 fps
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Decoder generation
-// ─────────────────────────────────────────────────────────────────────────────
 private const val MAX_NEW_TOKENS = 448
 
 /**
@@ -134,10 +124,6 @@ class WhisperEngine : SpeechEngine {
 
     @Volatile override var isLoaded: Boolean = false
         private set
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Public API
-    // ─────────────────────────────────────────────────────────────────────────
 
     override fun load(modelDir: File) {
         check(!isLoaded) { "Already loaded; call close() before reloading" }
@@ -260,17 +246,9 @@ class WhisperEngine : SpeechEngine {
         Log.d(TAG, "WhisperEngine closed")
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 1 — PCM normalisation
-    // ─────────────────────────────────────────────────────────────────────────
-
     /** Converts a 16-bit signed PCM [ShortArray] to float32 normalised to [-1.0, 1.0]. */
     private fun normalisePcm(pcm: ShortArray): FloatArray =
         FloatArray(pcm.size) { i -> pcm[i] / 32_768f }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 2 — log-mel spectrogram
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Computes a Whisper-compatible log-mel spectrogram from float32 PCM samples.
@@ -404,10 +382,6 @@ class WhisperEngine : SpeechEngine {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 3 — audio encoder
-    // ─────────────────────────────────────────────────────────────────────────
-
     /**
      * Wraps [melFeatures] (shape [N_MELS, TARGET_FRAMES]) into an ONNX tensor of
      * shape [1, N_MELS, TARGET_FRAMES], runs the encoder session once, and returns
@@ -434,10 +408,6 @@ class WhisperEngine : SpeechEngine {
             cloneTensor(env, hidden)
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 4 — greedy autoregressive decoder
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Runs a single decoder forward pass with `[SOT]` and empty KV cache, then
@@ -788,10 +758,6 @@ class WhisperEngine : SpeechEngine {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pipeline step 5 — vocabulary loading + detokenisation
-    // ─────────────────────────────────────────────────────────────────────────
-
     /**
      * Loads the BPE vocabulary from a HuggingFace `tokenizer.json` file.
      *
@@ -851,10 +817,6 @@ class WhisperEngine : SpeechEngine {
         }
         return sb.toString().trim()
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Utilities
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Returns true when the tail of [tokens] shows a repeating bigram cycle.
