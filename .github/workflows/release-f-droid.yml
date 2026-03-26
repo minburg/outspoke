@@ -75,6 +75,9 @@ jobs:
 
       # Build the signed release APK by injecting signing params via Gradle properties.
       # The keystore file never touches the source tree.
+      # -Pandroid.r8.suppressKotlinVersionCompatibilityCheck suppresses the harmless
+      # "error occurred when parsing kotlin metadata" warning that R8 emits when the
+      # project's Kotlin version is newer than the Kotlin version R8 was built against.
       - name: Build signed release APK
         env:
           STORE_FILE:     ${{ runner.temp }}/release.jks
@@ -86,23 +89,31 @@ jobs:
             -Pandroid.injected.signing.store.file="$STORE_FILE" \
             -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            -Pandroid.r8.suppressKotlinVersionCompatibilityCheck=true
 
-      # Rename to a human-readable filename that IzzyOnDroid / users can identify
-      - name: Rename APK
-        id: apk
+      # ABI splits produce one APK per architecture plus a universal APK, so there
+      # is no plain app-release.apk.  Rename every generated APK to a versioned,
+      # human-readable filename and generate a SHA-256 checksum alongside each one:
+      #   app-universal-release.apk  → outspoke-<version>.apk
+      #   app-arm64-v8a-release.apk  → outspoke-<version>-arm64-v8a.apk
+      #   (same pattern for armeabi-v7a, x86, x86_64)
+      - name: Rename APKs & generate checksums
         run: |
           VERSION="${{ steps.version.outputs.name }}"
-          APK_NAME="outspoke-${VERSION}.apk"
-          mv app/build/outputs/apk/release/app-release.apk "$APK_NAME"
-          echo "filename=$APK_NAME" >> "$GITHUB_OUTPUT"
-
-      # Generate a detached SHA-256 checksum so users can verify the download
-      - name: Generate SHA-256 checksum
-        run: |
-          APK="${{ steps.apk.outputs.filename }}"
-          sha256sum "$APK" > "${APK}.sha256"
-          echo "SHA-256: $(cat ${APK}.sha256)"
+          echo "APKs produced by the build:"
+          ls -lh app/build/outputs/apk/release/*.apk
+          for APK in app/build/outputs/apk/release/app-*-release.apk; do
+            SUFFIX=$(basename "$APK" | sed 's/app-\(.*\)-release\.apk/\1/')
+            if [ "$SUFFIX" = "universal" ]; then
+              DST="outspoke-${VERSION}.apk"
+            else
+              DST="outspoke-${VERSION}-${SUFFIX}.apk"
+            fi
+            mv "$APK" "$DST"
+            sha256sum "$DST" > "${DST}.sha256"
+            echo "SHA-256 ($DST): $(cat ${DST}.sha256)"
+          done
 
       # Create the GitHub Release. softprops/action-gh-release auto-generates
       # release notes from commits since the previous tag.
@@ -115,6 +126,6 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}  # treat v0.1.0-beta as pre-release
           files: |
-            ${{ steps.apk.outputs.filename }}
-            ${{ steps.apk.outputs.filename }}.sha256
+            outspoke-*.apk
+            outspoke-*.apk.sha256
 
