@@ -100,11 +100,12 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS:      ${{ secrets.KEY_ALIAS }}
         run: |
+          # Match both "SHA-256" and "SHA256" (some JDK versions print the label without the hyphen).
           keytool -list -v \
             -keystore "$RUNNER_TEMP/release.jks" \
             -storepass "$STORE_PASSWORD" \
             -alias "$KEY_ALIAS" \
-            | grep -i "SHA-256"
+            | grep -i -E "SHA-?256"
 
       # ABI splits produce one APK per architecture plus a universal APK, so there
       # is no plain app-release.apk.  Rename every generated APK to a versioned,
