@@ -7,7 +7,7 @@ import java.io.File
  * Abstraction over any on-device speech recognition engine.
  *
  * Implementing this interface allows [InferenceService] and [InferenceRepository] to
- * remain model-agnostic — swapping to Whisper, Moonshine, Canary, etc. requires only
+ * remain model-agnostic - swapping to Whisper, Moonshine, Canary, etc. requires only
  * a new class that implements this contract, with zero changes to the service layer.
  */
 interface SpeechEngine {
@@ -17,7 +17,7 @@ interface SpeechEngine {
 
     /**
      * Initialises all inference sessions from [modelDir].
-     * Must be called on a background thread — loading takes 1–3 s on first run.
+     * Must be called on a background thread - loading takes 1–3 s on first run.
      *
      * @throws IllegalStateException if called while already loaded.
      * @throws Exception if any required model file is missing or corrupt.

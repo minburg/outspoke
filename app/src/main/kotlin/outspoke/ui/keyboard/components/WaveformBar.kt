@@ -26,7 +26,7 @@ private const val BAR_COUNT = 60
 /**
  * A row of animated vertical bars that visualise the current microphone amplitude.
  *
- * A single [animateFloatAsState] drives the whole row — all bars are drawn in one
+ * A single [animateFloatAsState] drives the whole row - all bars are drawn in one
  * [Canvas] pass using `drawRoundRect`, avoiding the 60 individual Compose animation
  * states and recompositions that the previous implementation incurred.
  *
@@ -44,7 +44,7 @@ fun WaveformBar(
     barWidth: Dp = 3.dp,
     barSpacing: Dp = 2.dp,
 ) {
-    // Single animation state for the whole waveform — one tick per frame instead of 60.
+    // Single animation state for the whole waveform - one tick per frame instead of 60.
     val animatedAmplitude by animateFloatAsState(
         targetValue = amplitude,
         animationSpec = tween(durationMillis = 80),
@@ -71,7 +71,7 @@ fun WaveformBar(
 
 /**
  * Draws all [BAR_COUNT] bars onto the [DrawScope].
- * Called inside the Canvas lambda — no allocations other than the CornerRadius value type.
+ * Called inside the Canvas lambda - no allocations other than the CornerRadius value type.
  */
 private fun DrawScope.drawBars(
     amplitude: Float,

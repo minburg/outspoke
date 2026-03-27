@@ -11,7 +11,7 @@ import dev.brgr.outspoke.audio.PermissionHelper.hasRecordPermission
 /**
  * Utility for checking and directing the user to grant [Manifest.permission.RECORD_AUDIO].
  *
- * The IME itself **cannot** present a permission dialog — only an Activity can. Any call
+ * The IME itself **cannot** present a permission dialog - only an Activity can. Any call
  * to [hasRecordPermission] that returns `false` should be surfaced to the user as a
  * [dev.brgr.outspoke.ui.keyboard.KeyboardUiState.Error] with a link that opens the
  * companion app's permission screen.

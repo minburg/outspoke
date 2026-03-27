@@ -18,9 +18,9 @@ private const val TAG = "ModelDownloadManager"
  * [ModelStorageManager].
  *
  * Supports two download modes:
- *  - [DownloadSource.Files]      — individual files are streamed, SHA-256 verified, and
+ *  - [DownloadSource.Files]      - individual files are streamed, SHA-256 verified, and
  *                                  atomically renamed on success.
- *  - [DownloadSource.ZipArchive] — a single ZIP archive is downloaded, optionally SHA-256
+ *  - [DownloadSource.ZipArchive] - a single ZIP archive is downloaded, optionally SHA-256
  *                                  verified, extracted, and a [INSTALLED_MARKER] file is
  *                                  written so [ModelStorageManager.isModelReady] can confirm
  *                                  the installation.
@@ -122,7 +122,7 @@ class ModelDownloadManager(
                     Log.d(TAG, "SHA-256 verified for ${remoteFile.filename}")
                 }
 
-                // Atomic rename — only replaces the final file after a fully verified download.
+                // Atomic rename - only replaces the final file after a fully verified download.
                 tempFile.renameTo(finalFile)
                 Log.d(TAG, "Saved ${remoteFile.filename} (${finalFile.length()} bytes)")
 
@@ -205,7 +205,7 @@ class ModelDownloadManager(
             extractZip(zipFile = zipTemp, destDir = modelDir)
             zipTemp.delete()
 
-            // Write installation marker — checked by isModelReady() for ZIP-based models.
+            // Write installation marker - checked by isModelReady() for ZIP-based models.
             File(modelDir, INSTALLED_MARKER).writeText("ok")
             Log.d(TAG, "ZIP extracted and installed to $modelDir")
 

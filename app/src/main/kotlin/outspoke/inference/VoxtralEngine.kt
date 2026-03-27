@@ -35,10 +35,10 @@ private const val MAX_NEW_TOKENS = 448
  *  4. Autoregressive Mistral decoder (decoder_model_merged.onnx) with KV-cache carry-over
  *  5. Detokenise using the BPE vocabulary from tokenizer.json
  *
- * Tensor names are logged at load time via [logSession] — cross-check against logcat
+ * Tensor names are logged at load time via [logSession] - cross-check against logcat
  * if the ONNX export revision changes the names.
  *
- * NOTE: Voxtral is a ~4 GB model — it requires a high-end device with substantial RAM.
+ * NOTE: Voxtral is a ~4 GB model - it requires a high-end device with substantial RAM.
  */
 class VoxtralEngine : SpeechEngine {
 
@@ -60,7 +60,7 @@ class VoxtralEngine : SpeechEngine {
         const val EMBED_IN_INPUT_IDS  = "input_ids"           // INT64 [1, seq]
         const val EMBED_OUT_EMBEDS    = "inputs_embeds"        // FLOAT [1, seq, hidden]
 
-        // Decoder tensor names — decoder-only Mistral, no cross-attention.
+        // Decoder tensor names - decoder-only Mistral, no cross-attention.
         // Audio features are prepended to inputs_embeds on the prefill step.
         const val DEC_IN_INPUTS_EMBEDS = "inputs_embeds"      // FLOAT [1, seq, hidden]
         const val DEC_OUT_LOGITS       = "logits"             // FLOAT [1, seq, vocab]
@@ -77,7 +77,7 @@ class VoxtralEngine : SpeechEngine {
 
         // Voxtral Realtime streaming architecture token.
         // The model emits [STREAMING_PAD] (ID 32) between real speech tokens to signal
-        // "no new transcription yet — waiting for the next audio chunk".  In offline
+        // "no new transcription yet - waiting for the next audio chunk".  In offline
         // (batch) mode all audio is available upfront, so these pads should be treated
         // as transparent filler: filtered from the hypothesis and used to detect
         // end-of-speech when too many appear consecutively.
@@ -147,7 +147,7 @@ class VoxtralEngine : SpeechEngine {
             embedSession = e.createSession(embedTokensFile.absolutePath, opts)
             logSession("embed_tokens_q4", embedSession!!)
         } else {
-            Log.w(TAG, "$EMBED_TOKENS_FILENAME not found — will try input_ids fallback on decoder")
+            Log.w(TAG, "$EMBED_TOKENS_FILENAME not found - will try input_ids fallback on decoder")
         }
 
         if (decoderFile.exists()) {
@@ -165,7 +165,7 @@ class VoxtralEngine : SpeechEngine {
             vocabulary = loadVocabulary(tokenizerFile)
             Log.d(TAG, "Vocabulary loaded: ${vocabulary.size} tokens")
         } else {
-            Log.w(TAG, "$TOKENIZER_JSON not found — detokenisation will be unavailable")
+            Log.w(TAG, "$TOKENIZER_JSON not found - detokenisation will be unavailable")
         }
 
         // Pre-build the mel filterbank once so transcribe() is allocation-light
@@ -179,10 +179,10 @@ class VoxtralEngine : SpeechEngine {
     override fun transcribe(chunk: AudioChunk): TranscriptResult {
         if (!isLoaded) return TranscriptResult.Failure(IllegalStateException("Engine not loaded"))
 
-        // Skip stale chunks when inference is already running — avoids an unbounded queue
+        // Skip stale chunks when inference is already running - avoids an unbounded queue
         // of old audio windows that would delay or permanently block the most-recent chunk.
         if (!inferenceLock.tryLock()) {
-            Log.d(TAG, "transcribe: inference already in progress — skipping chunk")
+            Log.d(TAG, "transcribe: inference already in progress - skipping chunk")
             return TranscriptResult.Partial("")
         }
         try {
@@ -413,7 +413,7 @@ class VoxtralEngine : SpeechEngine {
             // transformer blocks, halving the time dimension: 3 000 → 1 500 frames.
             val encSeqLen = TARGET_FRAMES / 2L   // 1 500 encoder frames for 30 s audio
 
-            // attention_mask: int64 [1, encSeqLen], all 1s — full window, no padding
+            // attention_mask: int64 [1, encSeqLen], all 1s - full window, no padding
             if ("attention_mask" in inputNames) {
                 inputs["attention_mask"] = OnnxTensor.createTensor(
                     env,
@@ -453,7 +453,7 @@ class VoxtralEngine : SpeechEngine {
                 val shape = LongArray(rank) { i ->
                     val d = info.shape[i]
                     when {
-                        d >= 0L             -> d   // static dim — keep as-is
+                        d >= 0L             -> d   // static dim - keep as-is
                         rank == 4 && i == 2 -> 0L  // KV past sequence length → 0
                         else                -> 1L  // batch / other dynamic dim → 1
                     }
@@ -489,14 +489,14 @@ class VoxtralEngine : SpeechEngine {
     /**
      * Runs the decoder autoregressively in two phases:
      *
-     * **Phase 1 — Instruction + audio prefill** (no logits):
+     * **Phase 1 - Instruction + audio prefill** (no logits):
      * Feeds `[BOS_emb, INST_emb, audio_embs…]` to populate the KV cache without
      * materialising the enormous `[1, T_prefill, vocab_size]` logit tensor on the
      * Android Java heap.  Falls back to a bare audio prefill if `[INST]` is absent
      * from the loaded vocabulary.
      *
-     * **Phase 2 — Autoregressive generation** (starting from [/INST] seed token):
-     * Each step embeds a single token → logits `[1, 1, vocab_size]` (~128 KB) — safe.
+     * **Phase 2 - Autoregressive generation** (starting from [/INST] seed token):
+     * Each step embeds a single token → logits `[1, 1, vocab_size]` (~128 KB) - safe.
      *
      * **KV-cache ownership**: `present.*` tensors remain in ORT native (C++) memory via
      * the still-open `OrtSession.Result`.  The previous result is closed only *after*
@@ -517,7 +517,7 @@ class VoxtralEngine : SpeechEngine {
                    "hasPositionIds=$hasPositionIds decoderUsesEmbeds=$decoderUsesEmbeds")
 
         val embed = embedSession
-            ?: throw RuntimeException("embed_tokens session required — decoder uses inputs_embeds")
+            ?: throw RuntimeException("embed_tokens session required - decoder uses inputs_embeds")
 
         // ── Extract audio embedding data and dimensions ───────────────────────
         val audioData  = FloatArray(audioEmbeds.floatBuffer.remaining())
@@ -580,7 +580,7 @@ class VoxtralEngine : SpeechEngine {
         val presentOutputNames: Set<String> = outputNames.filter { it.startsWith("present") }.toSet()
 
         // KV cache: input name → OnnxTensor that lives inside prevStepResult.
-        // References only — no FloatArray copy — so ~600 MB stays in ORT native memory.
+        // References only - no FloatArray copy - so ~600 MB stays in ORT native memory.
         val kvCacheTensors = mutableMapOf<String, OnnxTensor>()
         var prevStepResult: OrtSession.Result? = null
         val hypothesis     = mutableListOf<Int>()
@@ -615,7 +615,7 @@ class VoxtralEngine : SpeechEngine {
                 Log.d(TAG, "greedyDecode: running Phase 1 prefill (len=$fullPrefillLen)")
                 prevStepResult = session.run(prefillInputs, presentOutputNames)
                 collectKvTensors(prevStepResult!!, outputNames, kvCacheTensors)
-                Log.d(TAG, "greedyDecode: Phase 1 complete — KV cache: ${kvCacheTensors.size} tensors")
+                Log.d(TAG, "greedyDecode: Phase 1 complete - KV cache: ${kvCacheTensors.size} tensors")
             } finally {
                 prefillInputs.values.forEach { it.close() }
             }
@@ -624,7 +624,7 @@ class VoxtralEngine : SpeechEngine {
             var nextToken     = seedTokenId  // [/INST] (instruction mode) or BOS (fallback)
             var consecutivePads = 0
             // Sliding window of the last REPETITION_WINDOW_TOKENS real (non-pad) hypothesis
-            // tokens — used to detect when the model is cycling.
+            // tokens - used to detect when the model is cycling.
             val recentHypothesis = mutableListOf<Int>()
 
             // ── Phase 2: Autoregressive generation ───────────────────────────
@@ -660,7 +660,7 @@ class VoxtralEngine : SpeechEngine {
                             longArrayOf(1L, 1L),
                         )
                     }
-                    // KV-cache tensors — owned by prevStepResult; do NOT close here
+                    // KV-cache tensors - owned by prevStepResult; do NOT close here
                     for ((name, tensor) in kvCacheTensors) {
                         genInputs[name] = tensor
                     }
@@ -673,7 +673,7 @@ class VoxtralEngine : SpeechEngine {
                     kvCacheTensors.clear()
                     collectKvTensors(currentResult, outputNames, kvCacheTensors)
 
-                    // Logits: [1, 1, vocab_size] — floatBuffer is ~128 KB, trivially safe
+                    // Logits: [1, 1, vocab_size] - floatBuffer is ~128 KB, trivially safe
                     val logitsTensor = currentResult.get(DEC_OUT_LOGITS)
                         .orElseThrow { RuntimeException("Decoder output '$DEC_OUT_LOGITS' not found") }
                         as OnnxTensor
@@ -694,13 +694,13 @@ class VoxtralEngine : SpeechEngine {
                             break
                         }
                         TOKEN_STREAMING_PAD -> {
-                            // Voxtral Realtime streaming pad — "waiting for more audio".
+                            // Voxtral Realtime streaming pad - "waiting for more audio".
                             // In batch/offline mode, too many consecutive pads means
                             // end-of-transcription (no more speech to decode).
                             consecutivePads++
                             if (consecutivePads > MAX_CONSECUTIVE_PADS) {
                                 Log.d(TAG, "greedyDecode: $consecutivePads consecutive " +
-                                           "[STREAMING_PAD] — end of transcription at step $step")
+                                           "[STREAMING_PAD] - end of transcription at step $step")
                                 break
                             }
                             // Do NOT add to hypothesis; keep feeding pad back to maintain
@@ -721,7 +721,7 @@ class VoxtralEngine : SpeechEngine {
                                 if (recentHypothesis.subList(0, half) ==
                                     recentHypothesis.subList(half, REPETITION_WINDOW_TOKENS)) {
                                     Log.d(TAG, "greedyDecode: repeating cycle detected " +
-                                               "at step $step — trimming tail and stopping")
+                                               "at step $step - trimming tail and stopping")
                                     // Drop the duplicated second half from the hypothesis
                                     repeat(half) { hypothesis.removeLastOrNull() }
                                     break
@@ -749,7 +749,7 @@ class VoxtralEngine : SpeechEngine {
      * Collects `present.*` output tensors from [result] into [dest], renaming each
      * to its corresponding `past_key_values.*` input name.
      *
-     * Tensors are **not copied** — they remain owned by [result].
+     * Tensors are **not copied** - they remain owned by [result].
      * [result] must stay open as long as any entry in [dest] is in use.
      */
     private fun collectKvTensors(
@@ -774,7 +774,7 @@ class VoxtralEngine : SpeechEngine {
             Log.d(TAG, "findTokenId: '$token' → ID $id")
             id
         } else {
-            Log.w(TAG, "findTokenId: '$token' not found in vocabulary — using default ID $default")
+            Log.w(TAG, "findTokenId: '$token' not found in vocabulary - using default ID $default")
             default
         }
     }
@@ -797,7 +797,7 @@ class VoxtralEngine : SpeechEngine {
             val shape = LongArray(rank) { i ->
                 val d = info.shape[i]
                 when {
-                    d >= 0L              -> d    // static dim — keep as-is
+                    d >= 0L              -> d    // static dim - keep as-is
                     rank == 4 && i == 2  -> 0L   // past sequence length → 0 (empty cache)
                     else                 -> 1L   // batch / other dynamic dim → 1
                 }
@@ -840,8 +840,8 @@ class VoxtralEngine : SpeechEngine {
      * `[/INST]` (stored in `added_tokens`) are available for instruction-format
      * construction even when a full `model.vocab` is also present.
      *
-     *  1. `model.vocab` — maps BPE piece string → token ID.
-     *  2. `added_tokens` — overlaid on top; overrides any conflicting positions and
+     *  1. `model.vocab` - maps BPE piece string → token ID.
+     *  2. `added_tokens` - overlaid on top; overrides any conflicting positions and
      *     extends the array when IDs exceed the main vocab size.
      *
      * Returns an array indexed by token ID.
@@ -856,7 +856,7 @@ class VoxtralEngine : SpeechEngine {
             entries[vocab.getInt(token)] = token
         }
 
-        // Overlay: added_tokens — contains [INST], [/INST], <s>, </s>, etc.
+        // Overlay: added_tokens - contains [INST], [/INST], <s>, </s>, etc.
         // These may override positions in the main vocab or extend beyond it.
         val addedTokens = json.optJSONArray("added_tokens")
         if (addedTokens != null) {
@@ -867,7 +867,7 @@ class VoxtralEngine : SpeechEngine {
         }
 
         if (entries.isEmpty()) {
-            Log.w(TAG, "Could not parse vocabulary from $TOKENIZER_JSON — detokenisation will be empty")
+            Log.w(TAG, "Could not parse vocabulary from $TOKENIZER_JSON - detokenisation will be empty")
             return emptyArray()
         }
 
@@ -883,7 +883,7 @@ class VoxtralEngine : SpeechEngine {
      * Handles:
      *  - Byte-level GPT-2 / Mistral tokens: `Ġ` (U+0120) → space, `Ċ` (U+010A) → newline
      *  - SentencePiece word-boundary marker: `▁` (U+2581) → space
-     *  - Special tokens enclosed in `<…>` — skipped
+     *  - Special tokens enclosed in `<…>` - skipped
      */
     private fun detokenize(tokenIds: List<Int>): String {
         if (tokenIds.isEmpty()) return ""

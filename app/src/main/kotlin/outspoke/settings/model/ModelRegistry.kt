@@ -9,7 +9,7 @@ private const val VOXTRAL_BASE =
 private const val VOXTRAL_ROOT =
     "https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/resolve/main"
 
-// Whisper Large v3 Turbo INT8 — same onnx-community export format as Voxtral.
+// Whisper Large v3 Turbo INT8 - same onnx-community export format as Voxtral.
 // ONNX files live under /onnx/; tokenizer.json is at the repo root.
 private const val WHISPER_TURBO_BASE =
     "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/onnx"
@@ -107,7 +107,7 @@ private val parakeetV3 = ModelInfo(
     id = ModelId.PARAKEET_V3,
     displayName = "Parakeet-V3 (Default)",
     description = "NeMo TDT model optimised for English on-device ASR. " +
-                  "Fast and compact — the recommended choice for most devices.",
+                  "Fast and compact - the recommended choice for most devices.",
     approximateSizeMb = 700,
     source = DownloadSource.Files(
         baseUrl = PARAKEET_BASE,
@@ -142,13 +142,13 @@ private val parakeetV3 = ModelInfo(
 
 // Q4-quantised variant: audio_encoder_q4 (661 MB) + embed_tokens_q4 (258 MB)
 //                       + decoder_model_merged_q4 (~2.3 GB) + tokenizer.json
-// Total ≈ 3 300 MB — suitable only for high-end devices with ≥ 6 GB RAM.
+// Total ≈ 3 300 MB - suitable only for high-end devices with ≥ 6 GB RAM.
 @Suppress("unused")
 private val voxtralMini = ModelInfo(
     id = ModelId.VOXTRAL_MINI,
     displayName = "Voxtral Mini 4B (Q4)",
     description = "Mistral-based multilingual speech model from onnx-community. " +
-                  "Q4-quantised (~3.3 GB) — requires a high-end device with ample storage.",
+                  "Q4-quantised (~3.3 GB) - requires a high-end device with ample storage.",
     approximateSizeMb = 3_300,
     source = DownloadSource.Files(
         baseUrl = VOXTRAL_BASE,
@@ -163,7 +163,7 @@ private val voxtralMini = ModelInfo(
             RemoteFile(filename = "decoder_model_merged_q4.onnx",       sizeFraction = 0.01f, sha256 = null),
             RemoteFile(filename = "decoder_model_merged_q4.onnx_data",  sizeFraction = 0.61f, sha256 = null),
             RemoteFile(filename = "decoder_model_merged_q4.onnx_data_1",sizeFraction = 0.08f, sha256 = null),
-            // Tokenizer + config — these live at the repo ROOT, not under /onnx/
+            // Tokenizer + config - these live at the repo ROOT, not under /onnx/
             RemoteFile(filename = "tokenizer.json",      sizeFraction = 0.00f, sha256 = null,
                 urlOverride = "$VOXTRAL_ROOT/tokenizer.json"),
             RemoteFile(filename = "tokenizer_config.json", sizeFraction = 0.00f, sha256 = null,
@@ -183,7 +183,7 @@ private val voxtralMini = ModelInfo(
     ),
 )
 
-// Whisper Large v3 Turbo INT8 — real file sizes (verified via HuggingFace API):
+// Whisper Large v3 Turbo INT8 - real file sizes (verified via HuggingFace API):
 //   encoder_model_int8.onnx          644 822 094 B ≈ 615 MB
 //   decoder_model_merged_int8.onnx   439 936 716 B ≈ 420 MB  (merged branches + full vocab table)
 //   tokenizer.json                     2 480 617 B ≈   2 MB

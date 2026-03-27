@@ -28,9 +28,9 @@ private const val MAX_NEW_TOKENS = 448
  * follows the standard merged-decoder format.
  *
  * Expected files in `modelDir`:
- *  - `encoder_model_int8.onnx`          — plain transformer encoder, no KV cache (~615 MB)
- *  - `decoder_model_merged_int8.onnx`   — merged decoder with `use_cache_branch` control (~420 MB)
- *  - `tokenizer.json`                   — HuggingFace tokenizer vocabulary
+ *  - `encoder_model_int8.onnx`          - plain transformer encoder, no KV cache (~615 MB)
+ *  - `decoder_model_merged_int8.onnx`   - merged decoder with `use_cache_branch` control (~420 MB)
+ *  - `tokenizer.json`                   - HuggingFace tokenizer vocabulary
  *
  * Inference pipeline:
  *  1. Normalise 16-bit PCM to float32 [-1, 1]
@@ -57,13 +57,13 @@ class WhisperEngine : SpeechEngine {
         const val DEC_IN_USE_CACHE_BRANCH = "use_cache_branch"
         const val DEC_OUT_LOGITS          = "logits"
 
-        // Whisper special token IDs — identical across all model sizes (vocab size = 51 865)
+        // Whisper special token IDs - identical across all model sizes (vocab size = 51 865)
         const val TOKEN_SOT           = 50258  // <|startoftranscript|>
         const val TOKEN_EOT           = 50256  // <|endoftext|>
         const val TOKEN_ENGLISH       = 50259  // <|en|>
         const val TOKEN_TRANSCRIBE    = 50359  // <|transcribe|>
         const val TOKEN_NO_TIMESTAMPS = 50363  // <|notimestamps|>
-        // Any token ID >= TOKEN_EOT is a Whisper control / special token — kept for reference
+        // Any token ID >= TOKEN_EOT is a Whisper control / special token - kept for reference
         // but resolved dynamically via findTokenId() at load time.
     }
 
@@ -106,7 +106,7 @@ class WhisperEngine : SpeechEngine {
 
     /**
      * BCP-47 tags to restrict auto-detection to (e.g. `["en", "de", "es"]`).
-     * Empty list = unconstrained — searches all ~100 language tokens, which is unreliable
+     * Empty list = unconstrained - searches all ~100 language tokens, which is unreliable
      * for short clips because adjacent tokens like EN (50259) and ES (50262) can have nearly
      * identical logits.  Set via [setLanguageConstraints].
      */
@@ -159,7 +159,7 @@ class WhisperEngine : SpeechEngine {
             vocabulary = loadVocabulary(tokenizerFile)
             Log.d(TAG, "Vocabulary loaded: ${vocabulary.size} tokens")
 
-            // Resolve special token IDs from the actual vocabulary — they shift between
+            // Resolve special token IDs from the actual vocabulary - they shift between
             // model sizes (large-v3 added more languages, pushing task tokens up by one).
             tokenSot          = findTokenId("<|startoftranscript|>", TOKEN_SOT)
             tokenEnglish      = findTokenId("<|en|>",                TOKEN_ENGLISH)
@@ -169,7 +169,7 @@ class WhisperEngine : SpeechEngine {
             Log.d(TAG, "Token IDs: SOT=$tokenSot EN=$tokenEnglish " +
                        "TRANSCRIBE=$tokenTranscribe NO_TS=$tokenNoTimestamps EOT=$tokenEot")
         } else {
-            Log.w(TAG, "$TOKENIZER_JSON not found — detokenisation will be unavailable")
+            Log.w(TAG, "$TOKENIZER_JSON not found - detokenisation will be unavailable")
         }
 
         // Pre-build the filterbank so transcribe() is allocation-light
@@ -185,7 +185,7 @@ class WhisperEngine : SpeechEngine {
 
         // Skip stale chunks when inference is already running
         if (!inferenceLock.tryLock()) {
-            Log.d(TAG, "transcribe: inference already in progress — skipping chunk")
+            Log.d(TAG, "transcribe: inference already in progress - skipping chunk")
             return TranscriptResult.Partial("")
         }
         try {
@@ -201,9 +201,9 @@ class WhisperEngine : SpeechEngine {
 
                 // Whisper requires at least 2 s of audio for reliable output.
                 // A 1-second clip produces hallucinated single-word results that immediately
-                // hit EOT — return Partial so the caller doesn't commit garbage as Final.
+                // hit EOT - return Partial so the caller doesn't commit garbage as Final.
                 if (chunk.samples.size < SAMPLE_RATE * 2) {
-                    Log.d(TAG, "transcribe: clip too short (${chunk.samples.size} samples) — returning Partial")
+                    Log.d(TAG, "transcribe: clip too short (${chunk.samples.size} samples) - returning Partial")
                     return TranscriptResult.Partial("")
                 }
 
@@ -223,7 +223,7 @@ class WhisperEngine : SpeechEngine {
                 // 5. Detokenise
                 val text = detokenize(tokenIds)
                 // A single-token output that hits EOT immediately is almost always a
-                // hallucination from insufficient audio — treat it as tentative.
+                // hallucination from insufficient audio - treat it as tentative.
                 when {
                     text.isBlank()     -> TranscriptResult.Partial("")
                     tokenIds.size <= 1 -> TranscriptResult.Partial(text)
@@ -387,7 +387,7 @@ class WhisperEngine : SpeechEngine {
      * shape [1, N_MELS, TARGET_FRAMES], runs the encoder session once, and returns
      * a cloned copy of `last_hidden_state` [1, 1500, D].
      *
-     * Whisper's encoder is a plain transformer — no KV cache, no past inputs.
+     * Whisper's encoder is a plain transformer - no KV cache, no past inputs.
      */
     private fun encodeAudio(
         env: OrtEnvironment,
@@ -467,7 +467,7 @@ class WhisperEngine : SpeechEngine {
                 }
 
                 if (candidates.isEmpty()) {
-                    Log.w(TAG, "detectLanguage: no valid candidates — falling back to English")
+                    Log.w(TAG, "detectLanguage: no valid candidates - falling back to English")
                     return tokenEnglish
                 }
 
@@ -500,12 +500,12 @@ class WhisperEngine : SpeechEngine {
      * **Language detection** (pre-pass):
      * Feeds `[SOT]` with an empty KV cache and argmaxes over the language token range
      * (50259–50357) to auto-detect the spoken language.  The KV cache from this pass
-     * is discarded immediately — it is only ~1 token, so the cost is negligible compared
+     * is discarded immediately - it is only ~1 token, so the cost is negligible compared
      * to the encoder.
      *
      * **Phase 1** (`use_cache_branch = 0`):
      * Feeds the 4-token Whisper prefix `[SOT, LANG, TRANSCRIBE, NO_TIMESTAMPS]`.
-     * Returns `logits [1, 4, vocab]` — the last position yields the first real token.
+     * Returns `logits [1, 4, vocab]` - the last position yields the first real token.
      * Both decoder and encoder cross-attention KV caches are populated.
      *
      * **Phase 2** (`use_cache_branch = 1`):
@@ -524,7 +524,7 @@ class WhisperEngine : SpeechEngine {
     ): List<Int> {
         val outputNames = session.outputNames.toList()
 
-        // Copy encoder hidden state once — reused as input every decoder step
+        // Copy encoder hidden state once - reused as input every decoder step
         val encHiddenShape = encoderHidden.info.shape
         val encHiddenData  = FloatArray(encoderHidden.floatBuffer.remaining())
         encoderHidden.floatBuffer.rewind()
@@ -541,7 +541,7 @@ class WhisperEngine : SpeechEngine {
         //     (e.g. ES=50262 beats EN=50259 by 0.1 logit on a short clip → hallucination).
         //   - Otherwise run detectLanguage() restricted to those candidate token IDs.
         //
-        // "auto" unconstrained: full ~100-language range — still supported but not recommended.
+        // "auto" unconstrained: full ~100-language range - still supported but not recommended.
         val detectedLang = if (languageTag != "auto") {
             findTokenId("<|$languageTag|>", tokenEnglish).also {
                 Log.d(TAG, "greedyDecode: forced language=$languageTag → token=$it")
@@ -559,7 +559,7 @@ class WhisperEngine : SpeechEngine {
 
             val minSamplesForDetect = SAMPLE_RATE * 2  // 2 s of speech minimum
             if (sampleCount < minSamplesForDetect && candidates.isNotEmpty()) {
-                Log.d(TAG, "greedyDecode: clip too short ($sampleCount samples) — " +
+                Log.d(TAG, "greedyDecode: clip too short ($sampleCount samples) - " +
                     "skipping detection, using ${constrainedTags.first()}")
                 candidates[0]
             } else {
@@ -580,7 +580,7 @@ class WhisperEngine : SpeechEngine {
         var prevResult: OrtSession.Result? = null
 
         try {
-            // ── Phase 1: seed call — use_cache_branch=0 ─────────────────────
+            // ── Phase 1: seed call - use_cache_branch=0 ─────────────────────
             val firstInputs = mutableMapOf<String, OnnxTensor>()
             try {
                 firstInputs[DEC_IN_INPUT_IDS] = OnnxTensor.createTensor(
@@ -601,7 +601,7 @@ class WhisperEngine : SpeechEngine {
                 Log.d(TAG, "greedyDecode: Phase 1 (use_cache_branch=0, prefixLen=$prefixLen)")
                 prevResult = session.run(firstInputs)
 
-                // logits [1, prefixLen, vocab] — take last position
+                // logits [1, prefixLen, vocab] - take last position
                 val logitsTensor = prevResult.get(DEC_OUT_LOGITS)
                     .orElseThrow { RuntimeException("Decoder output '$DEC_OUT_LOGITS' not found") }
                     as OnnxTensor
@@ -624,19 +624,19 @@ class WhisperEngine : SpeechEngine {
                 collectKvTensors(prevResult, outputNames, kvCache)
 
                 if (firstToken >= tokenEot) {
-                    Log.d(TAG, "greedyDecode: first generated token is special ($firstToken) — empty result")
+                    Log.d(TAG, "greedyDecode: first generated token is special ($firstToken) - empty result")
                     return emptyList()
                 }
                 hypothesis.add(firstToken)
 
-                // ── Phase 2: autoregressive loop — use_cache_branch=1 ────────
+                // ── Phase 2: autoregressive loop - use_cache_branch=1 ────────
                 var currentToken = firstToken
                 for (step in 0 until MAX_NEW_TOKENS - 1) {
                     // Guard against the ONNX KV-cache reshape crash that occurs when the
                     // accumulated sequence length exceeds the model's internal tiling boundary
                     // (~448 tokens). Stop well below that limit.
                     if (hypothesis.size >= 400) {
-                        Log.w(TAG, "greedyDecode: hit token safety cap — stopping")
+                        Log.w(TAG, "greedyDecode: hit token safety cap - stopping")
                         break
                     }
 
@@ -658,13 +658,13 @@ class WhisperEngine : SpeechEngine {
 
                         val currentResult = session.run(genInputs)
 
-                        // Safe to close the previous result now — its KV tensors were consumed
+                        // Safe to close the previous result now - its KV tensors were consumed
                         prevResult?.close()
                         prevResult = currentResult
                         kvCache.clear()
                         collectKvTensors(currentResult, outputNames, kvCache)
 
-                        // logits [1, 1, vocab] — position 0
+                        // logits [1, 1, vocab] - position 0
                         val stepLogits = currentResult.get(DEC_OUT_LOGITS)
                             .orElseThrow { RuntimeException("No '$DEC_OUT_LOGITS' at step $step") }
                             as OnnxTensor
@@ -684,10 +684,10 @@ class WhisperEngine : SpeechEngine {
                         }
 
                         hypothesis.add(generated)
-                        // Abort immediately if a bigram/trigram cycle has locked in — this
+                        // Abort immediately if a bigram/trigram cycle has locked in - this
                         // prevents multi-second CPU burns and the downstream ORT reshape crash.
                         if (hasRepetitionLoop(hypothesis)) {
-                            Log.w(TAG, "greedyDecode: repetition loop detected at step $step — aborting")
+                            Log.w(TAG, "greedyDecode: repetition loop detected at step $step - aborting")
                             return emptyList()
                         }
                         currentToken = generated
@@ -716,7 +716,7 @@ class WhisperEngine : SpeechEngine {
      *
      * Covers both decoder self-attention (`present.*.decoder.*`) and encoder
      * cross-attention (`present.*.encoder.*`) KV slots.
-     * Tensors are **not copied** — they remain owned by [result].
+     * Tensors are **not copied** - they remain owned by [result].
      */
     private fun collectKvTensors(
         result: OrtSession.Result,
@@ -748,7 +748,7 @@ class WhisperEngine : SpeechEngine {
             val shape = LongArray(rank) { i ->
                 val d = info.shape[i]
                 when {
-                    d >= 0L             -> d    // static dim — keep as-is
+                    d >= 0L             -> d    // static dim - keep as-is
                     rank == 4 && i == 2 -> 0L   // past_sequence_length → 0 (empty cache)
                     else                -> 1L   // batch / other dynamic dim → 1
                 }
@@ -762,8 +762,8 @@ class WhisperEngine : SpeechEngine {
      * Loads the BPE vocabulary from a HuggingFace `tokenizer.json` file.
      *
      * Merges two sources so that Whisper control tokens (`<|...|>`) are always present:
-     *  1. `model.vocab` — BPE piece string → token ID map
-     *  2. `added_tokens` — overlaid on top (adds / overrides special token entries)
+     *  1. `model.vocab` - BPE piece string → token ID map
+     *  2. `added_tokens` - overlaid on top (adds / overrides special token entries)
      *
      * Returns an array indexed by token ID.
      */
@@ -900,7 +900,7 @@ class WhisperEngine : SpeechEngine {
             Log.d(TAG, "findTokenId: '$token' → $id")
             id
         } else {
-            Log.w(TAG, "findTokenId: '$token' not found — using default $default")
+            Log.w(TAG, "findTokenId: '$token' not found - using default $default")
             default
         }
     }

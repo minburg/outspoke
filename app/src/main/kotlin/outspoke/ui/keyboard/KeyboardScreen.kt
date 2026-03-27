@@ -23,8 +23,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * Root composable for the keyboard input view.
  *
  * Layout (top → bottom):
- *  1. [StatusIndicator] — crossfades between Idle / Listening / Processing / Error states.
- *  2. [WaveformBar]     — animates with real-time amplitude.
+ *  1. [StatusIndicator] - crossfades between Idle / Listening / Processing / Error states.
+ *  2. [WaveformBar]     - animates with real-time amplitude.
  *  3. Bottom row (left → right):
  *       [Delete All] · [Delete Word] · [TalkButton] · [Delete Char] · [Switch Keyboard]
  *     The outer pair is pinned to each edge; the TalkButton stays centred with equal
@@ -34,7 +34,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * @param amplitude              Normalised RMS amplitude [0.0, 1.0].
  * @param isContinuous           `true` when continuous (locked) recording mode is active.
  * @param triggerMode            `"HOLD"` (default) or `"TAP_TOGGLE"`.
- * @param isWhisperEngine        `true` when the active engine is a Whisper variant — controls
+ * @param isWhisperEngine        `true` when the active engine is a Whisper variant - controls
  *                               visibility of the language selector row.
  * @param whisperLanguage        Currently selected Whisper language tag (`"auto"`, `"en"`, …).
  * @param onWhisperLanguageSelected Called when the user taps a language pill.
@@ -108,7 +108,7 @@ fun KeyboardScreen(
                 }
             }
 
-            // Language selector — only shown for Whisper models and when the engine
+            // Language selector - only shown for Whisper models and when the engine
             // is actually ready (hide during loading / error states).
             if (isWhisperEngine && uiState !is KeyboardUiState.EngineLoading && uiState !is KeyboardUiState.Error) {
                 LanguageSelector(
@@ -153,7 +153,7 @@ fun KeyboardScreen(
 
             // Centre: talk button
             // isListening is true for Listening and Processing (mic active, audio flowing).
-            // Transcribing means audio has stopped but the engine is still working — mic off,
+            // Transcribing means audio has stopped but the engine is still working - mic off,
             // button disabled until the Final result arrives and the state returns to Idle.
             TalkButton(
                 isListening = uiState is KeyboardUiState.Listening || uiState is KeyboardUiState.Processing,

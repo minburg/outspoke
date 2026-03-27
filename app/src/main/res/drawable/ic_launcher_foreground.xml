@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Foreground layer for the adaptive launcher icon.
-    108dp canvas; safe zone is the inner 72dp — keep all artwork within the center 66dp circle.
+    108dp canvas; safe zone is the inner 72dp - keep all artwork within the center 66dp circle.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"

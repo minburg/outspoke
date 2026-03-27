@@ -11,7 +11,7 @@ import dev.brgr.outspoke.settings.model.ModelId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Single DataStore instance per process — the delegate ensures this.
+// Single DataStore instance per process - the delegate ensures this.
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "outspoke_prefs")
 
 /**

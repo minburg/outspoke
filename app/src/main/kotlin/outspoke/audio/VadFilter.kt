@@ -16,7 +16,7 @@ import kotlin.math.ln
  *
  * Call [flush] when capture ends to reset internal state.
  *
- * @param sensitivity  [0.0, 1.0] — higher values require louder speech to pass.
+ * @param sensitivity  [0.0, 1.0] - higher values require louder speech to pass.
  */
 class VadFilter(sensitivity: Float = 0.5f) {
 
@@ -41,7 +41,7 @@ class VadFilter(sensitivity: Float = 0.5f) {
                 leadIn.addLast(chunk)
 
                 if (rms >= threshold) {
-                    // Speech onset — emit lead-in + triggering frame.
+                    // Speech onset - emit lead-in + triggering frame.
                     state = State.SPEECH
                     hangoverFrames = 0
                     val out = leadIn.toList()
@@ -54,11 +54,11 @@ class VadFilter(sensitivity: Float = 0.5f) {
 
             State.SPEECH -> {
                 if (rms >= threshold) {
-                    // Still active speech — reset hangover and emit.
+                    // Still active speech - reset hangover and emit.
                     hangoverFrames = 0
                     listOf(chunk)
                 } else {
-                    // Energy dropped — start/continue hangover.
+                    // Energy dropped - start/continue hangover.
                     hangoverFrames++
                     if (hangoverFrames >= HANGOVER_FRAMES) {
                         state = State.SILENCE
@@ -66,7 +66,7 @@ class VadFilter(sensitivity: Float = 0.5f) {
                         leadIn.clear()
                         emptyList()
                     } else {
-                        // Still within hangover window — keep emitting.
+                        // Still within hangover window - keep emitting.
                         listOf(chunk)
                     }
                 }

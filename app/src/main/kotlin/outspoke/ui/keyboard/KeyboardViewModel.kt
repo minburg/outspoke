@@ -32,7 +32,7 @@ class KeyboardViewModel(
     )
     val uiState: StateFlow<KeyboardUiState> = _uiState.asStateFlow()
 
-    /** Normalised RMS amplitude [0.0, 1.0] — updated by [AudioCaptureManager] per chunk. */
+    /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
     /**
@@ -45,7 +45,7 @@ class KeyboardViewModel(
 
     /**
      * VAD sensitivity in [0.0, 1.0]. Collected eagerly so the value is always available
-     * as a snapshot when recording starts — no suspend context required.
+     * as a snapshot when recording starts - no suspend context required.
      */
     val vadSensitivity: StateFlow<Float> = appPreferences.vadSensitivity
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
@@ -67,7 +67,7 @@ class KeyboardViewModel(
 
     /**
      * Persists [tag] to preferences and immediately forwards it to the loaded engine.
-     * Safe to call at any time — the engine's [setLanguage] is thread-safe.
+     * Safe to call at any time - the engine's [setLanguage] is thread-safe.
      */
     fun setWhisperLanguage(tag: String) {
         inferenceRepository?.setLanguage(tag)
@@ -81,7 +81,7 @@ class KeyboardViewModel(
         _engineState.value = state
         when (state) {
             EngineState.Unloaded -> _uiState.value = KeyboardUiState.EngineLoading(
-                "Model not downloaded — open Outspoke to download"
+                "Model not downloaded - open Outspoke to download"
             )
             EngineState.Loading -> _uiState.value = KeyboardUiState.EngineLoading(
                 "Loading transcription engine…"
@@ -129,7 +129,7 @@ class KeyboardViewModel(
 
     /**
      * Called by the UI when the user drags the talk button past the lock threshold.
-     * Recording continues uninterrupted — only the visual state changes.
+     * Recording continues uninterrupted - only the visual state changes.
      */
     fun onContinuousModeEnabled() {
         _isContinuousMode.value = true
@@ -163,7 +163,7 @@ class KeyboardViewModel(
      */
     fun onRecordStart() {
         if (_engineState.value !is EngineState.Ready) {
-            Log.w(TAG, "onRecordStart() ignored — engine not ready (${_engineState.value})")
+            Log.w(TAG, "onRecordStart() ignored - engine not ready (${_engineState.value})")
             return
         }
 
@@ -174,8 +174,8 @@ class KeyboardViewModel(
             try {
                 val repo = inferenceRepository
                 if (repo == null) {
-                    // Inference repo not yet bound — capture for amplitude feedback only.
-                    Log.w(TAG, "No InferenceRepository — capturing audio without transcription")
+                    // Inference repo not yet bound - capture for amplitude feedback only.
+                    Log.w(TAG, "No InferenceRepository - capturing audio without transcription")
                     audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f)
                         .collect { /* amplitude updated internally */ }
                     // Flow completed naturally (stopCapture called); no inference to wait for.
@@ -214,7 +214,7 @@ class KeyboardViewModel(
                 Log.e(TAG, "Microphone permission denied", e)
                 _isContinuousMode.value = false
                 _uiState.value = KeyboardUiState.Error(
-                    "Microphone permission denied — open Outspoke to grant it"
+                    "Microphone permission denied - open Outspoke to grant it"
                 )
             } catch (e: IllegalStateException) {
                 Log.e(TAG, "AudioRecord failed to initialise", e)
@@ -234,7 +234,7 @@ class KeyboardViewModel(
         // Always reset continuous mode when recording stops from any code path.
         _isContinuousMode.value = false
 
-        // Stop the microphone — this terminates the upstream audio flow, which causes
+        // Stop the microphone - this terminates the upstream audio flow, which causes
         // InferenceRepository to finish collecting audio and run its definitive final
         // inference pass.  We intentionally do NOT cancel captureJob here: slow engines
         // like Whisper can take 10-20 s to produce the Final result after audio ends,
@@ -263,12 +263,12 @@ class KeyboardViewModel(
             // Commit the last partial transcript so no text is lost on app-switch.
             textInjector?.commitFinal(currentState.partial)
         } else {
-            // Transcribing (no partial yet) or any other state — remove any composing span
+            // Transcribing (no partial yet) or any other state - remove any composing span
             // without committing. If the engine was still running its final pass it will be
             // cancelled; that partial audio is lost, which is acceptable on input-field change.
             textInjector?.clear()
         }
-        // Cancel the capture coroutine immediately — don't wait for the audio loop to drain.
+        // Cancel the capture coroutine immediately - don't wait for the audio loop to drain.
         captureJob?.cancel()
         captureJob = null
         _isContinuousMode.value = false

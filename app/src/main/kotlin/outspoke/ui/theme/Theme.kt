@@ -39,7 +39,7 @@ fun OutspokeTheme(
     )
 }
 
-// Fixed dark colour scheme for the keyboard — never uses dynamic colour or the
+// Fixed dark colour scheme for the keyboard - never uses dynamic colour or the
 // system light/dark setting so the keyboard always looks consistent.
 private val KeyboardColorScheme = darkColorScheme(
     primary = KeyboardAccent,

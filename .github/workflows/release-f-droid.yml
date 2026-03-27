@@ -92,6 +92,20 @@ jobs:
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
             -Pandroid.r8.suppressKotlinVersionCompatibilityCheck=true
 
+      # Print the SHA-256 fingerprint of the signing certificate so it can be
+      # copied into the metadata/dev.brgr.outspoke.yml AllowedAPKSigningKeys field.
+      # keytool is available wherever JDK is — no extra tools needed.
+      - name: Print signing certificate SHA-256 fingerprint
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS:      ${{ secrets.KEY_ALIAS }}
+        run: |
+          keytool -list -v \
+            -keystore "$RUNNER_TEMP/release.jks" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            | grep -i "SHA-256"
+
       # ABI splits produce one APK per architecture plus a universal APK, so there
       # is no plain app-release.apk.  Rename every generated APK to a versioned,
       # human-readable filename and generate a SHA-256 checksum alongside each one:

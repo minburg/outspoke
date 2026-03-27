@@ -17,7 +17,7 @@ import dev.brgr.outspoke.settings.model.*
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
- * Displays the full model catalog — one card per registered model — and allows the user
+ * Displays the full model catalog - one card per registered model - and allows the user
  * to download, delete, and select the active speech recognition model.
  */
 @Composable
@@ -238,7 +238,6 @@ private fun ReadyActions(
                 Text("Set as Active")
             }
         } else {
-            // Selected indicator — takes the place of the button
             Text(
                 text     = "Active model",
                 style    = MaterialTheme.typography.labelMedium,

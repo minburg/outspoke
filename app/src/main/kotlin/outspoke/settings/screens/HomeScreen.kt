@@ -62,7 +62,7 @@ fun HomeScreen(
         }
     }
 
-    // Refresh all statuses on every ON_RESUME — catches changes made in other apps/settings.
+    // Refresh all statuses on every ON_RESUME - catches changes made in other apps/settings.
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -134,7 +134,7 @@ private fun HomeScreenContent(
             action = if (!hasMicPermission) onRequestMicPermission else null,
         )
 
-        // 3. Model downloaded — always show an action so the model screen stays reachable
+        // 3. Model downloaded - always show an action so the model screen stays reachable
         StatusRow(
             icon = if (isModelReady) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
             iconTint = if (isModelReady) MaterialTheme.colorScheme.primary

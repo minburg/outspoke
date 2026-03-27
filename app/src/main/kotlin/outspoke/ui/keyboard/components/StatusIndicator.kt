@@ -78,7 +78,7 @@ fun StatusIndicator(
 private fun IdleIndicator() {
     Icon(
         imageVector = Icons.Filled.Mic,
-        contentDescription = "Idle — tap the button to start dictating",
+        contentDescription = "Idle - tap the button to start dictating",
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(20.dp),
     )
@@ -103,7 +103,7 @@ private fun ListeningIndicator() {
             .size(20.dp)
             .scale(pulseScale)
             .background(MaterialTheme.colorScheme.primary, CircleShape),
-    ) { /* pulsing filled circle — no inner content needed */ }
+    ) { /* pulsing filled circle - no inner content needed */ }
 }
 
 @Composable
@@ -211,7 +211,7 @@ private fun EngineLoadingIndicator(
  *
  * The arc is painted with a sweep gradient that fades from transparent at the tail,
  * blends through [MaterialTheme.colorScheme.tertiary] in the middle, and reaches full
- * [MaterialTheme.colorScheme.primary] at the head — giving a comet-tail appearance.
+ * [MaterialTheme.colorScheme.primary] at the head - giving a comet-tail appearance.
  * Both the gradient colours and the arc react to theme changes at runtime.
  */
 @Composable
@@ -238,10 +238,10 @@ private fun GradientArcSpinner(
         rotate(rotation) {
             drawArc(
                 brush = Brush.sweepGradient(
-                    0f    to head.copy(alpha = 0f),      // tail  — fully transparent
-                    0.55f to mid.copy(alpha = 0.65f),    // mid   — tertiary, half-visible
-                    0.75f to head,                       // head  — full primary
-                    1f    to head.copy(alpha = 0f),      // close — fade to transparent so the
+                    0f    to head.copy(alpha = 0f),      // tail  - fully transparent
+                    0.55f to mid.copy(alpha = 0.65f),    // mid   - tertiary, half-visible
+                    0.75f to head,                       // head  - full primary
+                    1f    to head.copy(alpha = 0f),      // close - fade to transparent so the
                                                          //         seam at 360°/0° is invisible
                 ),
                 startAngle = 0f,

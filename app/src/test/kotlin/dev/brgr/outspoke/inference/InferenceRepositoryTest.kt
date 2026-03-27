@@ -13,9 +13,9 @@ import java.io.File
  * Tests for [InferenceRepository]'s sliding-window buffering strategy.
  *
  * Constants from production code (package-private):
- *   MIN_SAMPLES    = 16 000  (1 s — minimum context before a partial is emitted)
- *   STRIDE_SAMPLES = 16 000  (1 s — partial emitted every stride once min is met)
- *   MAX_WINDOW     = 480 000 (30 s — oldest audio dropped when exceeded)
+ *   MIN_SAMPLES    = 32 000  (2 s - minimum context before a partial is emitted)
+ *   STRIDE_SAMPLES = 16 000  (1 s - partial emitted every stride once min is met)
+ *   MAX_WINDOW     = 480 000 (30 s - oldest audio dropped when exceeded)
  */
 class InferenceRepositoryTest {
 
@@ -30,10 +30,13 @@ class InferenceRepositoryTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** 1-second chunk — exactly meets MIN_SAMPLES and STRIDE_SAMPLES. */
+    /** 1-second chunk - meets STRIDE_SAMPLES but not MIN_SAMPLES on its own. */
     private fun oneSecondChunk() = AudioChunk(ShortArray(16_000), timestampMs = 0L)
 
-    /** Half-second chunk — below MIN_SAMPLES on its own. */
+    /** 2-second chunk - exactly meets MIN_SAMPLES (32 000) and STRIDE_SAMPLES (16 000). */
+    private fun twoSecondChunk() = AudioChunk(ShortArray(32_000), timestampMs = 0L)
+
+    /** Half-second chunk - below MIN_SAMPLES on its own. */
     private fun halfSecondChunk() = AudioChunk(ShortArray(8_000), timestampMs = 0L)
 
     // ── No audio ─────────────────────────────────────────────────────────────
@@ -54,24 +57,24 @@ class InferenceRepositoryTest {
 
     @Test
     fun `given less than minimum audio, when stream ends, then only a final is emitted`() = runTest {
-        // Given — 0.5 s < MIN_SAMPLES (1 s) so no mid-stream partial fires
+        // Given - 0.5 s < MIN_SAMPLES (1 s) so no mid-stream partial fires
         val repo = InferenceRepository(fakeEngine(TranscriptResult.Final("hi")))
 
         // When
         val results = repo.transcribe(flowOf(halfSecondChunk())).toList()
 
-        // Then — no partial, exactly one final
+        // Then - no partial, exactly one final
         assertEquals(1, results.size)
         assertTrue(results[0] is TranscriptResult.Final)
     }
 
     @Test
     fun `given exactly minimum audio, when stream ends, then a partial and a final are both emitted`() = runTest {
-        // Given — 1 s hits both MIN_SAMPLES and STRIDE_SAMPLES exactly
+        // Given - 2 s hits both MIN_SAMPLES (32 000) and STRIDE_SAMPLES (16 000) exactly
         val repo = InferenceRepository(fakeEngine(TranscriptResult.Final("hello")))
 
         // When
-        val results = repo.transcribe(flowOf(oneSecondChunk())).toList()
+        val results = repo.transcribe(flowOf(twoSecondChunk())).toList()
 
         // Then
         assertEquals(2, results.size)
@@ -85,14 +88,14 @@ class InferenceRepositoryTest {
 
     @Test
     fun `given engine returns Final mid-stream, when collected, then it is downcast to Partial`() = runTest {
-        // Given — engine always returns Final; repository must not commit mid-session
+        // Given - engine always returns Final; repository must not commit mid-session
         val repo = InferenceRepository(fakeEngine(TranscriptResult.Final("growing text")))
-        val chunk = oneSecondChunk()
+        val chunk = twoSecondChunk()   // 2 s meets MIN_SAMPLES so a mid-stream partial fires
 
         // When
         val results = repo.transcribe(flowOf(chunk)).toList()
 
-        // Then — first emission is Partial, not Final
+        // Then - first emission is Partial, not Final
         assertTrue(
             "Mid-stream Final should be downcast to Partial but got ${results[0]}",
             results[0] is TranscriptResult.Partial,
@@ -101,13 +104,13 @@ class InferenceRepositoryTest {
 
     @Test
     fun `given engine returns Partial mid-stream, when stream ends, then end result is promoted to Final`() = runTest {
-        // Given — engine always returns Partial
+        // Given - engine always returns Partial
         val repo = InferenceRepository(fakeEngine(TranscriptResult.Partial("growing text")))
 
-        // When — send two strides so the end-of-stream triggers with accumulated audio
+        // When - send two strides so the end-of-stream triggers with accumulated audio
         val results = repo.transcribe(flowOf(halfSecondChunk())).toList()
 
-        // Then — the end-of-stream result is promoted to Final
+        // Then - the end-of-stream result is promoted to Final
         assertTrue(
             "End-of-stream Partial should be promoted to Final but got ${results.last()}",
             results.last() is TranscriptResult.Final,
@@ -122,7 +125,7 @@ class InferenceRepositoryTest {
         val cause = RuntimeException("model error")
         val repo  = InferenceRepository(fakeEngine(TranscriptResult.Failure(cause)))
 
-        // When — half-second chunk skips mid-stream partial; only end-of-stream fires
+        // When - half-second chunk skips mid-stream partial; only end-of-stream fires
         val results = repo.transcribe(flowOf(halfSecondChunk())).toList()
 
         // Then
@@ -135,14 +138,14 @@ class InferenceRepositoryTest {
 
     @Test
     fun `given more than 30 seconds of audio, when collected, then inference still completes without error`() = runTest {
-        // Given — 32 chunks × 1 s = 32 s, exceeds MAX_WINDOW_SAMPLES (30 s)
+        // Given - 32 chunks × 1 s = 32 s, exceeds MAX_WINDOW_SAMPLES (30 s)
         val repo   = InferenceRepository(fakeEngine(TranscriptResult.Final("long dictation")))
         val chunks = List(32) { oneSecondChunk() }
 
-        // When — should not throw; old audio is silently dropped
+        // When - should not throw; old audio is silently dropped
         val results = repo.transcribe(chunks.asFlow()).toList()
 
-        // Then — at least one final result is emitted at stream end
+        // Then - at least one final result is emitted at stream end
         assertTrue(results.last() is TranscriptResult.Final)
     }
 }

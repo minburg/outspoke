@@ -2,7 +2,7 @@ package dev.brgr.outspoke.ui.keyboard
 
 /** All possible states the keyboard UI can be in at any given moment. */
 sealed class KeyboardUiState {
-    /** Mic is idle — waiting for the user to press the talk button. */
+    /** Mic is idle - waiting for the user to press the talk button. */
     object Idle : KeyboardUiState()
 
     /** Mic is active and audio is being captured. */

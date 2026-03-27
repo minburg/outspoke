@@ -14,7 +14,7 @@ import kotlin.math.sqrt
 
 private const val TAG = "AudioCaptureManager"
 
-/** 16 kHz mono — matches Parakeet V3's expected input format. */
+/** 16 kHz mono - matches Parakeet V3's expected input format. */
 private const val SAMPLE_RATE = 16_000
 
 /** 40 ms window at 16 kHz = 640 samples per chunk. */
@@ -31,7 +31,7 @@ private const val CHUNK_SAMPLES = 640
 //   • Floor        → keeps bars near-zero during genuine silence so the user
 //                     can see the mic is active without the bars being distracting.
 
-/** Minimum peak envelope — prevents infinite gain in total silence. */
+/** Minimum peak envelope - prevents infinite gain in total silence. */
 private const val AGC_FLOOR   = 0.01f
 
 /** Per-chunk attack coefficient (0 = no rise, 1 = instant). */
@@ -93,7 +93,7 @@ class AudioCaptureManager(private val context: Context) {
      * calling this. If the permission is absent a [SecurityException] is thrown immediately
      * so the caller can transition the UI to an error state.
      *
-     * The flow is cold — a new [AudioRecord] is created per collection. The [AudioRecord]
+     * The flow is cold - a new [AudioRecord] is created per collection. The [AudioRecord]
      * is always released in the `finally` block, even if the collector cancels mid-stream.
      *
      * @throws SecurityException if [android.Manifest.permission.RECORD_AUDIO] is not granted.
@@ -138,7 +138,7 @@ class AudioCaptureManager(private val context: Context) {
 
         try {
             recorder.startRecording()
-            Log.d(TAG, "AudioRecord started — chunk=$CHUNK_SAMPLES samples, buf=$bufferBytes bytes")
+            Log.d(TAG, "AudioRecord started - chunk=$CHUNK_SAMPLES samples, buf=$bufferBytes bytes")
 
             while (currentCoroutineContext().isActive && !stopRequested) {
                 val read = recorder.read(buffer, 0, buffer.size)
@@ -152,12 +152,12 @@ class AudioCaptureManager(private val context: Context) {
                         for (c in toSend) send(c)
                     }
                     read == AudioRecord.ERROR_DEAD_OBJECT -> {
-                        // Hardware-level error — the audio subsystem was taken away.
-                        Log.e(TAG, "AudioRecord ERROR_DEAD_OBJECT — stopping capture")
+                        // Hardware-level error - the audio subsystem was taken away.
+                        Log.e(TAG, "AudioRecord ERROR_DEAD_OBJECT - stopping capture")
                         return@channelFlow
                     }
                     read < 0 -> {
-                        // Non-fatal read error — log and skip this chunk.
+                        // Non-fatal read error - log and skip this chunk.
                         Log.w(TAG, "AudioRecord read returned error code: $read")
                     }
                     // read == 0: no data yet; continue the loop

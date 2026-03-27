@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -31,6 +33,14 @@ import kotlinx.coroutines.launch
 private const val TAG = "OutspokeIME"
 
 /**
+ * How long (ms) the keyboard must stay hidden before the inference engine is unloaded
+ * from RAM. Cancelled immediately if the keyboard reappears within this window.
+ * 30 s is long enough to cover brief app-switches but short enough to reclaim model
+ * memory (500 MB+) before the OS has to do it forcefully via an OOM kill.
+ */
+private const val IDLE_UNLOAD_DELAY_MS = 30_000L
+
+/**
  * The core IME service. Implements [LifecycleOwner], [ViewModelStoreOwner], and
  * [SavedStateRegistryOwner] so that [ImeComposeView] can wire them onto the view tree,
  * allowing Compose to function correctly inside a Service context.
@@ -41,32 +51,44 @@ class OutspokeInputMethodService :
     ViewModelStoreOwner,
     SavedStateRegistryOwner {
 
-    // -- Lifecycle
-
     private val lifecycleRegistry = LifecycleRegistry(this)
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
-    // -- ViewModel store
-
     private val store = ViewModelStore()
     override val viewModelStore: ViewModelStore get() = store
-
-    // -- Saved state
 
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
-    // -- ViewModel instances
-
     private lateinit var keyboardViewModel: KeyboardViewModel
-
-    // -- InferenceService binding
 
     /** Non-null while the service is bound and the engine is available. */
     private var inferenceBinder: InferenceService.InferenceBinder? = null
 
-    private val inferenceServiceConnection = object : ServiceConnection {
+    /** True whenever [bindService] has been called and [unbindService] has not yet matched it. */
+    private var isBound = false
+
+    /** Used to post and cancel the idle-unload runnable on the main thread. */
+    private val handler = Handler(Looper.getMainLooper())
+
+    /**
+     * Posted by [onWindowHidden] and cancelled by [onWindowShown].
+     * When it fires the service is unbound so Android can destroy it and free the
+     * model sessions from RAM. The engine reloads transparently on next [onWindowShown].
+     */
+    private val idleUnloadRunnable = Runnable {
+        if (isBound) {
+            Log.d(TAG, "Keyboard idle for ${IDLE_UNLOAD_DELAY_MS / 1000}s — unbinding InferenceService to free model RAM")
+            unbindService(inferenceServiceConnection)
+            isBound = false
+            inferenceBinder = null
+            keyboardViewModel.setInferenceRepository(null)
+            keyboardViewModel.setEngineState(EngineState.Loading)
+        }
+    }
+
+    private val inferenceServiceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             val b = binder as InferenceService.InferenceBinder
             inferenceBinder = b
@@ -82,20 +104,23 @@ class OutspokeInputMethodService :
                 }
             }
 
-            Log.d(TAG, "InferenceService connected — engine state: ${b.getEngineState().value}")
+            Log.d(TAG, "InferenceService connected - engine state: ${b.getEngineState().value}")
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
-            Log.w(TAG, "InferenceService disconnected unexpectedly")
+            Log.w(TAG, "InferenceService disconnected unexpectedly — attempting rebind")
             inferenceBinder = null
             keyboardViewModel.setInferenceRepository(null)
-            keyboardViewModel.setEngineState(EngineState.Unloaded)
+            // Show "Loading…" rather than "Model not downloaded" — the model is still present;
+            // the service was killed by the OS (e.g. OOM) and we are about to restart it.
+            keyboardViewModel.setEngineState(EngineState.Loading)
+            // isBound stays true — we already held the bind and are re-establishing it.
+            // BIND_AUTO_CREATE will recreate the service process and reload the engine.
+            bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
         }
     }
 
     private fun inferenceServiceIntent() = Intent(this, InferenceService::class.java)
-
-    // -- Service lifecycle → Compose lifecycle mapping
 
     override fun onCreate() {
         savedStateRegistryController.performAttach()
@@ -117,9 +142,9 @@ class OutspokeInputMethodService :
             ),
         )[KeyboardViewModel::class.java]
 
-        startForegroundService(inferenceServiceIntent())
         bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
-        Log.d(TAG, "InferenceService start + bind requested")
+        isBound = true
+        Log.d(TAG, "InferenceService bind requested")
     }
 
     override fun onBindInput() {
@@ -130,11 +155,21 @@ class OutspokeInputMethodService :
     override fun onWindowShown() {
         super.onWindowShown()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        // Cancel a pending idle-unload — the user is back before the timeout fired.
+        handler.removeCallbacks(idleUnloadRunnable)
+        // If the timeout already fired and we unloaded, rebind now so the engine reloads.
+        if (!isBound) {
+            Log.d(TAG, "Keyboard shown after idle unload — rebinding InferenceService")
+            bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
+            isBound = true
+        }
     }
 
     override fun onWindowHidden() {
         super.onWindowHidden()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        // Schedule an engine unload. Cancelled immediately if the keyboard reappears soon.
+        handler.postDelayed(idleUnloadRunnable, IDLE_UNLOAD_DELAY_MS)
     }
 
     override fun onUnbindInput() {
@@ -143,14 +178,16 @@ class OutspokeInputMethodService :
     }
 
     override fun onDestroy() {
-        unbindService(inferenceServiceConnection)
+        handler.removeCallbacks(idleUnloadRunnable)
+        if (isBound) {
+            unbindService(inferenceServiceConnection)
+            isBound = false
+        }
         inferenceBinder = null
         super.onDestroy()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
     }
-
-    // -- IME view
 
     /**
      * Height of the navigation bar in pixels, or 0 when gesture navigation is active.
@@ -209,7 +246,7 @@ class OutspokeInputMethodService :
     }
 
     /**
-     * Never enter fullscreen (extract-text) mode — the keyboard panel is always compact.
+     * Never enter fullscreen (extract-text) mode - the keyboard panel is always compact.
      */
     override fun onEvaluateFullscreenMode(): Boolean = false
 
@@ -220,7 +257,7 @@ class OutspokeInputMethodService :
      * The IME window is sized to exactly [keyboardHeightPx] and sits at the bottom of
      * the screen, so our content starts at Y=0 within the window.
      * [Insets.TOUCHABLE_INSETS_FRAME] ensures the full window frame consumes all touch
-     * events — without this the default TOUCHABLE_INSETS_VISIBLE mode would compute a
+     * events - without this the default TOUCHABLE_INSETS_VISIBLE mode would compute a
      * zero-height touchable region (visibleTopInsets == windowHeight) and let every tap
      * fall through to the app underneath.
      */
@@ -237,7 +274,7 @@ class OutspokeInputMethodService :
         keyboardViewModel.setTextInjector(
             TextInjector(connection, attribute ?: EditorInfo())
         )
-        Log.d(TAG, "onStartInput — engine: ${inferenceBinder?.getEngineState()?.value}")
+        Log.d(TAG, "onStartInput - engine: ${inferenceBinder?.getEngineState()?.value}")
     }
 
     override fun onFinishInput() {

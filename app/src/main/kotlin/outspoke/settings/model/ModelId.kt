@@ -7,7 +7,7 @@ import dev.brgr.outspoke.settings.model.ModelId.Companion.DEFAULT
  * Type-safe identifier for every supported on-device speech recognition model.
  *
  * [storageDirName] is the name of the sub-directory under `<filesDir>/models/` where all
- * files for that model are stored. Changing it will break existing installs — treat as stable.
+ * files for that model are stored. Changing it will break existing installs - treat as stable.
  */
 enum class ModelId(val storageDirName: String) {
     PARAKEET_V3("parakeet-v3"),

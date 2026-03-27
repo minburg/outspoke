@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class MicPermissionState {
     Checking,           // Waiting for the first system dialog result
-    Granted,            // Permission held — keyboard is usable
+    Granted,            // Permission held - keyboard is usable
     NeedsRequest,       // Denied once; system dialog can still be shown
     PermanentlyDenied,  // "Don't ask again" selected; must send user to Settings
 }
@@ -84,7 +84,7 @@ private fun MicPermissionScreen(resumeCount: Int) {
         }
     }
 
-    // Re-check every time the activity resumes — catches the case where the user
+    // Re-check every time the activity resumes - catches the case where the user
     // went to App Settings and granted the permission there.
     LaunchedEffect(resumeCount) {
         val nowGranted = ContextCompat.checkSelfPermission(

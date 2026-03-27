@@ -46,8 +46,6 @@ private const val NOTIFICATION_ID = 1001
  */
 class InferenceService : LifecycleService() {
 
-    // -- Engine state
-
     /** The currently loaded engine, or `null` while loading / unloaded. */
     @Volatile private var currentEngine: SpeechEngine? = null
 
@@ -57,12 +55,10 @@ class InferenceService : LifecycleService() {
     /** Mutex preventing concurrent [reloadForModel] calls from racing. */
     private val engineLoadMutex = Mutex()
 
-    private val _engineState = MutableStateFlow<EngineState>(EngineState.Unloaded)
+    private val _engineState = MutableStateFlow<EngineState>(EngineState.Loading)
 
     /** Observable loading / runtime state observed by the IME. */
     val engineState: StateFlow<EngineState> = _engineState.asStateFlow()
-
-    // -- Binder
 
     inner class InferenceBinder : Binder() {
         /** Returns the active [InferenceRepository], or `null` while the engine is loading. */
@@ -77,8 +73,6 @@ class InferenceService : LifecycleService() {
         return binder
     }
 
-    // -- Lifecycle
-
     override fun onCreate() {
         super.onCreate()
 
@@ -91,13 +85,14 @@ class InferenceService : LifecycleService() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
             )
         } catch (e: SecurityException) {
-            Log.w(TAG, "startForeground rejected — app not in eligible foreground state; " +
-                    "stopping service until re-launched from Activity context", e)
-            stopSelf()
-            return
+            // startForeground() is rejected when the service is started via the IME binding
+            // (no Activity in the foreground).  We continue running as a plain bound service -
+            // no persistent notification, but the engine loads and the keyboard stays functional.
+            // The notification will appear the next time the user opens the companion Activity.
+            Log.w(TAG, "startForeground rejected - running as bound service without notification", e)
         }
 
-        Log.d(TAG, "Service created — observing selected model preference")
+        Log.d(TAG, "Service created - observing selected model preference")
 
         // Observe the selected model preference and reload the engine whenever it changes.
         lifecycleScope.launch(Dispatchers.Default) {
@@ -106,7 +101,7 @@ class InferenceService : LifecycleService() {
             }
         }
 
-        // Watch the models/ root directory to detect external changes (e.g. download complete).
+        // Watch the models/root directory to detect external changes (e.g. download complete).
         startModelWatcher()
     }
 
@@ -118,10 +113,8 @@ class InferenceService : LifecycleService() {
         currentEngine?.close()
         currentEngine = null
         currentRepository = null
-        Log.d(TAG, "Service destroyed — engine closed")
+        Log.d(TAG, "Service destroyed - engine closed")
     }
-
-    // -- Engine loading
 
     /**
      * Closes any existing engine and loads a fresh one for [modelId].
@@ -138,9 +131,9 @@ class InferenceService : LifecycleService() {
             currentRepository = null
 
             if (!ModelStorageManager.isModelReady(applicationContext, modelId)) {
-                Log.w(TAG, "Model $modelId files not present — engine stays Unloaded")
+                Log.w(TAG, "Model $modelId files not present - engine stays Unloaded")
                 _engineState.value = EngineState.Unloaded
-                updateNotification("Model not downloaded — open Outspoke to download")
+                updateNotification("Model not downloaded - open Outspoke to download")
                 return
             }
 
@@ -165,11 +158,9 @@ class InferenceService : LifecycleService() {
         }
     }
 
-    // -- Models directory watcher
-
     /**
      * Watches the `models/` root directory so we detect both deletion and installation of
-     * model files for any model — triggering an engine reload for the selected model.
+     * model files for any model - triggering an engine reload for the selected model.
      *
      * The observer is only recreated when the watched directory actually changes.
      */
@@ -214,20 +205,18 @@ class InferenceService : LifecycleService() {
 
             when {
                 !isReady && currentState == EngineState.Ready -> {
-                    Log.w(TAG, "Selected model files removed — unloading engine")
+                    Log.w(TAG, "Selected model files removed - unloading engine")
                     reloadForModel(selectedModelId) // will detect !isReady and set Unloaded
                     startModelWatcher()
                 }
                 isReady && currentState == EngineState.Unloaded -> {
-                    Log.d(TAG, "Selected model files appeared — loading engine")
+                    Log.d(TAG, "Selected model files appeared - loading engine")
                     reloadForModel(selectedModelId)
                     startModelWatcher()
                 }
             }
         }
     }
-
-    // -- Notification helpers
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(

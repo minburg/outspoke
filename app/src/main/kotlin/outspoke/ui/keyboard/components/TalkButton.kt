@@ -29,15 +29,15 @@ private const val CONTINUOUS_DRAG_THRESHOLD_DP = 56
 /**
  * The primary interaction element of the keyboard.
  *
- * **HOLD mode** — press-and-hold to record; release to stop.
+ * **HOLD mode** - press-and-hold to record; release to stop.
  *
- * **Drag-up-to-lock** (HOLD mode only) — while holding, drag upward past [CONTINUOUS_DRAG_THRESHOLD_DP] dp
+ * **Drag-up-to-lock** (HOLD mode only) - while holding, drag upward past [CONTINUOUS_DRAG_THRESHOLD_DP] dp
  * to engage continuous mode.  The button scales and turns red to confirm the lock.
  * Recording continues without the user needing to keep touching the screen.
  *
- * **Continuous mode** (HOLD) — button shows a pulsing [Stop] icon.  Tap once to stop recording.
+ * **Continuous mode** (HOLD) - button shows a pulsing [Stop] icon.  Tap once to stop recording.
  *
- * **TAP_TOGGLE mode** — single tap starts recording; another tap stops it.  No hold needed.
+ * **TAP_TOGGLE mode** - single tap starts recording; another tap stops it.  No hold needed.
  *
  * @param triggerMode          `"HOLD"` (default) or `"TAP_TOGGLE"`.
  * @param isContinuous         `true` when continuous (locked) mode is active (HOLD mode only).
@@ -157,7 +157,7 @@ fun TalkButton(
                                         val change = event.changes.firstOrNull() ?: break
 
                                         if (!change.pressed) {
-                                            // Released — stop only if not locked
+                                            // Released - stop only if not locked
                                             dragProgress = 0f
                                             if (!locked) currentOnRecordStop()
                                             break
@@ -183,7 +183,7 @@ fun TalkButton(
         Icon(
             imageVector = if (isContinuousActive) Icons.Filled.Stop else Icons.Filled.Mic,
             contentDescription = when {
-                !enabled                                      -> "Talk button disabled — engine not ready"
+                !enabled                                      -> "Talk button disabled - engine not ready"
                 isContinuousActive                            -> "Stop continuous recording"
                 isListening && triggerMode == "TAP_TOGGLE"   -> "Tap to stop recording"
                 isListening                                   -> "Stop recording"

@@ -9,7 +9,7 @@ import java.io.File
  * Each model lives in its own sub-directory:
  *   `<filesDir>/models/<ModelId.storageDirName>/`
  *
- * All paths are within `context.filesDir` — no external-storage permission is required.
+ * All paths are within `context.filesDir` - no external-storage permission is required.
  */
 object ModelStorageManager {
 
@@ -37,7 +37,7 @@ object ModelStorageManager {
             file.exists() && file.length() > 0
         }
 
-    /** Convenience overload — looks up [ModelInfo] from [ModelRegistry]. */
+    /** Convenience overload - looks up [ModelInfo] from [ModelRegistry]. */
     fun isModelReady(context: Context, modelId: ModelId): Boolean =
         isModelReady(context, ModelRegistry[modelId])
 
@@ -53,7 +53,7 @@ object ModelStorageManager {
         getModelDir(context, modelId).deleteRecursively()
     }
 
-    /** Legacy no-arg overload — deletes the default model. */
+    /** Legacy no-arg overload - deletes the default model. */
     fun deleteModel(context: Context): Unit =
         deleteModel(context, ModelId.DEFAULT)
 }

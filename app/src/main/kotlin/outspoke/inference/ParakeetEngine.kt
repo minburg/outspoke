@@ -60,8 +60,6 @@ class ParakeetEngine : SpeechEngine {
     private var blankId: Int = FALLBACK_BLANK_ID
     private var numDurations: Int = 0   // derived at load: outputDim - (blankId + 1)
 
-    // Pre-allocated PCM normalisation buffer — resized lazily.
-    @Volatile private var normBuf: FloatArray = FloatArray(0)
 
     @Volatile override var isLoaded: Boolean = false
         private set
@@ -69,7 +67,7 @@ class ParakeetEngine : SpeechEngine {
 
     /**
      * Creates all ONNX sessions and loads the vocabulary.
-     * **Must be called on a background thread** — loading takes 1-3 s on first run.
+     * **Must be called on a background thread** - loading takes 1-3 s on first run.
      *
      * @throws IllegalStateException if called while already loaded.
      * @throws Exception (OrtException / IOException) if any model file is corrupt.
@@ -91,7 +89,7 @@ class ParakeetEngine : SpeechEngine {
             prepSession = e.createSession(prepFile.absolutePath, opts)
             logSession("nemo128 (preprocessor)", prepSession!!)
         } else {
-            Log.w(TAG, "nemo128.onnx absent — will forward raw audio to encoder (shapes will mismatch)")
+            Log.w(TAG, "nemo128.onnx absent - will forward raw audio to encoder (shapes will mismatch)")
         }
 
         encSession = e.createSession(File(modelDir, "encoder-model.int8.onnx").absolutePath, opts)
@@ -103,21 +101,21 @@ class ParakeetEngine : SpeechEngine {
         logSession("decoder_joint", decSession!!)
 
         // vocab.txt format: "<token_text> <id>" (e.g. "▁like 2656").
-        // Lines are in ID order so line N = token ID N — we just need the first field.
+        // Lines are in ID order so line N = token ID N - we just need the first field.
         vocabulary = File(modelDir, "vocab.txt").readLines()
             .map { line -> line.trim().split(Regex("\\s+")).firstOrNull().orEmpty() }
             .toTypedArray()
         Log.d(TAG, "Vocabulary: ${vocabulary.size} tokens")
 
         // Resolution order:
-        //  1. Scan vocab.txt for a known blank label — most reliable for NeMo TDT exports
-        //  2. config.json — may be stale or wrong in third-party ONNX conversions
-        //  3. vocabulary.size - 1 — safe heuristic (blank is always the last NeMo token)
+        //  1. Scan vocab.txt for a known blank label - most reliable for NeMo TDT exports
+        //  2. config.json - may be stale or wrong in third-party ONNX conversions
+        //  3. vocabulary.size - 1 - safe heuristic (blank is always the last NeMo token)
         blankId = scanVocabForBlankId()
             ?: parseBlankId(File(modelDir, "config.json"))
             ?: run {
                 val fallback = (vocabulary.size - 1).coerceAtLeast(0)
-                Log.w(TAG, "blank_id not found in vocab or config.json — using vocabulary.size-1=$fallback")
+                Log.w(TAG, "blank_id not found in vocab or config.json - using vocabulary.size-1=$fallback")
                 fallback
             }
         val blankLabel = vocabulary.getOrNull(blankId) ?: "<out-of-range>"
@@ -142,7 +140,7 @@ class ParakeetEngine : SpeechEngine {
      * - Short chunks (< ~200 ms) will typically return [TranscriptResult.Partial] with an
      *   empty string because the encoder does not have enough context. Accumulate chunks in
      *   [InferenceRepository] before calling this for production use.
-     * - This is a **blocking** call — always dispatch to [kotlinx.coroutines.Dispatchers.Default].
+     * - This is a **blocking** call - always dispatch to [kotlinx.coroutines.Dispatchers.Default].
      */
     override fun transcribe(chunk: AudioChunk): TranscriptResult {
         if (!isLoaded) return TranscriptResult.Failure(IllegalStateException("Engine not loaded"))
@@ -182,11 +180,17 @@ class ParakeetEngine : SpeechEngine {
         Log.d(TAG, "ParakeetEngine closed")
     }
 
-    /** Converts `ShortArray` PCM to a `FloatArray` in `[-1.0, 1.0]`. Allocation-free on hot path. */
+    /**
+     * Converts [pcm] PCM samples to float32 in [-1.0, 1.0].
+     *
+     * Intentionally allocates a fresh array per call so that concurrent partial-inference
+     * coroutines each operate on independent data. The allocation cost (~64 KB per 1-s
+     * chunk) is negligible compared to the ONNX inference itself.
+     */
     private fun normalizePcm(pcm: ShortArray): FloatArray {
-        if (normBuf.size < pcm.size) normBuf = FloatArray(pcm.size)
-        for (i in pcm.indices) normBuf[i] = pcm[i] / 32_768f
-        return normBuf.copyOf(pcm.size) // caller needs an owned copy
+        val out = FloatArray(pcm.size)
+        for (i in pcm.indices) out[i] = pcm[i] / 32_768f
+        return out
     }
 
     /**
@@ -199,7 +203,7 @@ class ParakeetEngine : SpeechEngine {
     private fun preprocess(env: OrtEnvironment, samples: FloatArray): Pair<OnnxTensor, Long> {
         val audioLen = samples.size.toLong()
         val prep = prepSession ?: run {
-            Log.w(TAG, "No preprocessor — forwarding raw audio (shapes will mismatch)")
+            Log.w(TAG, "No preprocessor - forwarding raw audio (shapes will mismatch)")
             return OnnxTensor.createTensor(
                 env, FloatBuffer.wrap(samples), longArrayOf(1L, audioLen)
             ) to audioLen
@@ -217,7 +221,7 @@ class ParakeetEngine : SpeechEngine {
         return prep.run(inputs).use { result ->
             audioTensor.close(); lenTensor.close()
             val featTensor = result.get(prepOutputNames[0]).get() as OnnxTensor
-            // Read time dimension directly from shape — avoids INT32/INT64 ambiguity on length output
+            // Read time dimension directly from shape - avoids INT32/INT64 ambiguity on length output
             val featLen = featTensor.info.shape[2]   // shape: [batch, 128, T′]
             cloneTensor(env, featTensor) to featLen
         }
@@ -248,7 +252,7 @@ class ParakeetEngine : SpeechEngine {
     }
 
     /**
-     * Greedy TDT decoder — all details verified from logcat on 2026-03-23:
+     * Greedy TDT decoder - all details verified from logcat on 2026-03-23:
      *
      * Encoder output layout: [batch, enc_dim=1024, enc_time]  ← (B, D, T) NOT (B, T, D)
      *
@@ -296,7 +300,7 @@ class ParakeetEngine : SpeechEngine {
 
         val hypothesis = mutableListOf<Int>()
         // Predictor embedding range is [0, blankId), so initialise with 0 (SOS).
-        // blankId is a *joint output label* only — never fed into the embedding layer.
+        // blankId is a *joint output label* only - never fed into the embedding layer.
         var prevToken       = 0
         var t               = 0
         var maxIter         = T * 20 + 50   // global safety cap
@@ -379,7 +383,7 @@ class ParakeetEngine : SpeechEngine {
                             tokensAtFrame = 0
                         } else if (tokensAtFrame >= MAX_TOKENS_PER_FRAME) {
                             // Safety: force advance when duration=0 emissions pile up on one frame
-                            Log.w(TAG, "greedyDecode: stuck at frame $t — forcing advance")
+                            Log.w(TAG, "greedyDecode: stuck at frame $t - forcing advance")
                             t++
                             tokensAtFrame = 0
                         }
@@ -403,8 +407,8 @@ class ParakeetEngine : SpeechEngine {
      * Handles SentencePiece word-boundary markers (U+2581 `▁`).
      *
      * Filtered entries:
-     *  - [blankId] — the blank/CTC token; should never reach here but guard anyway
-     *  - Purely numeric strings — NeMo SentencePiece exports label unused/special token
+     *  - [blankId] - the blank/CTC token; should never reach here but guard anyway
+     *  - Purely numeric strings - NeMo SentencePiece exports label unused/special token
      *    slots with their index (e.g. "8192", "1076", "▁7877"). Both bare and
      *    `▁`-prefixed forms are filtered so that word-boundary variants such as
      *    "▁8192" are caught before the space-insertion logic runs.
@@ -433,7 +437,7 @@ class ParakeetEngine : SpeechEngine {
                 val token = vocabulary[id]
                 // Remove the SentencePiece word-boundary marker before processing.
                 val bare = token.removePrefix("▁")
-                // Strip any leading digit run — NeMo fills unused slots with their index
+                // Strip any leading digit run - NeMo fills unused slots with their index
                 // (e.g. "▁1980ess" → bare = "1980ess" → effective = "ess").
                 // If nothing meaningful remains after stripping, skip the token entirely.
                 val effective = bare.dropWhile { it.isDigit() }
@@ -495,7 +499,7 @@ class ParakeetEngine : SpeechEngine {
     /**
      * Attempts to read `blank_id` from `config.json`.
      * Checks (in order): top-level, `model_defaults`, `decoder`, `tokenizer` sections.
-     * Returns `null` if the file is absent or no key is found — caller falls back to vocabulary.size-1.
+     * Returns `null` if the file is absent or no key is found - caller falls back to vocabulary.size-1.
      */
     private fun parseBlankId(configFile: File): Int? {
         if (!configFile.exists()) return null

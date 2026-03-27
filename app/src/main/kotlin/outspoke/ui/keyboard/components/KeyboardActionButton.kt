@@ -30,7 +30,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * @param icon               Vector icon to display.
  * @param contentDescription Accessibility label.
  * @param onClick            Action triggered on tap.
- * @param tint               Icon colour — defaults to [MaterialTheme.colorScheme.onSurfaceVariant].
+ * @param tint               Icon colour - defaults to [MaterialTheme.colorScheme.onSurfaceVariant].
  */
 @Composable
 fun KeyboardActionButton(
