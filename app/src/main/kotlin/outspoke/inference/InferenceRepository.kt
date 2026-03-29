@@ -182,11 +182,12 @@ private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30   // 30 s = 480 000 samp
 
 /**
  * Minimum audio passed to the final inference pass.
- * Very short recordings (< 0.5 s) give the encoder too few frames and Parakeet
- * returns blank output. Zero-padding to this length solves single-word failures;
- * the decoder simply advances through the silent tail as blanks.
+ * Clips shorter than 1 second are padded to 1.25 seconds (20 000 samples). Very short
+ * inputs give the encoder too few frames and Parakeet returns blank or spurious tokens.
+ * Zero-padding is decoded as silence — TDT advances through blank frames without emitting
+ * speech tokens. (Reference pipeline: < 1 s → padded to 1.25 s.)
  */
-private const val MIN_FINAL_SAMPLES = SAMPLE_RATE / 2     // 0.5 s = 8 000 samples
+private const val MIN_FINAL_SAMPLES = SAMPLE_RATE * 5 / 4  // 1.25 s = 20 000 samples
 
 // ── Stable-chunk commit constants ─────────────────────────────────────────────
 
