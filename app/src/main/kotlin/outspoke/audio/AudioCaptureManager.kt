@@ -20,6 +20,13 @@ private const val SAMPLE_RATE = 16_000
 /** 30 ms window at 16 kHz = 480 samples per chunk. Matches Silero VAD's required frame size. */
 private const val CHUNK_SAMPLES = 480
 
+/**
+ * Maximum silence frames pumped through the VAD during the trailing drain phase.
+ * 20 frames × 30 ms = 600 ms — generously above [VadFilter]'s 15-frame / 450 ms hangover
+ * so the hangover always expires before this cap is hit.
+ */
+private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20
+
 // ── Adaptive Gain Control (AGC) ──────────────────────────────────────────────
 // VOICE_RECOGNITION disables hardware AGC, so raw RMS values are tiny
 // (speech ≈ 0.003–0.05, shouting ≈ 0.05–0.2 on most devices).  A fixed gain
@@ -134,6 +141,7 @@ class AudioCaptureManager(private val context: Context) {
             "AudioRecord failed to initialise (state=${recorder.state})"
         }
 
+
         val buffer = ShortArray(CHUNK_SAMPLES)
 
         try {
@@ -163,8 +171,43 @@ class AudioCaptureManager(private val context: Context) {
                     // read == 0: no data yet; continue the loop
                 }
             }
+
+            // ── Trailing Audio Drain ──────────────────────────────────────────
+            // When the user releases the record key, two sources of audio are still pending:
+            //   1. Samples sitting in the AudioRecord hardware ring buffer not yet read.
+            //   2. The VAD hangover window (up to 450 ms) that has not yet expired.
+            // Draining both ensures the last word is never cut off mid-phoneme.
+
+            if (stopRequested && currentCoroutineContext().isActive) {
+                // Phase 1: drain any remaining hardware buffer data (non-blocking reads).
+                var drained: Int
+                do {
+                    drained = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
+                    if (drained > 0) {
+                        val chunk = AudioChunk(samples = buffer.copyOf(drained))
+                        val rms = calculateRms(chunk.samples)
+                        val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
+                        for (c in toSend) send(c)
+                    }
+                } while (drained > 0)
+                Log.d(TAG, "AudioRecord hardware buffer drained")
+
+                // Phase 2: if VAD is still in hangover/speech, feed silence frames until
+                // the hangover counter expires and VAD transitions back to SILENCE.
+                // This guarantees the hangover tail is emitted before the flow completes.
+                if (vad != null && vad.isSpeechActive) {
+                    val silence = AudioChunk(ShortArray(CHUNK_SAMPLES))
+                    var safetyFrames = HANGOVER_DRAIN_SAFETY_FRAMES
+                    while (vad.isSpeechActive && safetyFrames-- > 0) {
+                        val toSend = vad.process(silence, 0f)
+                        for (c in toSend) send(c)
+                    }
+                    Log.d(TAG, "VAD hangover drain complete (framesLeft=$safetyFrames)")
+                }
+            }
+            // ─────────────────────────────────────────────────────────────────
+
         } finally {
-            // Reset VAD state; hangover frames were already emitted during the read loop.
             vad?.flush()
             recorder.stop()
             recorder.release()
