@@ -67,7 +67,7 @@ private fun TranscriptResult.logLabel(): String = when (this) {
  *   "kann.. kann"                   → "kann.."
  *   "gut gut gut"                   → "gut"
  */
-internal fun String.deduplicateRepeatedPhrases(): String {
+internal fun String.collapseRepeatedPhrases(): String {
     val words = trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (words.size < 2) return this
 
@@ -123,8 +123,79 @@ internal fun String.deduplicateRepeatedPhrases(): String {
 }
 
 /**
+ * Collapses single words that repeat 3 or more times consecutively.
+ * E.g., "no no no" -> "no", but "no no" -> "no no".
+ */
+internal fun String.collapseStutters(): String {
+    val words = this.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (words.size < 3) return this
+
+    val result = mutableListOf<String>()
+    var i = 0
+
+    while (i < words.size) {
+        val currentWord = words[i]
+        val normCurrent = currentWord.normalizedForComparison()
+        if (normCurrent.isEmpty()) {
+            result.add(currentWord)
+            i++
+            continue
+        }
+        
+        var count = 1
+        var j = i + 1
+        while (j < words.size) {
+            val nextWord = words[j]
+            if (nextWord.normalizedForComparison() == normCurrent) {
+                count++
+                j++
+            } else {
+                break
+            }
+        }
+        
+        if (count >= 3) {
+            // Keep only 1
+            result.add(currentWord)
+            Log.d(TAG, "[STUTTER] \"$currentWord\" ×$count → kept 1")
+        } else if (count == 2) {
+            // Keep both
+            result.add(words[i])
+            result.add(words[i + 1])
+        } else {
+            // Keep 1
+            result.add(currentWord)
+        }
+        i += count
+    }
+    return result.joinToString(" ")
+}
+
+/**
+ * Removes language-specific filler words using a word-boundary regex.
+ * Also consumes any trailing comma or period attached to the filler.
+ */
+internal fun String.removeFillerWords(language: String = "en"): String {
+    val enFillers = listOf("uh", "um", "uhm", "umm", "uhh", "uhhh", "ah", "hmm", "hm", "mmm", "mm", "mh", "eh", "ehh")
+    
+    val fillers = when {
+        language.startsWith("en", ignoreCase = true) -> enFillers
+        else -> emptyList() // Extension point for multi-language
+    }
+    
+    if (fillers.isEmpty()) return this
+
+    val regexStr = "\\b(?:${fillers.joinToString("|")})\\b[,.]?"
+    val regex = Regex(regexStr, RegexOption.IGNORE_CASE)
+    
+    return this.replace(regex, "").replace(Regex(" {2,}"), " ").trim()
+}
+
+/**
  * Removes common model artefacts from a raw transcript:
- *  - Consecutive repeated words / phrases (model hallucination loops)
+ *  - Filler words
+ *  - single word stutters (>= 3 repeats)
+ *  - Consecutive repeated phrases (model hallucination loops)
  *  - Leading dots / ellipsis: `"...Hello"` → `"Hello"`
  *  - Trailing multiple dots: `"Hello..."` → `"Hello."`
  *  - Missing space after sentence-ending punctuation: `"gut.Ich"` → `"gut. Ich"`
@@ -140,19 +211,27 @@ internal fun String.cleanTranscript(): String {
     }
     val input = trim()
 
-    // Step 1: collapse consecutive repeated words / phrases.
-    val afterDedup = input.deduplicateRepeatedPhrases()
-    if (afterDedup != input) Log.d(TAG, "[CLEAN:DEDUP]       \"$input\" → \"$afterDedup\"")
+    // Step 1: remove filler words (language aware, defaults to English)
+    val afterFillers = input.removeFillerWords()
+    if (afterFillers != input) Log.d(TAG, "[CLEAN:FILLERS]     \"$input\" → \"$afterFillers\"")
 
-    // Step 2: strip artefact leading dots / ellipsis.
+    // Step 2: collapse >=3 single word stutters
+    val afterStutters = afterFillers.collapseStutters()
+    if (afterStutters != afterFillers) Log.d(TAG, "[CLEAN:STUTTER]     \"$afterFillers\" → \"$afterStutters\"")
+
+    // Step 3: collapse consecutive repeated phrases (hallucination loops)
+    val afterDedup = afterStutters.collapseRepeatedPhrases()
+    if (afterDedup != afterStutters) Log.d(TAG, "[CLEAN:PHRASES]     \"$afterStutters\" → \"$afterDedup\"")
+
+    // Step 4: strip artefact leading dots / ellipsis.
     val afterLeadDots = afterDedup.replace(LEADING_DOTS_RE, "")
     if (afterLeadDots != afterDedup) Log.d(TAG, "[CLEAN:LEAD_DOTS]   \"$afterDedup\" → \"$afterLeadDots\"")
 
-    // Step 3: reduce trailing 2+ dots to a single dot.
+    // Step 5: reduce trailing 2+ dots to a single dot.
     val afterTrailDots = afterLeadDots.replace(TRAILING_DOTS_RE, ".")
     if (afterTrailDots != afterLeadDots) Log.d(TAG, "[CLEAN:TRAIL_DOTS]  \"$afterLeadDots\" → \"$afterTrailDots\"")
 
-    // Step 4: restore missing space after sentence-ending punctuation before a letter.
+    // Step 6: restore missing space after sentence-ending punctuation before a letter.
     val afterSentSpace = afterTrailDots.replace(MISSING_SENTENCE_SPACE_RE, "$1 $2").trim()
     if (afterSentSpace != afterTrailDots.trim()) Log.d(TAG, "[CLEAN:SENT_SPACE]  \"${afterTrailDots.trim()}\" → \"$afterSentSpace\"")
 
