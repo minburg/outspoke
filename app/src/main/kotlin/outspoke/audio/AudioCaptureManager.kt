@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import dev.brgr.outspoke.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.*
@@ -39,16 +40,16 @@ private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20
 //                     can see the mic is active without the bars being distracting.
 
 /** Minimum peak envelope - prevents infinite gain in total silence. */
-private const val AGC_FLOOR   = 0.01f
+private const val AGC_FLOOR = 0.01f
 
 /** Per-chunk attack coefficient (0 = no rise, 1 = instant). */
-private const val AGC_ATTACK  = 0.15f
+private const val AGC_ATTACK = 0.15f
 
 /**
  * Per-chunk decay multiplier.
  * Half-life = log(0.5) / log(AGC_DECAY) chunks ≈ 45 chunks ≈ 1.8 s.
  */
-private const val AGC_DECAY   = 0.985f
+private const val AGC_DECAY = 0.985f
 
 /**
  * Manages a single [AudioRecord] session and emits captured audio as a cold
@@ -71,13 +72,15 @@ class AudioCaptureManager(private val context: Context) {
      * Using a flag instead of coroutine cancellation lets the [Flow] complete normally
      * so that the inference layer can emit a final result before tearing down.
      */
-    @Volatile private var stopRequested: Boolean = false
+    @Volatile
+    private var stopRequested: Boolean = false
 
     /**
      * Running peak envelope for AGC.  Intentionally NOT reset between sessions so
      * the gain stays calibrated across repeated short recordings in the same environment.
      */
-    @Volatile private var agcEnvelope: Float = AGC_FLOOR
+    @Volatile
+    private var agcEnvelope: Float = AGC_FLOOR
 
     /**
      * Signals the active [startCapture] flow to exit its read loop and complete normally.
@@ -112,14 +115,22 @@ class AudioCaptureManager(private val context: Context) {
         if (!PermissionHelper.hasRecordPermission(context)) {
             throw SecurityException(
                 "RECORD_AUDIO permission is not granted. " +
-                    "Open the Outspoke app to grant microphone access."
+                        "Open the Outspoke app to grant microphone access."
             )
         }
 
         stopRequested = false   // reset for this capture session
 
         // Only create a filter when sensitivity > 0; null means pass-through (VAD disabled).
-        val vad: VadFilter? = if (vadSensitivity > 0f) VadFilter(vadSensitivity) else null
+        val vad: IVadFilter? = if (vadSensitivity > 0f) {
+            try {
+                val sileroBytes = context.resources.openRawResource(R.raw.silero_vad_v4).readBytes()
+                SileroVadFilter(modelBytes = sileroBytes, threshold = 0.3f)
+            } catch (e: Exception) {
+                Log.w(TAG, "Silero VAD model not found in raw resources. Falling back to Energy VAD.", e)
+                VadFilter(vadSensitivity)
+            }
+        } else null
 
         val minBufferBytes = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
@@ -159,11 +170,13 @@ class AudioCaptureManager(private val context: Context) {
                         val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
                         for (c in toSend) send(c)
                     }
+
                     read == AudioRecord.ERROR_DEAD_OBJECT -> {
                         // Hardware-level error - the audio subsystem was taken away.
                         Log.e(TAG, "AudioRecord ERROR_DEAD_OBJECT - stopping capture")
                         return@channelFlow
                     }
+
                     read < 0 -> {
                         // Non-fatal read error - log and skip this chunk.
                         Log.w(TAG, "AudioRecord read returned error code: $read")
@@ -209,6 +222,7 @@ class AudioCaptureManager(private val context: Context) {
 
         } finally {
             vad?.flush()
+            vad?.close()
             recorder.stop()
             recorder.release()
             _amplitude.value = 0f

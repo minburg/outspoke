@@ -36,7 +36,7 @@ import kotlin.math.ln
  *
  * @param sensitivity  [0.0, 1.0] - higher values require louder speech to pass.
  */
-class VadFilter(sensitivity: Float = 0.5f) {
+class VadFilter(sensitivity: Float = 0.5f) : IVadFilter {
 
     // Map sensitivity to RMS threshold via exponential curve.
     // 0.0 → ~0.002, 0.5 → ~0.010, 1.0 → ~0.050
@@ -60,9 +60,9 @@ class VadFilter(sensitivity: Float = 0.5f) {
     private val leadIn = ArrayDeque<AudioChunk>(LEAD_IN_FRAMES + 1)
 
     /** `true` while outputting speech frames (including during the hangover window). */
-    val isSpeechActive: Boolean get() = state == State.SPEECH
+    override val isSpeechActive: Boolean get() = state == State.SPEECH
 
-    fun process(chunk: AudioChunk, rms: Float): List<AudioChunk> {
+    override fun process(chunk: AudioChunk, rms: Float): List<AudioChunk> {
         return when (state) {
             State.SILENCE -> {
                 // Always maintain the pre-roll ring buffer during silence so that
@@ -120,7 +120,7 @@ class VadFilter(sensitivity: Float = 0.5f) {
      * Returns `true` if the session ended while speech was still active (hangover or
      * confirmed speech), meaning trailing audio may have been cut off mid-word.
      */
-    fun flush(): Boolean {
+    override fun flush(): Boolean {
         val wasSpeech = state == State.SPEECH
         state = State.SILENCE
         hangoverFrames = 0

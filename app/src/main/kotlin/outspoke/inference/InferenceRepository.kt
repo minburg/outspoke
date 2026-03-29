@@ -192,6 +192,32 @@ internal fun String.removeFillerWords(language: String = "en"): String {
 }
 
 /**
+ * Capitalizes the first letter of the text and any letter that immediately follows
+ * a sentence-ending punctuation mark ('.', '!', '?') and optional whitespace.
+ */
+internal fun String.applySentenceCapitalization(): String {
+    if (this.isBlank()) return this
+    val text = this.trim()
+    val builder = StringBuilder(text.length)
+    var capitalizeNext = true
+
+    for (i in text.indices) {
+        val c = text[i]
+        if (capitalizeNext && c.isLetter()) {
+            builder.append(c.uppercaseChar())
+            capitalizeNext = false
+        } else {
+            builder.append(c)
+        }
+
+        if (c == '.' || c == '!' || c == '?') {
+            capitalizeNext = true
+        }
+    }
+    return builder.toString()
+}
+
+/**
  * Removes common model artefacts from a raw transcript:
  *  - Filler words
  *  - single word stutters (>= 3 repeats)
@@ -199,6 +225,7 @@ internal fun String.removeFillerWords(language: String = "en"): String {
  *  - Leading dots / ellipsis: `"...Hello"` → `"Hello"`
  *  - Trailing multiple dots: `"Hello..."` → `"Hello."`
  *  - Missing space after sentence-ending punctuation: `"gut.Ich"` → `"gut. Ich"`
+ *  - Enforces sentence boundary capitalization.
  *  - Strings that contain no alphanumeric content are discarded entirely.
  *
  * Each transformation step is logged as `[CLEAN:*]` when it actually changes the
@@ -235,11 +262,15 @@ internal fun String.cleanTranscript(): String {
     val afterSentSpace = afterTrailDots.replace(MISSING_SENTENCE_SPACE_RE, "$1 $2").trim()
     if (afterSentSpace != afterTrailDots.trim()) Log.d(TAG, "[CLEAN:SENT_SPACE]  \"${afterTrailDots.trim()}\" → \"$afterSentSpace\"")
 
-    return if (afterSentSpace.none { it.isLetterOrDigit() }) {
+    // Step 7: capitalize first word of sentences.
+    val afterCaps = afterSentSpace.applySentenceCapitalization()
+    if (afterCaps != afterSentSpace) Log.d(TAG, "[CLEAN:CAPITALIZE]  \"$afterSentSpace\" → \"$afterCaps\"")
+
+    return if (afterCaps.none { it.isLetterOrDigit() }) {
         Log.d(TAG, "[CLEAN] \"$input\" → discarded (no alphanumeric content)")
         ""
     } else {
-        afterSentSpace
+        afterCaps
     }
 }
 
