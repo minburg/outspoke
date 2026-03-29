@@ -17,8 +17,8 @@ private const val TAG = "AudioCaptureManager"
 /** 16 kHz mono - matches Parakeet V3's expected input format. */
 private const val SAMPLE_RATE = 16_000
 
-/** 40 ms window at 16 kHz = 640 samples per chunk. */
-private const val CHUNK_SAMPLES = 640
+/** 30 ms window at 16 kHz = 480 samples per chunk. Matches Silero VAD's required frame size. */
+private const val CHUNK_SAMPLES = 480
 
 // ── Adaptive Gain Control (AGC) ──────────────────────────────────────────────
 // VOICE_RECOGNITION disables hardware AGC, so raw RMS values are tiny
