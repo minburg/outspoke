@@ -39,7 +39,8 @@ interface SpeechEngine {
      *
      * Thread-safe; may be called at any time, including between [transcribe] calls.
      */
-    fun setLanguage(tag: String) { /* no-op by default */ }
+    fun setLanguage(tag: String) { /* no-op by default */
+    }
 
     /**
      * Restricts automatic language detection to a subset of BCP-47 tags.
@@ -53,7 +54,8 @@ interface SpeechEngine {
      *
      * No-op for engines that do not support language selection.
      */
-    fun setLanguageConstraints(tags: List<String>) { /* no-op by default */ }
+    fun setLanguageConstraints(tags: List<String>) { /* no-op by default */
+    }
 
     /**
      * Releases all native ONNX sessions and frees memory.

@@ -58,8 +58,8 @@ class TextInjector(
         val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
         val isTextClass = cls == InputType.TYPE_CLASS_TEXT
         val isPassword = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
         isTextClass && !isPassword
     }
 
@@ -150,7 +150,7 @@ class TextInjector(
         val maxOverlap = minOf(committed.size, fresh.size)
         for (overlap in maxOverlap downTo 1) {
             val committedTail = committed.takeLast(overlap)
-            val freshHead     = fresh.take(overlap)
+            val freshHead = fresh.take(overlap)
             if (committedTail.indices.all { i ->
                     committedTail[i].normalizeWord() == freshHead[i].normalizeWord()
                 }) {
@@ -172,7 +172,7 @@ class TextInjector(
         // (common words like "und", "ich", "die" appear frequently in any sentence).
         val maxScanLen = minOf(committed.size, 6)
         for (overlapLen in maxScanLen downTo 2) {
-            val tail      = committed.takeLast(overlapLen)
+            val tail = committed.takeLast(overlapLen)
             val scanLimit = fresh.size - overlapLen
             for (startPos in 1..scanLimit) {
                 if (tail.indices.all { i ->
@@ -296,16 +296,16 @@ class TextInjector(
      */
     fun commitFinal(text: String) {
         lastPartial = ""
-        val savedCommitted    = committedWords.toList()
+        val savedCommitted = committedWords.toList()
         val wasSessionStarted = sessionStarted
 
         // Reset for the next recording session.
-        committedWords  = mutableListOf()
-        composingWords  = emptyList()
-        sessionStarted  = false
+        committedWords = mutableListOf()
+        composingWords = emptyList()
+        sessionStarted = false
 
-        val finalWords    = text.splitToWords()
-        val remaining     = findNewContent(savedCommitted, finalWords)
+        val finalWords = text.splitToWords()
+        val remaining = findNewContent(savedCommitted, finalWords)
         val remainingText = remaining.joinToString(" ")
 
         if (!wasSessionStarted && remainingText.isNotEmpty() && supportsComposing) {
@@ -339,7 +339,7 @@ class TextInjector(
      * next session.
      */
     fun clear() {
-        lastPartial    = ""
+        lastPartial = ""
         committedWords = mutableListOf()
         composingWords = emptyList()
         sessionStarted = false
@@ -406,7 +406,7 @@ class TextInjector(
      */
     fun deleteAll() {
         val before = inputConnection.getTextBeforeCursor(100_000, 0)?.length ?: 0
-        val after  = inputConnection.getTextAfterCursor(100_000, 0)?.length ?: 0
+        val after = inputConnection.getTextAfterCursor(100_000, 0)?.length ?: 0
         if (before > 0 || after > 0) {
             inputConnection.deleteSurroundingText(before, after)
         }

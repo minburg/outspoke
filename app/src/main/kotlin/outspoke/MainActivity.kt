@@ -73,6 +73,7 @@ private fun MicPermissionScreen(resumeCount: Int) {
             granted -> MicPermissionState.Granted
             activity.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) ->
                 MicPermissionState.NeedsRequest
+
             else -> MicPermissionState.PermanentlyDenied
         }
     }
@@ -107,6 +108,7 @@ private fun MicPermissionScreen(resumeCount: Int) {
                 MicPermissionState.NeedsRequest -> RationaleContent(
                     onGrant = { launcher.launch(Manifest.permission.RECORD_AUDIO) },
                 )
+
                 MicPermissionState.PermanentlyDenied -> PermanentlyDeniedContent(
                     onOpenSettings = {
                         activity.startActivity(

@@ -2,7 +2,7 @@
 
 A privacy-focused speech-to-text keyboard(IME) for Android. Speech recognition runs entirely on-device — no internet needed after the initial model download, no account, no data leaving your phone.
 
-It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference.
+It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference. Voice activity detection uses [Silero VAD v4](https://github.com/snakers4/silero-vad) (also ONNX, also fully on-device) to suppress silence before it ever reaches the ASR model.
 
 > **Status:** Early development / pre-release. Expect rough edges.
 
@@ -10,13 +10,13 @@ It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.
 
 ## Features
 
-- 🔒 **Fully offline after setup** — audio is never transmitted anywhere
-- 🎙️ **Real-time transcription** — progressive partial results while you speak
+- **Fully offline after setup** — audio is never transmitted anywhere
+- **Real-time transcription** — progressive partial results while you speak
 - **Works in any app** — injects text via Android's standard `InputConnection` API
-- 🧠 **Parakeet-TDT 0.6B v3** — INT8 quantized, ~700 MB, runs on mid-range hardware
-- **Voice Activity Detection** — energy-threshold VAD suppresses silence automatically
+- **Parakeet-TDT 0.6B v3** — INT8 quantized, ~700 MB, runs on mid-range hardware
+- **Voice Activity Detection** — Silero VAD v4 neural network (ONNX) filters silence before it reaches the ASR model; falls back to energy-threshold VAD if the model can't load
 - **Configurable trigger modes** — hold-to-talk or tap-to-toggle
-- 📦 **No Google Play Services, no telemetry, no analytics**
+- **No Google Play Services, no telemetry, no analytics**
 
 ---
 
@@ -57,6 +57,9 @@ Outspoke is structured as a clean layered pipeline. The `SpeechEngine` interface
 ┌──────────────▼──────────────────┐
 │  OutspokeInputMethodService     │  ← Android IME service
 │  (LifecycleOwner + Compose UI)  │
+│  ┌───────────────────────────┐  │
+│  │    KeyboardViewModel      │  │  ← UI state + capture lifecycle
+│  └───────────────────────────┘  │
 └──────────────┬──────────────────┘
                │  binds to
 ┌──────────────▼──────────────────┐
@@ -72,7 +75,8 @@ Outspoke is structured as a clean layered pipeline. The `SpeechEngine` interface
                │  Flow<AudioChunk>
 ┌──────────────▼──────────────────┐
 │    AudioCaptureManager          │  ← 16 kHz / 16-bit / mono PCM
-│    VadFilter                    │  ← Energy-threshold VAD
+│    SileroVadFilter              │  ← Neural VAD (Silero v4, ONNX)
+│    RMSVadFilter                 │  ← Energy-threshold fallback
 └─────────────────────────────────┘
 ```
 
@@ -84,10 +88,13 @@ Outspoke is structured as a clean layered pipeline. The `SpeechEngine` interface
 | `inference` | `ParakeetEngine` | Implements `SpeechEngine` using three ONNX sessions (preprocessor → encoder → decoder/joint) |
 | `inference` | `InferenceService` | `LifecycleService` that owns the engine and exposes `InferenceRepository` to bound clients |
 | `inference` | `InferenceRepository` | Bridges `Flow<AudioChunk>` to the engine; emits `TranscriptResult.Partial` / `Final` |
-| `audio` | `AudioCaptureManager` | Opens `AudioRecord`, emits 40 ms `AudioChunk`s as a cold `Flow` |
-| `audio` | `VadFilter` | Stateful energy-threshold VAD with configurable sensitivity, lead-in buffer, and hangover |
+| `audio` | `AudioCaptureManager` | Opens `AudioRecord`, emits 40 ms `AudioChunk`s as a cold `Flow`; drains hardware buffer and VAD hangover on stop |
+| `audio` | `VadFilter` | Interface — common contract for VAD implementations (process, flush, isSpeechActive) |
+| `audio` | `SileroVadFilter` | Neural VAD using Silero v4 (ONNX); preserves RNN state across chunks; primary filter when model is available |
+| `audio` | `RMSVadFilter` | Energy-threshold VAD; used as fallback when Silero ONNX model can't load |
 | `ime` | `OutspokeInputMethodService` | Core IME; wires Compose view tree, binds `InferenceService`, drives capture lifecycle |
 | `ime` | `TextInjector` | Commits partial/final text via `InputConnection` with composing-text highlighting |
+| `ui` | `KeyboardViewModel` | Bridges IME lifecycle, audio capture, and inference results into `KeyboardUiState`; owns `captureJob` |
 | `settings` | `ModelDownloadManager` | Downloads model files from Hugging Face over OkHttp with SHA-256 verification |
 | `settings` | `ModelStorageManager` | Manages model file paths inside `filesDir` (no external storage permission needed) |
 
@@ -119,8 +126,10 @@ interface SpeechEngine {
 To add, for example, a Whisper or Moonshine backend:
 
 1. Create a new class implementing `SpeechEngine` (e.g. `WhisperEngine`).
-2. Add its model files to `ModelStorageManager.REQUIRED_FILES`.
-3. Register it in `SpeechEngineFactory` and update `ModelStorageManager` with its required files — the repository and IME layers don't need to change.
+2. Add a `ModelId` enum value and a `ModelInfo` entry in `ModelRegistry` — this covers display name, download URLs, file list, and size estimate.
+3. Add a branch in `SpeechEngineFactory` to instantiate the new engine for that `ModelId`.
+
+The repository and IME layers don't need to change.
 
 ---
 

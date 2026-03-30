@@ -93,8 +93,9 @@ data class ModelInfo(
  */
 object ModelRegistry {
 
-//    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
-    val all: List<ModelInfo> = listOf(parakeetV3) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
+    //    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
+    val all: List<ModelInfo> =
+        listOf(parakeetV3) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
 
     private val byId: Map<ModelId, ModelInfo> = all.associateBy { it.id }
 
@@ -106,29 +107,29 @@ object ModelRegistry {
 private val parakeetV3 = ModelInfo(
     id = ModelId.PARAKEET_V3,
     displayName = "Parakeet-V3 (Default)",
-    description = "NeMo TDT model optimised for English on-device ASR. " +
-                  "Fast and compact - the recommended choice for most devices.",
+    description = "NeMo TDT model for on-device ASR optimised for English and 24 other european languages like DE, FR, ES, IT, RU etc. " +
+            "Very fast and compact - the recommended choice for most devices.",
     approximateSizeMb = 700,
     source = DownloadSource.Files(
         baseUrl = PARAKEET_BASE,
         files = listOf(
             RemoteFile(
-                filename     = "encoder-model.int8.onnx",
+                filename = "encoder-model.int8.onnx",
                 sizeFraction = 0.70f,
-                sha256       = "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09",
+                sha256 = "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09",
             ),
             RemoteFile(
-                filename     = "decoder_joint-model.int8.onnx",
+                filename = "decoder_joint-model.int8.onnx",
                 sizeFraction = 0.19f,
-                sha256       = "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70",
+                sha256 = "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70",
             ),
             RemoteFile(
-                filename     = "nemo128.onnx",
+                filename = "nemo128.onnx",
                 sizeFraction = 0.06f,
-                sha256       = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f",
+                sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f",
             ),
             RemoteFile(filename = "config.json", sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "vocab.txt",   sizeFraction = 0.04f, sha256 = null),
+            RemoteFile(filename = "vocab.txt", sizeFraction = 0.04f, sha256 = null),
         ),
     ),
     requiredFiles = listOf(
@@ -148,28 +149,34 @@ private val voxtralMini = ModelInfo(
     id = ModelId.VOXTRAL_MINI,
     displayName = "Voxtral Mini 4B (Q4)",
     description = "Mistral-based multilingual speech model from onnx-community. " +
-                  "Q4-quantised (~3.3 GB) - requires a high-end device with ample storage.",
+            "Q4-quantised (~3.3 GB) - requires a high-end device with ample storage.",
     approximateSizeMb = 3_300,
     source = DownloadSource.Files(
         baseUrl = VOXTRAL_BASE,
         files = listOf(
             // Audio encoder: .onnx header + single .onnx_data sidecar
-            RemoteFile(filename = "audio_encoder_q4.onnx",              sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "audio_encoder_q4.onnx_data",         sizeFraction = 0.20f, sha256 = null),
+            RemoteFile(filename = "audio_encoder_q4.onnx", sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "audio_encoder_q4.onnx_data", sizeFraction = 0.20f, sha256 = null),
             // Token embedding table
-            RemoteFile(filename = "embed_tokens_q4.onnx",               sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "embed_tokens_q4.onnx_data",          sizeFraction = 0.08f, sha256 = null),
+            RemoteFile(filename = "embed_tokens_q4.onnx", sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "embed_tokens_q4.onnx_data", sizeFraction = 0.08f, sha256 = null),
             // Merged decoder: header + two data shards
-            RemoteFile(filename = "decoder_model_merged_q4.onnx",       sizeFraction = 0.01f, sha256 = null),
-            RemoteFile(filename = "decoder_model_merged_q4.onnx_data",  sizeFraction = 0.61f, sha256 = null),
-            RemoteFile(filename = "decoder_model_merged_q4.onnx_data_1",sizeFraction = 0.08f, sha256 = null),
+            RemoteFile(filename = "decoder_model_merged_q4.onnx", sizeFraction = 0.01f, sha256 = null),
+            RemoteFile(filename = "decoder_model_merged_q4.onnx_data", sizeFraction = 0.61f, sha256 = null),
+            RemoteFile(filename = "decoder_model_merged_q4.onnx_data_1", sizeFraction = 0.08f, sha256 = null),
             // Tokenizer + config - these live at the repo ROOT, not under /onnx/
-            RemoteFile(filename = "tokenizer.json",      sizeFraction = 0.00f, sha256 = null,
-                urlOverride = "$VOXTRAL_ROOT/tokenizer.json"),
-            RemoteFile(filename = "tokenizer_config.json", sizeFraction = 0.00f, sha256 = null,
-                urlOverride = "$VOXTRAL_ROOT/tokenizer_config.json"),
-            RemoteFile(filename = "generation_config.json", sizeFraction = 0.00f, sha256 = null,
-                urlOverride = "$VOXTRAL_ROOT/generation_config.json"),
+            RemoteFile(
+                filename = "tokenizer.json", sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/tokenizer.json"
+            ),
+            RemoteFile(
+                filename = "tokenizer_config.json", sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/tokenizer_config.json"
+            ),
+            RemoteFile(
+                filename = "generation_config.json", sizeFraction = 0.00f, sha256 = null,
+                urlOverride = "$VOXTRAL_ROOT/generation_config.json"
+            ),
         ),
     ),
     requiredFiles = listOf(
@@ -193,26 +200,26 @@ private val whisperLargeV3Turbo = ModelInfo(
     id = ModelId.WHISPER_SMALL,   // reuses existing ModelId slot
     displayName = "Whisper Large-v3 Turbo (INT8)",
     description = "OpenAI Whisper Large-v3 encoder with a 2-layer turbo decoder. " +
-                  "Near-Large-v3 accuracy, multilingual, INT8-quantised (~1.1 GB).",
+            "Near-Large-v3 accuracy, multilingual, INT8-quantised (~1.1 GB).",
     approximateSizeMb = 1_037,
     source = DownloadSource.Files(
         baseUrl = WHISPER_TURBO_BASE,
         files = listOf(
             RemoteFile(
-                filename     = "encoder_model_int8.onnx",
+                filename = "encoder_model_int8.onnx",
                 sizeFraction = 0.593f,
-                sha256       = null,
+                sha256 = null,
             ),
             RemoteFile(
-                filename     = "decoder_model_merged_int8.onnx",
+                filename = "decoder_model_merged_int8.onnx",
                 sizeFraction = 0.405f,
-                sha256       = null,
+                sha256 = null,
             ),
             RemoteFile(
-                filename     = "tokenizer.json",
+                filename = "tokenizer.json",
                 sizeFraction = 0.002f,
-                sha256       = null,
-                urlOverride  = "$WHISPER_TURBO_ROOT/tokenizer.json",
+                sha256 = null,
+                urlOverride = "$WHISPER_TURBO_ROOT/tokenizer.json",
             ),
         ),
     ),

@@ -42,7 +42,7 @@ class TranscriptResultTest {
     fun `given partial and final with the same text, when compared, then they are not equal`() {
         // Given
         val partial = TranscriptResult.Partial("hello")
-        val final   = TranscriptResult.Final("hello")
+        val final = TranscriptResult.Final("hello")
 
         // When / Then
         assertNotEquals(partial, final)

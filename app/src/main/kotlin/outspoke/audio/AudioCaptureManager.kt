@@ -23,7 +23,7 @@ private const val CHUNK_SAMPLES = 480
 
 /**
  * Maximum silence frames pumped through the VAD during the trailing drain phase.
- * 20 frames × 30 ms = 600 ms — generously above [VadFilter]'s 15-frame / 450 ms hangover
+ * 20 frames × 30 ms = 600 ms — generously above [RMSVadFilter]'s 15-frame / 450 ms hangover
  * so the hangover always expires before this cap is hit.
  */
 private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20
@@ -122,13 +122,13 @@ class AudioCaptureManager(private val context: Context) {
         stopRequested = false   // reset for this capture session
 
         // Only create a filter when sensitivity > 0; null means pass-through (VAD disabled).
-        val vad: IVadFilter? = if (vadSensitivity > 0f) {
+        val vad: VadFilter? = if (vadSensitivity > 0f) {
             try {
                 val sileroBytes = context.resources.openRawResource(R.raw.silero_vad_v4).readBytes()
                 SileroVadFilter(modelBytes = sileroBytes, threshold = 0.3f)
             } catch (e: Exception) {
                 Log.w(TAG, "Silero VAD model not found in raw resources. Falling back to Energy VAD.", e)
-                VadFilter(vadSensitivity)
+                RMSVadFilter(vadSensitivity)
             }
         } else null
 
@@ -185,7 +185,7 @@ class AudioCaptureManager(private val context: Context) {
                 }
             }
 
-            // ── Trailing Audio Drain ──────────────────────────────────────────
+            // --> Trailing Audio Drain
             // When the user releases the record key, two sources of audio are still pending:
             //   1. Samples sitting in the AudioRecord hardware ring buffer not yet read.
             //   2. The VAD hangover window (up to 450 ms) that has not yet expired.
@@ -218,7 +218,6 @@ class AudioCaptureManager(private val context: Context) {
                     Log.d(TAG, "VAD hangover drain complete (framesLeft=$safetyFrames)")
                 }
             }
-            // ─────────────────────────────────────────────────────────────────
 
         } finally {
             vad?.flush()

@@ -12,8 +12,8 @@ import dev.brgr.outspoke.settings.model.ModelId
  */
 object SpeechEngineFactory {
     fun create(modelId: ModelId): SpeechEngine = when (modelId) {
-        ModelId.PARAKEET_V3   -> ParakeetEngine()
-        ModelId.VOXTRAL_MINI  -> VoxtralEngine()
+        ModelId.PARAKEET_V3 -> ParakeetEngine()
+        ModelId.VOXTRAL_MINI -> VoxtralEngine()
         ModelId.WHISPER_SMALL -> WhisperEngine()
     }
 }

@@ -13,11 +13,11 @@ import kotlin.math.*
 
 private const val TAG = "WhisperEngine"
 
-private const val SAMPLE_RATE   = 16_000
-private const val N_FFT         = 400        // 25 ms window @ 16 kHz
-private const val HOP_LENGTH    = 160        // 10 ms hop → 100 frames / sec
-private const val N_MELS        = 128        // Whisper large-v3/turbo uses 128 mel bins (v1/v2/small/medium use 80)
-private const val MAX_SAMPLES   = 480_000    // 30 s @ 16 kHz
+private const val SAMPLE_RATE = 16_000
+private const val N_FFT = 400        // 25 ms window @ 16 kHz
+private const val HOP_LENGTH = 160        // 10 ms hop → 100 frames / sec
+private const val N_MELS = 128        // Whisper large-v3/turbo uses 128 mel bins (v1/v2/small/medium use 80)
+private const val MAX_SAMPLES = 480_000    // 30 s @ 16 kHz
 private const val TARGET_FRAMES = 3_000      // 30 s × 100 fps
 
 private const val MAX_NEW_TOKENS = 448
@@ -45,23 +45,23 @@ class WhisperEngine : SpeechEngine {
     private companion object {
         const val ENCODER_FILENAME = "encoder_model_int8.onnx"
         const val DECODER_FILENAME = "decoder_model_merged_int8.onnx"
-        const val TOKENIZER_JSON   = "tokenizer.json"
+        const val TOKENIZER_JSON = "tokenizer.json"
 
         // Encoder tensor names
         const val ENC_IN_FEATURES = "input_features"    // FLOAT [1, 128, 3000]
-        const val ENC_OUT_HIDDEN  = "last_hidden_state" // FLOAT [1, 1500, D]
+        const val ENC_OUT_HIDDEN = "last_hidden_state" // FLOAT [1, 1500, D]
 
         // Decoder tensor names
-        const val DEC_IN_INPUT_IDS        = "input_ids"
-        const val DEC_IN_ENCODER_HIDDEN   = "encoder_hidden_states"
+        const val DEC_IN_INPUT_IDS = "input_ids"
+        const val DEC_IN_ENCODER_HIDDEN = "encoder_hidden_states"
         const val DEC_IN_USE_CACHE_BRANCH = "use_cache_branch"
-        const val DEC_OUT_LOGITS          = "logits"
+        const val DEC_OUT_LOGITS = "logits"
 
         // Whisper special token IDs - identical across all model sizes (vocab size = 51 865)
-        const val TOKEN_SOT           = 50258  // <|startoftranscript|>
-        const val TOKEN_EOT           = 50256  // <|endoftext|>
-        const val TOKEN_ENGLISH       = 50259  // <|en|>
-        const val TOKEN_TRANSCRIBE    = 50359  // <|transcribe|>
+        const val TOKEN_SOT = 50258  // <|startoftranscript|>
+        const val TOKEN_EOT = 50256  // <|endoftext|>
+        const val TOKEN_ENGLISH = 50259  // <|en|>
+        const val TOKEN_TRANSCRIBE = 50359  // <|transcribe|>
         const val TOKEN_NO_TIMESTAMPS = 50363  // <|notimestamps|>
         // Any token ID >= TOKEN_EOT is a Whisper control / special token - kept for reference
         // but resolved dynamically via findTokenId() at load time.
@@ -79,11 +79,11 @@ class WhisperEngine : SpeechEngine {
 
     // Special token IDs resolved dynamically from the loaded vocabulary.
     // Hardcoded values are only fallbacks for models where the token string is absent.
-    private var tokenSot          = TOKEN_SOT
-    private var tokenEnglish      = TOKEN_ENGLISH
-    private var tokenTranscribe   = TOKEN_TRANSCRIBE
+    private var tokenSot = TOKEN_SOT
+    private var tokenEnglish = TOKEN_ENGLISH
+    private var tokenTranscribe = TOKEN_TRANSCRIBE
     private var tokenNoTimestamps = TOKEN_NO_TIMESTAMPS
-    private var tokenEot          = TOKEN_EOT
+    private var tokenEot = TOKEN_EOT
 
     /** Mel filterbank matrix [N_MELS × (N_FFT/2+1)], built once at load time. */
     private var melFilters: FloatArray = FloatArray(0)
@@ -97,7 +97,8 @@ class WhisperEngine : SpeechEngine {
      *
      * Updated by [setLanguage]; thread-safe via [Volatile].
      */
-    @Volatile private var languageTag: String = "auto"
+    @Volatile
+    private var languageTag: String = "auto"
 
     override fun setLanguage(tag: String) {
         languageTag = tag
@@ -110,7 +111,8 @@ class WhisperEngine : SpeechEngine {
      * for short clips because adjacent tokens like EN (50259) and ES (50262) can have nearly
      * identical logits.  Set via [setLanguageConstraints].
      */
-    @Volatile private var constrainedTags: List<String> = emptyList()
+    @Volatile
+    private var constrainedTags: List<String> = emptyList()
 
     override fun setLanguageConstraints(tags: List<String>) {
         constrainedTags = tags
@@ -122,7 +124,8 @@ class WhisperEngine : SpeechEngine {
         (0.5 * (1.0 - cos(2.0 * PI * i / N_FFT))).toFloat()
     }
 
-    @Volatile override var isLoaded: Boolean = false
+    @Volatile
+    override var isLoaded: Boolean = false
         private set
 
     override fun load(modelDir: File) {
@@ -161,13 +164,15 @@ class WhisperEngine : SpeechEngine {
 
             // Resolve special token IDs from the actual vocabulary - they shift between
             // model sizes (large-v3 added more languages, pushing task tokens up by one).
-            tokenSot          = findTokenId("<|startoftranscript|>", TOKEN_SOT)
-            tokenEnglish      = findTokenId("<|en|>",                TOKEN_ENGLISH)
-            tokenTranscribe   = findTokenId("<|transcribe|>",        TOKEN_TRANSCRIBE)
-            tokenNoTimestamps = findTokenId("<|notimestamps|>",      TOKEN_NO_TIMESTAMPS)
-            tokenEot          = findTokenId("<|endoftext|>",         TOKEN_EOT)
-            Log.d(TAG, "Token IDs: SOT=$tokenSot EN=$tokenEnglish " +
-                       "TRANSCRIBE=$tokenTranscribe NO_TS=$tokenNoTimestamps EOT=$tokenEot")
+            tokenSot = findTokenId("<|startoftranscript|>", TOKEN_SOT)
+            tokenEnglish = findTokenId("<|en|>", TOKEN_ENGLISH)
+            tokenTranscribe = findTokenId("<|transcribe|>", TOKEN_TRANSCRIBE)
+            tokenNoTimestamps = findTokenId("<|notimestamps|>", TOKEN_NO_TIMESTAMPS)
+            tokenEot = findTokenId("<|endoftext|>", TOKEN_EOT)
+            Log.d(
+                TAG, "Token IDs: SOT=$tokenSot EN=$tokenEnglish " +
+                        "TRANSCRIBE=$tokenTranscribe NO_TS=$tokenNoTimestamps EOT=$tokenEot"
+            )
         } else {
             Log.w(TAG, "$TOKENIZER_JSON not found - detokenisation will be unavailable")
         }
@@ -225,9 +230,9 @@ class WhisperEngine : SpeechEngine {
                 // A single-token output that hits EOT immediately is almost always a
                 // hallucination from insufficient audio - treat it as tentative.
                 when {
-                    text.isBlank()     -> TranscriptResult.Partial("")
+                    text.isBlank() -> TranscriptResult.Partial("")
                     tokenIds.size <= 1 -> TranscriptResult.Partial(text)
-                    else               -> TranscriptResult.Final(text)
+                    else -> TranscriptResult.Final(text)
                 }
             } catch (ex: Exception) {
                 Log.e(TAG, "transcribe() failed", ex)
@@ -241,7 +246,7 @@ class WhisperEngine : SpeechEngine {
     override fun close() {
         encoderSession?.close(); encoderSession = null
         decoderSession?.close(); decoderSession = null
-        env?.close();            env = null
+        env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "WhisperEngine closed")
     }
@@ -261,10 +266,10 @@ class WhisperEngine : SpeechEngine {
         val audio = FloatArray(MAX_SAMPLES)
         System.arraycopy(samples, 0, audio, 0, minOf(samples.size, MAX_SAMPLES))
 
-        val fftSize  = 512               // N_FFT=400 → next power of 2 is 512
+        val fftSize = 512               // N_FFT=400 → next power of 2 is 512
         val freqBins = N_FFT / 2 + 1     // 201 one-sided DFT bins
 
-        val mel     = FloatArray(N_MELS * TARGET_FRAMES)
+        val mel = FloatArray(N_MELS * TARGET_FRAMES)
         val fftReal = DoubleArray(fftSize)
         val fftImag = DoubleArray(fftSize)
 
@@ -312,30 +317,30 @@ class WhisperEngine : SpeechEngine {
      */
     private fun buildMelFilterbank(): FloatArray {
         val freqBins = N_FFT / 2 + 1
-        val fMin     = 0.0
-        val fMax     = SAMPLE_RATE / 2.0  // 8 000 Hz
+        val fMin = 0.0
+        val fMax = SAMPLE_RATE / 2.0  // 8 000 Hz
 
         fun hzToMel(hz: Double): Double = 2595.0 * log10(1.0 + hz / 700.0)
-        fun melToHz(m: Double): Double   = 700.0 * (10.0.pow(m / 2595.0) - 1.0)
+        fun melToHz(m: Double): Double = 700.0 * (10.0.pow(m / 2595.0) - 1.0)
 
-        val melMin  = hzToMel(fMin)
-        val melMax  = hzToMel(fMax)
+        val melMin = hzToMel(fMin)
+        val melMax = hzToMel(fMax)
         val melStep = (melMax - melMin) / (N_MELS + 1)
 
-        val centre   = DoubleArray(N_MELS + 2) { i -> melToHz(melMin + i * melStep) }
+        val centre = DoubleArray(N_MELS + 2) { i -> melToHz(melMin + i * melStep) }
         val fftFreqs = DoubleArray(freqBins) { k -> k.toDouble() * SAMPLE_RATE / N_FFT }
 
         val filters = FloatArray(N_MELS * freqBins)
         for (m in 0 until N_MELS) {
-            val lo  = centre[m]
+            val lo = centre[m]
             val mid = centre[m + 1]
-            val hi  = centre[m + 2]
+            val hi = centre[m + 2]
             for (k in 0 until freqBins) {
                 val f = fftFreqs[k]
                 val w = when {
                     f < lo || f > hi -> 0.0
-                    f <= mid         -> (f - lo)  / (mid - lo)
-                    else             -> (hi - f)  / (hi - mid)
+                    f <= mid -> (f - lo) / (mid - lo)
+                    else -> (hi - f) / (hi - mid)
                 }
                 filters[m * freqBins + k] = w.toFloat()
             }
@@ -354,7 +359,9 @@ class WhisperEngine : SpeechEngine {
         var j = 0
         for (i in 1 until n) {
             var bit = n shr 1
-            while (j and bit != 0) { j = j xor bit; bit = bit shr 1 }
+            while (j and bit != 0) {
+                j = j xor bit; bit = bit shr 1
+            }
             j = j xor bit
             if (i < j) {
                 var tmp = re[i]; re[i] = re[j]; re[j] = tmp
@@ -365,17 +372,19 @@ class WhisperEngine : SpeechEngine {
         // Butterfly stages
         var len = 2
         while (len <= n) {
-            val halfLen   = len / 2
+            val halfLen = len / 2
             val angleStep = -PI / halfLen
             for (i in 0 until n step len) {
                 for (k in 0 until halfLen) {
                     val angle = angleStep * k
-                    val wr = cos(angle); val wi = sin(angle)
-                    val ur = re[i + k];  val ui = im[i + k]
+                    val wr = cos(angle);
+                    val wi = sin(angle)
+                    val ur = re[i + k];
+                    val ui = im[i + k]
                     val vr = wr * re[i + k + halfLen] - wi * im[i + k + halfLen]
                     val vi = wr * im[i + k + halfLen] + wi * re[i + k + halfLen]
-                    re[i + k]           = ur + vr;  im[i + k]           = ui + vi
-                    re[i + k + halfLen] = ur - vr;  im[i + k + halfLen] = ui - vi
+                    re[i + k] = ur + vr; im[i + k] = ui + vi
+                    re[i + k + halfLen] = ur - vr; im[i + k + halfLen] = ui - vi
                 }
             }
             len = len shl 1
@@ -451,7 +460,7 @@ class WhisperEngine : SpeechEngine {
             try {
                 val logitsTensor = result.get(DEC_OUT_LOGITS)
                     .orElseThrow { RuntimeException("No logits during language detection") }
-                    as OnnxTensor
+                        as OnnxTensor
                 val vocabSize = logitsTensor.info.shape[2].toInt()
                 val logits = FloatArray(vocabSize)
                 logitsTensor.floatBuffer.rewind()
@@ -462,7 +471,7 @@ class WhisperEngine : SpeechEngine {
                     candidateTokenIds.filter { it in 0 until vocabSize }.toIntArray()
                 } else {
                     val first = tokenEnglish
-                    val last  = minOf(tokenTranscribe - 2, vocabSize - 1)
+                    val last = minOf(tokenTranscribe - 2, vocabSize - 1)
                     if (last >= first) IntArray(last - first + 1) { first + it } else intArrayOf()
                 }
 
@@ -471,11 +480,13 @@ class WhisperEngine : SpeechEngine {
                     return tokenEnglish
                 }
 
-                var bestLang  = candidates[0]
+                var bestLang = candidates[0]
                 var bestLogit = logits[bestLang]
                 for (id in candidates.drop(1)) {
                     val v = logits[id]
-                    if (v > bestLogit) { bestLogit = v; bestLang = id }
+                    if (v > bestLogit) {
+                        bestLogit = v; bestLang = id
+                    }
                 }
 
                 // Log the confidence gap (top minus second-best).
@@ -483,8 +494,10 @@ class WhisperEngine : SpeechEngine {
                 val secondBest = candidates.filter { it != bestLang }
                     .maxOfOrNull { logits[it] } ?: Float.NEGATIVE_INFINITY
                 val gap = bestLogit - secondBest
-                Log.d(TAG, "detectLanguage: token=$bestLang " +
-                    "(${vocabulary.getOrNull(bestLang)}) gap=${"%.2f".format(gap)}")
+                Log.d(
+                    TAG, "detectLanguage: token=$bestLang " +
+                            "(${vocabulary.getOrNull(bestLang)}) gap=${"%.2f".format(gap)}"
+                )
                 return bestLang
             } finally {
                 result.close()
@@ -526,7 +539,7 @@ class WhisperEngine : SpeechEngine {
 
         // Copy encoder hidden state once - reused as input every decoder step
         val encHiddenShape = encoderHidden.info.shape
-        val encHiddenData  = FloatArray(encoderHidden.floatBuffer.remaining())
+        val encHiddenData = FloatArray(encoderHidden.floatBuffer.remaining())
         encoderHidden.floatBuffer.rewind()
         encoderHidden.floatBuffer.get(encHiddenData)
 
@@ -550,8 +563,9 @@ class WhisperEngine : SpeechEngine {
             val candidates = if (constrainedTags.isNotEmpty()) {
                 constrainedTags.mapNotNull { tag ->
                     val id = findTokenId("<|$tag|>", -1)
-                    if (id < 0) { Log.w(TAG, "greedyDecode: unknown constraint '$tag'"); null }
-                    else id
+                    if (id < 0) {
+                        Log.w(TAG, "greedyDecode: unknown constraint '$tag'"); null
+                    } else id
                 }.toIntArray()
             } else {
                 intArrayOf()  // empty = full language range inside detectLanguage()
@@ -559,8 +573,10 @@ class WhisperEngine : SpeechEngine {
 
             val minSamplesForDetect = SAMPLE_RATE * 2  // 2 s of speech minimum
             if (sampleCount < minSamplesForDetect && candidates.isNotEmpty()) {
-                Log.d(TAG, "greedyDecode: clip too short ($sampleCount samples) - " +
-                    "skipping detection, using ${constrainedTags.first()}")
+                Log.d(
+                    TAG, "greedyDecode: clip too short ($sampleCount samples) - " +
+                            "skipping detection, using ${constrainedTags.first()}"
+                )
                 candidates[0]
             } else {
                 detectLanguage(env, session, encHiddenShape, encHiddenData, candidates)
@@ -576,7 +592,7 @@ class WhisperEngine : SpeechEngine {
 
         val hypothesis = mutableListOf<Int>()
         // KV cache: input name (past_key_values.*) → tensor owned by prevResult
-        val kvCache    = mutableMapOf<String, OnnxTensor>()
+        val kvCache = mutableMapOf<String, OnnxTensor>()
         var prevResult: OrtSession.Result? = null
 
         try {
@@ -604,7 +620,7 @@ class WhisperEngine : SpeechEngine {
                 // logits [1, prefixLen, vocab] - take last position
                 val logitsTensor = prevResult.get(DEC_OUT_LOGITS)
                     .orElseThrow { RuntimeException("Decoder output '$DEC_OUT_LOGITS' not found") }
-                    as OnnxTensor
+                        as OnnxTensor
                 val vocabSize = logitsTensor.info.shape[2].toInt()
                 val allLogits = FloatArray(prefixLen * vocabSize)
                 logitsTensor.floatBuffer.rewind()
@@ -612,13 +628,17 @@ class WhisperEngine : SpeechEngine {
 
                 val lastOffset = (prefixLen - 1) * vocabSize
                 var firstToken = 0
-                var maxLogit   = allLogits[lastOffset]
+                var maxLogit = allLogits[lastOffset]
                 for (i in 1 until vocabSize) {
                     val v = allLogits[lastOffset + i]
-                    if (v > maxLogit) { maxLogit = v; firstToken = i }
+                    if (v > maxLogit) {
+                        maxLogit = v; firstToken = i
+                    }
                 }
-                Log.d(TAG, "greedyDecode Phase 1: firstToken=$firstToken " +
-                        "(${vocabulary.getOrNull(firstToken)})")
+                Log.d(
+                    TAG, "greedyDecode Phase 1: firstToken=$firstToken " +
+                            "(${vocabulary.getOrNull(firstToken)})"
+                )
 
                 // Collect all present.* → past_key_values.*
                 collectKvTensors(prevResult, outputNames, kvCache)
@@ -667,15 +687,17 @@ class WhisperEngine : SpeechEngine {
                         // logits [1, 1, vocab] - position 0
                         val stepLogits = currentResult.get(DEC_OUT_LOGITS)
                             .orElseThrow { RuntimeException("No '$DEC_OUT_LOGITS' at step $step") }
-                            as OnnxTensor
-                        val sv     = stepLogits.info.shape[2].toInt()
+                                as OnnxTensor
+                        val sv = stepLogits.info.shape[2].toInt()
                         val logits = FloatArray(sv)
                         stepLogits.floatBuffer.rewind()
                         stepLogits.floatBuffer.get(logits)
 
                         val generated = logits.indices.maxByOrNull { logits[it] } ?: TOKEN_EOT
-                        Log.d(TAG, "greedyDecode step=$step input=$currentToken " +
-                                "generated=$generated (${vocabulary.getOrNull(generated)})")
+                        Log.d(
+                            TAG, "greedyDecode step=$step input=$currentToken " +
+                                    "generated=$generated (${vocabulary.getOrNull(generated)})"
+                        )
 
                         // Stop on EOT or any other Whisper control token
                         if (generated >= tokenEot) {
@@ -743,14 +765,14 @@ class WhisperEngine : SpeechEngine {
     ) {
         for (name in inputNames) {
             if (!name.startsWith("past_key_values")) continue
-            val info  = session.inputInfo[name]?.info as? TensorInfo ?: continue
-            val rank  = info.shape.size
+            val info = session.inputInfo[name]?.info as? TensorInfo ?: continue
+            val rank = info.shape.size
             val shape = LongArray(rank) { i ->
                 val d = info.shape[i]
                 when {
-                    d >= 0L             -> d    // static dim - keep as-is
+                    d >= 0L -> d    // static dim - keep as-is
                     rank == 4 && i == 2 -> 0L   // past_sequence_length → 0 (empty cache)
-                    else                -> 1L   // batch / other dynamic dim → 1
+                    else -> 1L   // batch / other dynamic dim → 1
                 }
             }
             val size = shape.fold(1L) { acc, d -> acc * d }.toInt()
@@ -768,7 +790,7 @@ class WhisperEngine : SpeechEngine {
      * Returns an array indexed by token ID.
      */
     private fun loadVocabulary(file: File): Array<String> {
-        val json    = JSONObject(file.readText())
+        val json = JSONObject(file.readText())
         val entries = mutableMapOf<Int, String>()
 
         val vocab = json.optJSONObject("model")?.optJSONObject("vocab")
@@ -788,7 +810,7 @@ class WhisperEngine : SpeechEngine {
         }
 
         val maxId = entries.keys.maxOrNull() ?: 0
-        val arr   = Array(maxId + 1) { i -> entries[i] ?: "" }
+        val arr = Array(maxId + 1) { i -> entries[i] ?: "" }
         Log.d(TAG, "loadVocabulary: ${arr.size} tokens (model.vocab + added_tokens merged)")
         return arr
     }
@@ -876,7 +898,7 @@ class WhisperEngine : SpeechEngine {
      */
     private fun cloneTensor(env: OrtEnvironment, source: OnnxTensor): OnnxTensor {
         val shape = source.info.shape
-        val data  = FloatArray(source.floatBuffer.remaining())
+        val data = FloatArray(source.floatBuffer.remaining())
         source.floatBuffer.rewind()
         source.floatBuffer.get(data)
         return OnnxTensor.createTensor(env, FloatBuffer.wrap(data), shape)

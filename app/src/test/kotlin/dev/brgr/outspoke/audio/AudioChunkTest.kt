@@ -36,7 +36,7 @@ class AudioChunkTest {
         // Given
         val samples = shortArrayOf(1, 2, 3)
         val a = AudioChunk(samples = samples.copyOf(), sampleRate = 16_000, timestampMs = 0L)
-        val b = AudioChunk(samples = samples.copyOf(), sampleRate = 8_000,  timestampMs = 0L)
+        val b = AudioChunk(samples = samples.copyOf(), sampleRate = 8_000, timestampMs = 0L)
 
         // When / Then
         assertNotEquals(a, b)

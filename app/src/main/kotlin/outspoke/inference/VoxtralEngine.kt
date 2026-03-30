@@ -15,11 +15,11 @@ import kotlin.math.*
 
 private const val TAG = "VoxtralEngine"
 
-private const val SAMPLE_RATE   = 16_000
-private const val N_FFT         = 400        // 25 ms analysis window @ 16 kHz
-private const val HOP_LENGTH    = 160        // 10 ms hop → 100 frames / sec
-private const val N_MELS        = 128        // mel frequency bins
-private const val MAX_SAMPLES   = 480_000    // hard cap: 30 s @ 16 kHz
+private const val SAMPLE_RATE = 16_000
+private const val N_FFT = 400        // 25 ms analysis window @ 16 kHz
+private const val HOP_LENGTH = 160        // 10 ms hop → 100 frames / sec
+private const val N_MELS = 128        // mel frequency bins
+private const val MAX_SAMPLES = 480_000    // hard cap: 30 s @ 16 kHz
 private const val TARGET_FRAMES = 3_000      // 30 s × 100 fps
 
 private const val MAX_NEW_TOKENS = 448
@@ -47,23 +47,23 @@ class VoxtralEngine : SpeechEngine {
         // https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/tree/main/onnx
         // ORT loads the companion .onnx_data sidecar(s) automatically when they reside
         // in the same directory as the .onnx header file.
-        const val ENCODER_FILENAME     = "audio_encoder_q4.onnx"          // 416 kB + 661 MB data
+        const val ENCODER_FILENAME = "audio_encoder_q4.onnx"          // 416 kB + 661 MB data
         const val EMBED_TOKENS_FILENAME = "embed_tokens_q4.onnx"           // 857 B  + 258 MB data
-        const val DECODER_FILENAME     = "decoder_model_merged_q4.onnx"    // 290 kB + ~2.3 GB data
-        const val TOKENIZER_JSON       = "tokenizer.json"
+        const val DECODER_FILENAME = "decoder_model_merged_q4.onnx"    // 290 kB + ~2.3 GB data
+        const val TOKENIZER_JSON = "tokenizer.json"
 
         // Audio encoder tensor names (Whisper-compatible export)
-        const val ENC_IN_FEATURES   = "input_features"       // FLOAT [1, 128, 3000]
-        const val ENC_OUT_HIDDEN    = "last_hidden_state"     // FLOAT [1, T_audio, D]
+        const val ENC_IN_FEATURES = "input_features"       // FLOAT [1, 128, 3000]
+        const val ENC_OUT_HIDDEN = "last_hidden_state"     // FLOAT [1, T_audio, D]
 
         // Embed-tokens tensor names
-        const val EMBED_IN_INPUT_IDS  = "input_ids"           // INT64 [1, seq]
-        const val EMBED_OUT_EMBEDS    = "inputs_embeds"        // FLOAT [1, seq, hidden]
+        const val EMBED_IN_INPUT_IDS = "input_ids"           // INT64 [1, seq]
+        const val EMBED_OUT_EMBEDS = "inputs_embeds"        // FLOAT [1, seq, hidden]
 
         // Decoder tensor names - decoder-only Mistral, no cross-attention.
         // Audio features are prepended to inputs_embeds on the prefill step.
         const val DEC_IN_INPUTS_EMBEDS = "inputs_embeds"      // FLOAT [1, seq, hidden]
-        const val DEC_OUT_LOGITS       = "logits"             // FLOAT [1, seq, vocab]
+        const val DEC_OUT_LOGITS = "logits"             // FLOAT [1, seq, vocab]
 
         // Voxtral / Mistral special token IDs (standard sentencepiece BOS/EOS)
         const val TOKEN_BOS = 1
@@ -81,8 +81,8 @@ class VoxtralEngine : SpeechEngine {
         // (batch) mode all audio is available upfront, so these pads should be treated
         // as transparent filler: filtered from the hypothesis and used to detect
         // end-of-speech when too many appear consecutively.
-        const val TOKEN_STREAMING_PAD      = 32
-        const val MAX_CONSECUTIVE_PADS     = 30   // break after this many consecutive pads
+        const val TOKEN_STREAMING_PAD = 32
+        const val MAX_CONSECUTIVE_PADS = 30   // break after this many consecutive pads
         const val REPETITION_WINDOW_TOKENS = 12   // hypothesis tokens tracked for loop detection
     }
 
@@ -116,7 +116,8 @@ class VoxtralEngine : SpeechEngine {
         (0.5 * (1.0 - cos(2.0 * PI * i / N_FFT))).toFloat()
     }
 
-    @Volatile override var isLoaded: Boolean = false
+    @Volatile
+    override var isLoaded: Boolean = false
         private set
 
 
@@ -132,9 +133,9 @@ class VoxtralEngine : SpeechEngine {
         env = OrtEnvironment.getEnvironment()
         val e = env!!
 
-        val encoderFile     = File(modelDir, ENCODER_FILENAME)
+        val encoderFile = File(modelDir, ENCODER_FILENAME)
         val embedTokensFile = File(modelDir, EMBED_TOKENS_FILENAME)
-        val decoderFile     = File(modelDir, DECODER_FILENAME)
+        val decoderFile = File(modelDir, DECODER_FILENAME)
 
         if (encoderFile.exists()) {
             encoderSession = e.createSession(encoderFile.absolutePath, opts)
@@ -223,9 +224,9 @@ class VoxtralEngine : SpeechEngine {
 
     override fun close() {
         encoderSession?.close(); encoderSession = null
-        embedSession?.close();   embedSession   = null
+        embedSession?.close(); embedSession = null
         decoderSession?.close(); decoderSession = null
-        env?.close();            env = null
+        env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "VoxtralEngine closed")
     }
@@ -252,10 +253,10 @@ class VoxtralEngine : SpeechEngine {
         val audio = FloatArray(MAX_SAMPLES)
         System.arraycopy(samples, 0, audio, 0, minOf(samples.size, MAX_SAMPLES))
 
-        val fftSize  = 512               // N_FFT=400 → next power of 2 is 512
+        val fftSize = 512               // N_FFT=400 → next power of 2 is 512
         val freqBins = N_FFT / 2 + 1     // 201 one-sided DFT bins
 
-        val mel     = FloatArray(N_MELS * TARGET_FRAMES)
+        val mel = FloatArray(N_MELS * TARGET_FRAMES)
         val fftReal = DoubleArray(fftSize)
         val fftImag = DoubleArray(fftSize)
 
@@ -307,15 +308,15 @@ class VoxtralEngine : SpeechEngine {
      */
     private fun buildMelFilterbank(): FloatArray {
         val freqBins = N_FFT / 2 + 1
-        val fMin     = 0.0
-        val fMax     = SAMPLE_RATE / 2.0   // 8 000 Hz
+        val fMin = 0.0
+        val fMax = SAMPLE_RATE / 2.0   // 8 000 Hz
 
         fun hzToMel(hz: Double): Double = 2595.0 * log10(1.0 + hz / 700.0)
-        fun melToHz(m: Double): Double   = 700.0 * (10.0.pow(m / 2595.0) - 1.0)
+        fun melToHz(m: Double): Double = 700.0 * (10.0.pow(m / 2595.0) - 1.0)
 
-        val melMin   = hzToMel(fMin)
-        val melMax   = hzToMel(fMax)
-        val melStep  = (melMax - melMin) / (N_MELS + 1)
+        val melMin = hzToMel(fMin)
+        val melMax = hzToMel(fMax)
+        val melStep = (melMax - melMin) / (N_MELS + 1)
 
         // N_MELS + 2 equally-spaced points in mel domain → Hz
         val centre = DoubleArray(N_MELS + 2) { i -> melToHz(melMin + i * melStep) }
@@ -324,15 +325,15 @@ class VoxtralEngine : SpeechEngine {
 
         val filters = FloatArray(N_MELS * freqBins)
         for (m in 0 until N_MELS) {
-            val lo  = centre[m]
+            val lo = centre[m]
             val mid = centre[m + 1]
-            val hi  = centre[m + 2]
+            val hi = centre[m + 2]
             for (k in 0 until freqBins) {
                 val f = fftFreqs[k]
                 val w = when {
-                    f < lo  || f > hi -> 0.0
-                    f <= mid          -> (f - lo)  / (mid - lo)
-                    else              -> (hi - f)  / (hi - mid)
+                    f < lo || f > hi -> 0.0
+                    f <= mid -> (f - lo) / (mid - lo)
+                    else -> (hi - f) / (hi - mid)
                 }
                 filters[m * freqBins + k] = w.toFloat()
             }
@@ -352,7 +353,9 @@ class VoxtralEngine : SpeechEngine {
         var j = 0
         for (i in 1 until n) {
             var bit = n shr 1
-            while (j and bit != 0) { j = j xor bit; bit = bit shr 1 }
+            while (j and bit != 0) {
+                j = j xor bit; bit = bit shr 1
+            }
             j = j xor bit
             if (i < j) {
                 var tmp = re[i]; re[i] = re[j]; re[j] = tmp
@@ -363,17 +366,19 @@ class VoxtralEngine : SpeechEngine {
         // Butterfly stages
         var len = 2
         while (len <= n) {
-            val halfLen   = len / 2
+            val halfLen = len / 2
             val angleStep = -PI / halfLen   // = -2π / len
             for (i in 0 until n step len) {
                 for (k in 0 until halfLen) {
                     val angle = angleStep * k
-                    val wr = cos(angle); val wi = sin(angle)
-                    val ur = re[i + k];  val ui = im[i + k]
+                    val wr = cos(angle);
+                    val wi = sin(angle)
+                    val ur = re[i + k];
+                    val ui = im[i + k]
                     val vr = wr * re[i + k + halfLen] - wi * im[i + k + halfLen]
                     val vi = wr * im[i + k + halfLen] + wi * re[i + k + halfLen]
-                    re[i + k]           = ur + vr;  im[i + k]           = ui + vi
-                    re[i + k + halfLen] = ur - vr;  im[i + k + halfLen] = ui - vi
+                    re[i + k] = ur + vr; im[i + k] = ui + vi
+                    re[i + k + halfLen] = ur - vr; im[i + k + halfLen] = ui - vi
                 }
             }
             len = len shl 1
@@ -399,7 +404,7 @@ class VoxtralEngine : SpeechEngine {
         melFeatures: FloatArray,
     ): OnnxTensor {
         val inputNames = session.inputNames.toSet()
-        val inputs     = mutableMapOf<String, OnnxTensor>()
+        val inputs = mutableMapOf<String, OnnxTensor>()
 
         try {
             // Primary: mel spectrogram [1, N_MELS, TARGET_FRAMES]
@@ -448,14 +453,14 @@ class VoxtralEngine : SpeechEngine {
             // signal "no past context" to the GQA and Conv cache nodes.
             for (name in inputNames) {
                 if (name in inputs) continue                          // already provided
-                val info  = session.inputInfo[name]?.info as? TensorInfo ?: continue
-                val rank  = info.shape.size
+                val info = session.inputInfo[name]?.info as? TensorInfo ?: continue
+                val rank = info.shape.size
                 val shape = LongArray(rank) { i ->
                     val d = info.shape[i]
                     when {
-                        d >= 0L             -> d   // static dim - keep as-is
+                        d >= 0L -> d   // static dim - keep as-is
                         rank == 4 && i == 2 -> 0L  // KV past sequence length → 0
-                        else                -> 1L  // batch / other dynamic dim → 1
+                        else -> 1L  // batch / other dynamic dim → 1
                     }
                 }
                 val size = shape.fold(1L) { acc, d -> acc * d }.toInt()
@@ -508,29 +513,31 @@ class VoxtralEngine : SpeechEngine {
         session: OrtSession,
         audioEmbeds: OnnxTensor,   // encoder output: [1, T_audio, D]
     ): List<Int> {
-        val inputNames       = session.inputNames.toSet()
-        val outputNames      = session.outputNames.toList()
-        val hasKvCache       = inputNames.any { it.startsWith("past_key_values") }
+        val inputNames = session.inputNames.toSet()
+        val outputNames = session.outputNames.toList()
+        val hasKvCache = inputNames.any { it.startsWith("past_key_values") }
         val hasAttentionMask = "attention_mask" in inputNames
-        val hasPositionIds   = "position_ids"   in inputNames
-        Log.d(TAG, "greedyDecode: hasKvCache=$hasKvCache hasAttentionMask=$hasAttentionMask " +
-                   "hasPositionIds=$hasPositionIds decoderUsesEmbeds=$decoderUsesEmbeds")
+        val hasPositionIds = "position_ids" in inputNames
+        Log.d(
+            TAG, "greedyDecode: hasKvCache=$hasKvCache hasAttentionMask=$hasAttentionMask " +
+                    "hasPositionIds=$hasPositionIds decoderUsesEmbeds=$decoderUsesEmbeds"
+        )
 
         val embed = embedSession
             ?: throw RuntimeException("embed_tokens session required - decoder uses inputs_embeds")
 
         // ── Extract audio embedding data and dimensions ───────────────────────
-        val audioData  = FloatArray(audioEmbeds.floatBuffer.remaining())
+        val audioData = FloatArray(audioEmbeds.floatBuffer.remaining())
         audioEmbeds.floatBuffer.rewind()
         audioEmbeds.floatBuffer.get(audioData)
         val audioShape = audioEmbeds.info.shape   // [1, T_audio, D]
-        val tAudio     = audioShape[1].toInt()
-        val hiddenDim  = audioShape[2].toInt()
+        val tAudio = audioShape[1].toInt()
+        val hiddenDim = audioShape[2].toInt()
 
         // ── Resolve special token IDs from the loaded vocabulary ──────────────
         // findTokenId() also verifies the piece is non-empty at that position.
-        val tokenBos  = findTokenId("<s>",     TOKEN_BOS)
-        val tokenInst = findTokenId("[INST]",  TOKEN_INST_DEFAULT)
+        val tokenBos = findTokenId("<s>", TOKEN_BOS)
+        val tokenInst = findTokenId("[INST]", TOKEN_INST_DEFAULT)
         val tokenIEnd = findTokenId("[/INST]", TOKEN_IEND_DEFAULT)
         Log.d(TAG, "greedyDecode: tokenBos=$tokenBos tokenInst=$tokenInst tokenIEnd=$tokenIEnd")
 
@@ -548,33 +555,35 @@ class VoxtralEngine : SpeechEngine {
         val prefixIds: LongArray
         val seedTokenId: Int
         if (useInstructionFormat) {
-            prefixIds   = longArrayOf(tokenBos.toLong(), tokenInst.toLong())
+            prefixIds = longArrayOf(tokenBos.toLong(), tokenInst.toLong())
             seedTokenId = tokenIEnd
         } else {
-            prefixIds   = LongArray(0)
+            prefixIds = LongArray(0)
             seedTokenId = TOKEN_BOS
         }
 
         val fullPrefillData: FloatArray
         val fullPrefillLen: Int
         if (prefixIds.isNotEmpty()) {
-            val prefixEmb  = embedTokens(env, embed, prefixIds)
+            val prefixEmb = embedTokens(env, embed, prefixIds)
             val prefixData = FloatArray(prefixEmb.floatBuffer.remaining())
             prefixEmb.floatBuffer.rewind()
             prefixEmb.floatBuffer.get(prefixData)
             prefixEmb.close()
 
-            fullPrefillLen  = prefixIds.size + tAudio
+            fullPrefillLen = prefixIds.size + tAudio
             fullPrefillData = FloatArray(fullPrefillLen * hiddenDim)
             System.arraycopy(prefixData, 0, fullPrefillData, 0, prefixData.size)
-            System.arraycopy(audioData,  0, fullPrefillData, prefixData.size, audioData.size)
+            System.arraycopy(audioData, 0, fullPrefillData, prefixData.size, audioData.size)
         } else {
-            fullPrefillLen  = tAudio
+            fullPrefillLen = tAudio
             fullPrefillData = audioData
         }
 
-        Log.d(TAG, "greedyDecode: prefillLen=$fullPrefillLen " +
-                   "(prefix=${prefixIds.size} + audio=$tAudio) seed=$seedTokenId")
+        Log.d(
+            TAG, "greedyDecode: prefillLen=$fullPrefillLen " +
+                    "(prefix=${prefixIds.size} + audio=$tAudio) seed=$seedTokenId"
+        )
 
         // Present-outputs-only set for the prefill run (logits deliberately omitted)
         val presentOutputNames: Set<String> = outputNames.filter { it.startsWith("present") }.toSet()
@@ -583,7 +592,7 @@ class VoxtralEngine : SpeechEngine {
         // References only - no FloatArray copy - so ~600 MB stays in ORT native memory.
         val kvCacheTensors = mutableMapOf<String, OnnxTensor>()
         var prevStepResult: OrtSession.Result? = null
-        val hypothesis     = mutableListOf<Int>()
+        val hypothesis = mutableListOf<Int>()
 
         try {
             // ── Phase 1: Full-context prefill (no logits) ────────────────────
@@ -620,8 +629,8 @@ class VoxtralEngine : SpeechEngine {
                 prefillInputs.values.forEach { it.close() }
             }
 
-            var currentKvLen  = fullPrefillLen
-            var nextToken     = seedTokenId  // [/INST] (instruction mode) or BOS (fallback)
+            var currentKvLen = fullPrefillLen
+            var nextToken = seedTokenId  // [/INST] (instruction mode) or BOS (fallback)
             var consecutivePads = 0
             // Sliding window of the last REPETITION_WINDOW_TOKENS real (non-pad) hypothesis
             // tokens - used to detect when the model is cycling.
@@ -633,7 +642,7 @@ class VoxtralEngine : SpeechEngine {
             for (step in 0 until MAX_NEW_TOKENS) {
                 val genInputs = mutableMapOf<String, OnnxTensor>()
                 try {
-                    val tokenEmb  = embedTokens(env, embed, longArrayOf(nextToken.toLong()))
+                    val tokenEmb = embedTokens(env, embed, longArrayOf(nextToken.toLong()))
                     val tokenData = FloatArray(tokenEmb.floatBuffer.remaining())
                     tokenEmb.floatBuffer.rewind()
                     tokenEmb.floatBuffer.get(tokenData)
@@ -676,16 +685,18 @@ class VoxtralEngine : SpeechEngine {
                     // Logits: [1, 1, vocab_size] - floatBuffer is ~128 KB, trivially safe
                     val logitsTensor = currentResult.get(DEC_OUT_LOGITS)
                         .orElseThrow { RuntimeException("Decoder output '$DEC_OUT_LOGITS' not found") }
-                        as OnnxTensor
+                            as OnnxTensor
                     val vocabSize = logitsTensor.info.shape[2].toInt()
-                    val logits    = FloatArray(vocabSize)
+                    val logits = FloatArray(vocabSize)
                     logitsTensor.floatBuffer.get(logits)  // buffer starts at 0; no rewind needed
 
                     val generated = logits.indices.maxByOrNull { logits[it] } ?: TOKEN_EOS
-                    Log.d(TAG, "greedyDecode step=$step input=$nextToken " +
-                               "generated=$generated (${vocabulary.getOrNull(generated)})")
+                    Log.d(
+                        TAG, "greedyDecode step=$step input=$nextToken " +
+                                "generated=$generated (${vocabulary.getOrNull(generated)})"
+                    )
 
-                    nextToken    = generated
+                    nextToken = generated
                     currentKvLen += 1
 
                     when (generated) {
@@ -693,19 +704,23 @@ class VoxtralEngine : SpeechEngine {
                             // Normal end of sequence
                             break
                         }
+
                         TOKEN_STREAMING_PAD -> {
                             // Voxtral Realtime streaming pad - "waiting for more audio".
                             // In batch/offline mode, too many consecutive pads means
                             // end-of-transcription (no more speech to decode).
                             consecutivePads++
                             if (consecutivePads > MAX_CONSECUTIVE_PADS) {
-                                Log.d(TAG, "greedyDecode: $consecutivePads consecutive " +
-                                           "[STREAMING_PAD] - end of transcription at step $step")
+                                Log.d(
+                                    TAG, "greedyDecode: $consecutivePads consecutive " +
+                                            "[STREAMING_PAD] - end of transcription at step $step"
+                                )
                                 break
                             }
                             // Do NOT add to hypothesis; keep feeding pad back to maintain
                             // consistent KV-cache state (matches streaming training behaviour).
                         }
+
                         else -> {
                             consecutivePads = 0
                             hypothesis.add(generated)
@@ -719,9 +734,12 @@ class VoxtralEngine : SpeechEngine {
                             if (recentHypothesis.size == REPETITION_WINDOW_TOKENS) {
                                 val half = REPETITION_WINDOW_TOKENS / 2
                                 if (recentHypothesis.subList(0, half) ==
-                                    recentHypothesis.subList(half, REPETITION_WINDOW_TOKENS)) {
-                                    Log.d(TAG, "greedyDecode: repeating cycle detected " +
-                                               "at step $step - trimming tail and stopping")
+                                    recentHypothesis.subList(half, REPETITION_WINDOW_TOKENS)
+                                ) {
+                                    Log.d(
+                                        TAG, "greedyDecode: repeating cycle detected " +
+                                                "at step $step - trimming tail and stopping"
+                                    )
                                     // Drop the duplicated second half from the hypothesis
                                     repeat(half) { hypothesis.removeLastOrNull() }
                                     break
@@ -792,14 +810,14 @@ class VoxtralEngine : SpeechEngine {
     ) {
         for (name in inputNames) {
             if (!name.startsWith("past_key_values")) continue
-            val info  = session.inputInfo[name]?.info as? TensorInfo ?: continue
-            val rank  = info.shape.size
+            val info = session.inputInfo[name]?.info as? TensorInfo ?: continue
+            val rank = info.shape.size
             val shape = LongArray(rank) { i ->
                 val d = info.shape[i]
                 when {
-                    d >= 0L              -> d    // static dim - keep as-is
-                    rank == 4 && i == 2  -> 0L   // past sequence length → 0 (empty cache)
-                    else                 -> 1L   // batch / other dynamic dim → 1
+                    d >= 0L -> d    // static dim - keep as-is
+                    rank == 4 && i == 2 -> 0L   // past sequence length → 0 (empty cache)
+                    else -> 1L   // batch / other dynamic dim → 1
                 }
             }
             val size = shape.fold(1L) { acc, d -> acc * d }.toInt()
@@ -816,9 +834,9 @@ class VoxtralEngine : SpeechEngine {
      * The session result is closed inside this function.
      */
     private fun embedTokens(env: OrtEnvironment, session: OrtSession, ids: LongArray): OnnxTensor {
-        val seqLen    = ids.size.toLong()
+        val seqLen = ids.size.toLong()
         val idsTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(ids), longArrayOf(1L, seqLen))
-        val inputs    = mapOf(EMBED_IN_INPUT_IDS to idsTensor)
+        val inputs = mapOf(EMBED_IN_INPUT_IDS to idsTensor)
 
         return session.run(inputs).use { result ->
             idsTensor.close()
@@ -827,7 +845,7 @@ class VoxtralEngine : SpeechEngine {
             val outNames = session.outputNames.toList()
             val embeds = (result.get(EMBED_OUT_EMBEDS).orElse(null)
                 ?: result.get(outNames[0]).orElse(null))
-                as? OnnxTensor
+                    as? OnnxTensor
                 ?: throw RuntimeException("embed_tokens: no valid output tensor found")
             cloneTensor(env, embeds)
         }
@@ -847,7 +865,7 @@ class VoxtralEngine : SpeechEngine {
      * Returns an array indexed by token ID.
      */
     private fun loadVocabulary(file: File): Array<String> {
-        val json    = JSONObject(file.readText())
+        val json = JSONObject(file.readText())
         val entries = mutableMapOf<Int, String>()
 
         // Primary source: model.vocab (BPE piece → ID map)
@@ -872,7 +890,7 @@ class VoxtralEngine : SpeechEngine {
         }
 
         val maxId = entries.keys.maxOrNull() ?: 0
-        val arr   = Array(maxId + 1) { i -> entries[i] ?: "" }
+        val arr = Array(maxId + 1) { i -> entries[i] ?: "" }
         Log.d(TAG, "loadVocabulary: ${arr.size} tokens (model.vocab + added_tokens merged)")
         return arr
     }
@@ -907,7 +925,7 @@ class VoxtralEngine : SpeechEngine {
      */
     private fun cloneTensor(env: OrtEnvironment, source: OnnxTensor): OnnxTensor {
         val shape = source.info.shape
-        val data  = FloatArray(source.floatBuffer.remaining())
+        val data = FloatArray(source.floatBuffer.remaining())
         source.floatBuffer.rewind()
         source.floatBuffer.get(data)
         return OnnxTensor.createTensor(env, FloatBuffer.wrap(data), shape)

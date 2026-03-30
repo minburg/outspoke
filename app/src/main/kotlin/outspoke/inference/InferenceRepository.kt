@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.flowOn
 private const val TAG = "InferenceRepository"
 private const val SAMPLE_RATE = 16_000
 
-private val LEADING_DOTS_RE  = Regex("""^\.+\s*""")
+private val LEADING_DOTS_RE = Regex("""^\.+\s*""")
 private val TRAILING_DOTS_RE = Regex("""\.{2,}$""")
 
 /**
@@ -50,7 +50,7 @@ private fun Int.toSec(): String = "%.2fs".format(this / SAMPLE_RATE.toFloat())
  */
 private fun TranscriptResult.logLabel(): String = when (this) {
     is TranscriptResult.Partial -> "Partial(\"${text}\")"
-    is TranscriptResult.Final   -> "Final(\"${text}\")"
+    is TranscriptResult.Final -> "Final(\"${text}\")"
     is TranscriptResult.Failure -> "Failure(${cause.message})"
 }
 
@@ -82,13 +82,13 @@ internal fun String.collapseRepeatedPhrases(): String {
         for (len in (remaining / 2) downTo 1) {
             if (i + len * 2 > words.size) continue
 
-            val phrase     = words.subList(i, i + len)
+            val phrase = words.subList(i, i + len)
             val nextPhrase = words.subList(i + len, i + len * 2)
 
             val matches = phrase.size == nextPhrase.size &&
-                phrase.zip(nextPhrase).all { (a, b) ->
-                    a.normalizedForComparison() == b.normalizedForComparison()
-                }
+                    phrase.zip(nextPhrase).all { (a, b) ->
+                        a.normalizedForComparison() == b.normalizedForComparison()
+                    }
 
             if (matches) {
                 // Keep first occurrence, then eat every consecutive copy.
@@ -141,7 +141,7 @@ internal fun String.collapseStutters(): String {
             i++
             continue
         }
-        
+
         var count = 1
         var j = i + 1
         while (j < words.size) {
@@ -153,7 +153,7 @@ internal fun String.collapseStutters(): String {
                 break
             }
         }
-        
+
         if (count >= 3) {
             // Keep only 1
             result.add(currentWord)
@@ -177,17 +177,17 @@ internal fun String.collapseStutters(): String {
  */
 internal fun String.removeFillerWords(language: String = "en"): String {
     val enFillers = listOf("uh", "um", "uhm", "umm", "uhh", "uhhh", "ah", "hmm", "hm", "mmm", "mm", "mh", "eh", "ehh")
-    
+
     val fillers = when {
         language.startsWith("en", ignoreCase = true) -> enFillers
         else -> emptyList() // Extension point for multi-language
     }
-    
+
     if (fillers.isEmpty()) return this
 
     val regexStr = "\\b(?:${fillers.joinToString("|")})\\b[,.]?"
     val regex = Regex(regexStr, RegexOption.IGNORE_CASE)
-    
+
     return this.replace(regex, "").replace(Regex(" {2,}"), " ").trim()
 }
 
@@ -260,7 +260,10 @@ internal fun String.cleanTranscript(): String {
 
     // Step 6: restore missing space after sentence-ending punctuation before a letter.
     val afterSentSpace = afterTrailDots.replace(MISSING_SENTENCE_SPACE_RE, "$1 $2").trim()
-    if (afterSentSpace != afterTrailDots.trim()) Log.d(TAG, "[CLEAN:SENT_SPACE]  \"${afterTrailDots.trim()}\" → \"$afterSentSpace\"")
+    if (afterSentSpace != afterTrailDots.trim()) Log.d(
+        TAG,
+        "[CLEAN:SENT_SPACE]  \"${afterTrailDots.trim()}\" → \"$afterSentSpace\""
+    )
 
     // Step 7: capitalize first word of sentences.
     val afterCaps = afterSentSpace.applySentenceCapitalization()
@@ -398,9 +401,9 @@ class InferenceRepository(private val engine: SpeechEngine) {
     fun setLanguageConstraints(tags: List<String>) = engine.setLanguageConstraints(tags)
 
     fun transcribe(audio: Flow<AudioChunk>): Flow<TranscriptResult> = channelFlow {
-        val window        = ArrayDeque<ShortArray>()
+        val window = ArrayDeque<ShortArray>()
         var windowSamples = 0
-        var strideAccum   = 0
+        var strideAccum = 0
 
         // Stable-chunk: ring buffer of the last STABLE_STRIDES cleaned word lists.
         val recentPartialWords = ArrayDeque<List<String>>()
@@ -412,7 +415,9 @@ class InferenceRepository(private val engine: SpeechEngine) {
         fun buildChunk(): AudioChunk {
             val merged = ShortArray(windowSamples)
             var pos = 0
-            for (arr in window) { arr.copyInto(merged, pos); pos += arr.size }
+            for (arr in window) {
+                arr.copyInto(merged, pos); pos += arr.size
+            }
             return AudioChunk(merged)
         }
 
@@ -443,7 +448,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
         audio.buffer(Channel.UNLIMITED).collect { incoming ->
             window.addLast(incoming.samples)
             windowSamples += incoming.samples.size
-            strideAccum   += incoming.samples.size
+            strideAccum += incoming.samples.size
 
             // Hard ceiling — evict oldest audio once the window hits 30 s.
             var evicted = false
@@ -452,17 +457,21 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 evicted = true
             }
             if (evicted) {
-                Log.d(TAG, "[WINDOW] MAX_WINDOW (${MAX_WINDOW_SAMPLES.toSec()}) ceiling hit" +
-                    " → evicted oldest audio, window now ${windowSamples.toSec()}")
+                Log.d(
+                    TAG, "[WINDOW] MAX_WINDOW (${MAX_WINDOW_SAMPLES.toSec()}) ceiling hit" +
+                            " → evicted oldest audio, window now ${windowSamples.toSec()}"
+                )
             }
 
             // Log once (not every chunk) when a stride boundary is crossed but
             // MIN_SAMPLES is not yet met.
             if (strideAccum >= STRIDE_SAMPLES && windowSamples < MIN_SAMPLES) {
                 if (!strideWaitLogged) {
-                    Log.d(TAG, "[STRIDE] stride ready (strideAccum=${strideAccum.toSec()})" +
-                        " but window=${windowSamples.toSec()} < MIN_SAMPLES=${MIN_SAMPLES.toSec()}" +
-                        " — still accumulating")
+                    Log.d(
+                        TAG, "[STRIDE] stride ready (strideAccum=${strideAccum.toSec()})" +
+                                " but window=${windowSamples.toSec()} < MIN_SAMPLES=${MIN_SAMPLES.toSec()}" +
+                                " — still accumulating"
+                    )
                     strideWaitLogged = true
                 }
             }
@@ -480,15 +489,17 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                 val cleaned = when (result) {
                     is TranscriptResult.Partial -> result.copy(text = result.text.cleanTranscript())
-                    is TranscriptResult.Final   -> TranscriptResult.Partial(result.text.cleanTranscript())
+                    is TranscriptResult.Final -> TranscriptResult.Partial(result.text.cleanTranscript())
                     else -> result
                 }
 
                 when {
                     cleaned is TranscriptResult.Partial && cleaned.text.isBlank() ->
                         Log.d(TAG, "[PARTIAL] discarded — blank after cleaning")
+
                     cleaned is TranscriptResult.Partial ->
                         Log.d(TAG, "[PARTIAL] clean  = \"${cleaned.text}\"")
+
                     cleaned is TranscriptResult.Failure ->
                         Log.w(TAG, "[PARTIAL] inference failure", cleaned.cause)
                 }
@@ -505,18 +516,24 @@ class InferenceRepository(private val engine: SpeechEngine) {
                     if (recentPartialWords.size > STABLE_STRIDES) recentPartialWords.removeFirst()
 
                     if (recentPartialWords.size < STABLE_STRIDES) {
-                        Log.d(TAG, "[STABLE] need $STABLE_STRIDES strides of history," +
-                            " have ${recentPartialWords.size} — waiting")
+                        Log.d(
+                            TAG, "[STABLE] need $STABLE_STRIDES strides of history," +
+                                    " have ${recentPartialWords.size} — waiting"
+                        )
                     } else if (windowSamples <= TRIGGER_WINDOW_SAMPLES) {
-                        Log.d(TAG, "[STABLE] window=${windowSamples.toSec()}" +
-                            " ≤ TRIGGER=${TRIGGER_WINDOW_SAMPLES.toSec()} — no trim needed")
+                        Log.d(
+                            TAG, "[STABLE] window=${windowSamples.toSec()}" +
+                                    " ≤ TRIGGER=${TRIGGER_WINDOW_SAMPLES.toSec()} — no trim needed"
+                        )
                     } else {
                         val stableCount = longestCommonPrefixLength(recentPartialWords.toList())
-                        val totalWords  = words.size
+                        val totalWords = words.size
 
                         if (stableCount == 0) {
-                            Log.d(TAG, "[STABLE] no common prefix across last $STABLE_STRIDES" +
-                                " strides (words diverged) — no trim")
+                            Log.d(
+                                TAG, "[STABLE] no common prefix across last $STABLE_STRIDES" +
+                                        " strides (words diverged) — no trim"
+                            )
                         } else {
                             // When stableCount < totalWords the model is still decoding the
                             // (stableCount+1)-th word; back off by 1 so that unstable word's
@@ -532,12 +549,14 @@ class InferenceRepository(private val engine: SpeechEngine) {
                             // Speech is not perfectly uniform, so we are conservative
                             // and always retain MIN_CONTEXT_SAMPLES of tail audio.
                             val stableAudioEst = (safeStableCount.toFloat() / totalWords * windowSamples).toInt()
-                            val dropSamples    = maxOf(0, stableAudioEst - MIN_CONTEXT_SAMPLES)
+                            val dropSamples = maxOf(0, stableAudioEst - MIN_CONTEXT_SAMPLES)
 
-                            Log.d(TAG, "[STABLE] prefix=$stableCount/$totalWords words stable" +
-                                " (safe=$safeStableCount, ≈${stableAudioEst.toSec()})," +
-                                " keeping ${MIN_CONTEXT_SAMPLES.toSec()} context" +
-                                " → drop=${dropSamples.toSec()}, min_required=${MIN_TRIM_SAMPLES.toSec()}")
+                            Log.d(
+                                TAG, "[STABLE] prefix=$stableCount/$totalWords words stable" +
+                                        " (safe=$safeStableCount, ≈${stableAudioEst.toSec()})," +
+                                        " keeping ${MIN_CONTEXT_SAMPLES.toSec()} context" +
+                                        " → drop=${dropSamples.toSec()}, min_required=${MIN_TRIM_SAMPLES.toSec()}"
+                            )
 
                             if (dropSamples >= MIN_TRIM_SAMPLES) {
                                 val windowBefore = windowSamples.toSec()
@@ -548,8 +567,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 // the same stable prefix in the next stride.
                                 recentPartialWords.clear()
                             } else {
-                                Log.d(TAG, "[STABLE] drop=${dropSamples.toSec()}" +
-                                    " < MIN_TRIM=${MIN_TRIM_SAMPLES.toSec()} — skipping trim")
+                                Log.d(
+                                    TAG, "[STABLE] drop=${dropSamples.toSec()}" +
+                                            " < MIN_TRIM=${MIN_TRIM_SAMPLES.toSec()} — skipping trim"
+                                )
                             }
                         }
                     }
@@ -565,21 +586,23 @@ class InferenceRepository(private val engine: SpeechEngine) {
             // single-word recognition.  ShortArray.copyOf fills added positions with 0
             // (silence); the TDT decoder advances through blank frames at the tail
             // without emitting spurious tokens.
-            val rawChunk   = buildChunk()
+            val rawChunk = buildChunk()
             val finalChunk = if (rawChunk.samples.size < MIN_FINAL_SAMPLES)
                 AudioChunk(rawChunk.samples.copyOf(MIN_FINAL_SAMPLES))
             else rawChunk
 
             val padded = finalChunk.samples.size != rawChunk.samples.size
-            Log.d(TAG, "[FINAL] window=${rawChunk.samples.size.toSec()}" +
-                if (padded) " → padded to ${finalChunk.samples.size.toSec()}" else " (no padding needed)")
+            Log.d(
+                TAG, "[FINAL] window=${rawChunk.samples.size.toSec()}" +
+                        if (padded) " → padded to ${finalChunk.samples.size.toSec()}" else " (no padding needed)"
+            )
 
             val result = engine.transcribe(finalChunk)
             Log.d(TAG, "[FINAL] raw   = ${result.logLabel()}")
 
             val cleaned = when (result) {
                 is TranscriptResult.Partial -> TranscriptResult.Final(result.text.cleanTranscript())
-                is TranscriptResult.Final   -> result.copy(text = result.text.cleanTranscript())
+                is TranscriptResult.Final -> result.copy(text = result.text.cleanTranscript())
                 else -> result
             }
             Log.d(TAG, "[FINAL] clean = ${cleaned.logLabel()}")

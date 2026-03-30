@@ -58,14 +58,15 @@ fun StatusIndicator(
         modifier = modifier,
     ) { state ->
         when (state) {
-            is KeyboardUiState.Idle          -> IdleIndicator()
-            is KeyboardUiState.Listening     -> ListeningIndicator()
-            is KeyboardUiState.Processing    -> ProcessingIndicator(partial = state.partial)
-            is KeyboardUiState.Transcribing  -> TranscribingIndicator()
-            is KeyboardUiState.Error         -> ErrorIndicator(
+            is KeyboardUiState.Idle -> IdleIndicator()
+            is KeyboardUiState.Listening -> ListeningIndicator()
+            is KeyboardUiState.Processing -> ProcessingIndicator(partial = state.partial)
+            is KeyboardUiState.Transcribing -> TranscribingIndicator()
+            is KeyboardUiState.Error -> ErrorIndicator(
                 message = state.message,
                 onOpenCompanionApp = onOpenCompanionApp,
             )
+
             is KeyboardUiState.EngineLoading -> EngineLoadingIndicator(
                 message = state.message,
                 onOpenCompanionApp = onOpenCompanionApp,
@@ -220,14 +221,14 @@ private fun GradientArcSpinner(
     strokeWidth: Dp = 2.dp,
 ) {
     val head = MaterialTheme.colorScheme.primary
-    val mid  = MaterialTheme.colorScheme.tertiary
+    val mid = MaterialTheme.colorScheme.tertiary
 
     val infiniteTransition = rememberInfiniteTransition(label = "arcSpinnerRotation")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue  = 360f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 900, easing = LinearEasing),
+            animation = tween(durationMillis = 900, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "arcSpinnerAngle",
@@ -238,16 +239,16 @@ private fun GradientArcSpinner(
         rotate(rotation) {
             drawArc(
                 brush = Brush.sweepGradient(
-                    0f    to head.copy(alpha = 0f),      // tail  - fully transparent
+                    0f to head.copy(alpha = 0f),      // tail  - fully transparent
                     0.55f to mid.copy(alpha = 0.65f),    // mid   - tertiary, half-visible
                     0.75f to head,                       // head  - full primary
-                    1f    to head.copy(alpha = 0f),      // close - fade to transparent so the
-                                                         //         seam at 360°/0° is invisible
+                    1f to head.copy(alpha = 0f),      // close - fade to transparent so the
+                    //         seam at 360°/0° is invisible
                 ),
                 startAngle = 0f,
                 sweepAngle = 270f,
-                useCenter  = false,
-                style      = Stroke(width = strokePx, cap = StrokeCap.Round),
+                useCenter = false,
+                style = Stroke(width = strokePx, cap = StrokeCap.Round),
             )
         }
     }

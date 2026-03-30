@@ -1,9 +1,14 @@
 package dev.brgr.outspoke.ui.keyboard.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.outlined.Backspace
@@ -13,25 +18,21 @@ import androidx.compose.material.icons.filled.SubdirectoryArrowLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import kotlinx.coroutines.delay
 
-/**
- * A small icon button used for secondary keyboard actions (delete char, delete word,
- * delete all, switch keyboard).  Sized and tinted consistently with the rest of the
- * keyboard chrome.
- *
- * @param icon               Vector icon to display.
- * @param contentDescription Accessibility label.
- * @param onClick            Action triggered on tap.
- * @param tint               Icon colour - defaults to [MaterialTheme.colorScheme.onSurfaceVariant].
- */
 @Composable
 fun KeyboardActionButton(
     icon: ImageVector,
@@ -40,9 +41,36 @@ fun KeyboardActionButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier.size(40.dp),
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    // This effect handles the "auto-repeat" logic
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            // First click happens immediately
+            onClick()
+
+            // Initial delay before starting the rapid fire (standard keyboard behavior)
+            delay(500)
+
+            // Continuous loop while button is held
+            while (isPressed) {
+                onClick()
+                delay(60) // Speed of deletion (60ms is roughly standard)
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape) // Optional: gives it a ripple bound
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(), // Shows the visual feedback
+                onClick = {} // We handle logic in LaunchedEffect, but need this for accessibility
+            ),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,

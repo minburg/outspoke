@@ -79,7 +79,10 @@ class OutspokeInputMethodService :
      */
     private val idleUnloadRunnable = Runnable {
         if (isBound) {
-            Log.d(TAG, "Keyboard idle for ${IDLE_UNLOAD_DELAY_MS / 1000}s — unbinding InferenceService to free model RAM")
+            Log.d(
+                TAG,
+                "Keyboard idle for ${IDLE_UNLOAD_DELAY_MS / 1000}s — unbinding InferenceService to free model RAM"
+            )
             unbindService(inferenceServiceConnection)
             isBound = false
             inferenceBinder = null

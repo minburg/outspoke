@@ -20,9 +20,9 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 /** All language options exposed in the keyboard. Order determines display order. */
 val WHISPER_LANGUAGE_OPTIONS: List<Pair<String, String>> = listOf(
     "auto" to "Auto",
-    "en"   to "EN",
-    "de"   to "DE",
-    "es"   to "ES",
+    "en" to "EN",
+    "de" to "DE",
+    "es" to "ES",
 )
 
 /**
@@ -47,12 +47,12 @@ fun LanguageSelector(
     ) {
         WHISPER_LANGUAGE_OPTIONS.forEach { (tag, label) ->
             val isSelected = tag == selectedLanguage
-            val bgColor    = if (isSelected) MaterialTheme.colorScheme.primary
-                             else MaterialTheme.colorScheme.surface
-            val textColor  = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                             else MaterialTheme.colorScheme.onSurfaceVariant
+            val bgColor = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.surface
+            val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurfaceVariant
             val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-                              else MaterialTheme.colorScheme.outlineVariant
+            else MaterialTheme.colorScheme.outlineVariant
 
             Text(
                 text = label,

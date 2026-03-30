@@ -16,8 +16,8 @@ data class AudioChunk(
         if (this === other) return true
         if (other !is AudioChunk) return false
         return sampleRate == other.sampleRate &&
-            timestampMs == other.timestampMs &&
-            samples.contentEquals(other.samples)
+                timestampMs == other.timestampMs &&
+                samples.contentEquals(other.samples)
     }
 
     override fun hashCode(): Int {

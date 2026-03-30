@@ -4,37 +4,37 @@
     108dp canvas; safe zone is the inner 72dp - keep all artwork within the center 66dp circle.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+        android:width="108dp"
+        android:height="108dp"
+        android:viewportWidth="108"
+        android:viewportHeight="108">
 
     <!-- Microphone body -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,28 a10,14 0 0,1 10,14 l0,16 a10,14 0 0,1 -20,0 l0,-16 a10,14 0 0,1 10,-14 Z" />
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,28 a10,14 0 0,1 10,14 l0,16 a10,14 0 0,1 -20,0 l0,-16 a10,14 0 0,1 10,-14 Z"/>
 
     <!-- Microphone stand arc -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M38,58 a16,16 0 0,0 32,0" />
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M38,58 a16,16 0 0,0 32,0"/>
 
     <!-- Stand pole -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,74 L54,82" />
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M54,74 L54,82"/>
 
     <!-- Stand base -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M44,82 L64,82" />
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M44,82 L64,82"/>
 
 </vector>
 

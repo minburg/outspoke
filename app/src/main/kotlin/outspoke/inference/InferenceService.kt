@@ -47,10 +47,12 @@ private const val NOTIFICATION_ID = 1001
 class InferenceService : LifecycleService() {
 
     /** The currently loaded engine, or `null` while loading / unloaded. */
-    @Volatile private var currentEngine: SpeechEngine? = null
+    @Volatile
+    private var currentEngine: SpeechEngine? = null
 
     /** Repository wrapping [currentEngine]. Rebuilt each time the engine changes. */
-    @Volatile private var currentRepository: InferenceRepository? = null
+    @Volatile
+    private var currentRepository: InferenceRepository? = null
 
     /** Mutex preventing concurrent [reloadForModel] calls from racing. */
     private val engineLoadMutex = Mutex()
@@ -141,10 +143,10 @@ class InferenceService : LifecycleService() {
             updateNotification("Loading transcription engine…")
 
             try {
-                val engine  = SpeechEngineFactory.create(modelId)
+                val engine = SpeechEngineFactory.create(modelId)
                 val modelDir = ModelStorageManager.getModelDir(applicationContext, modelId)
                 engine.load(modelDir)
-                currentEngine     = engine
+                currentEngine = engine
                 currentRepository = InferenceRepository(engine)
                 _engineState.value = EngineState.Ready
                 updateNotification("Outspoke ready (${ModelRegistry[modelId].displayName})")
@@ -182,7 +184,8 @@ class InferenceService : LifecycleService() {
             override fun onEvent(event: Int, path: String?) {
                 val mask = event and ALL_EVENTS
                 if (mask and (DELETE or DELETE_SELF or MOVED_FROM or
-                              CREATE or MOVED_TO or CLOSE_WRITE) != 0) {
+                            CREATE or MOVED_TO or CLOSE_WRITE) != 0
+                ) {
                     onModelDirectoryChanged()
                 }
             }
@@ -209,6 +212,7 @@ class InferenceService : LifecycleService() {
                     reloadForModel(selectedModelId) // will detect !isReady and set Unloaded
                     startModelWatcher()
                 }
+
                 isReady && currentState == EngineState.Unloaded -> {
                     Log.d(TAG, "Selected model files appeared - loading engine")
                     reloadForModel(selectedModelId)

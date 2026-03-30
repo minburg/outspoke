@@ -52,7 +52,7 @@ fun WaveformBar(
     )
 
     val barColorOne = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
-    val barColorTwo  = MaterialTheme.colorScheme.primary
+    val barColorTwo = MaterialTheme.colorScheme.primary
 
     Canvas(
         modifier = modifier
@@ -60,11 +60,11 @@ fun WaveformBar(
             .width((barWidth + barSpacing) * BAR_COUNT - barSpacing),
     ) {
         drawBars(
-            amplitude    = animatedAmplitude,
-            barWidthPx   = barWidth.toPx(),
+            amplitude = animatedAmplitude,
+            barWidthPx = barWidth.toPx(),
             barSpacingPx = barSpacing.toPx(),
-            barColorOne     = barColorOne,
-            barColorTwo     = barColorTwo,
+            barColorOne = barColorOne,
+            barColorTwo = barColorTwo,
         )
     }
 }
@@ -98,16 +98,16 @@ private fun DrawScope.drawBars(
 
         val barHeight = maxHeightPx * heightFraction
         val left = index * stride
-        val top  = (maxHeightPx - barHeight) / 2f
+        val top = (maxHeightPx - barHeight) / 2f
 
         // Interpolate colour: edges → barColorOne, centre → barColorTwo,
         // using the same gaussian envelope that drives bar height.
         val barColor = lerp(barColorOne, barColorTwo, gaussianEnvelope)
 
         drawRoundRect(
-            color        = barColor,
-            topLeft      = Offset(left, top),
-            size         = Size(barWidthPx, barHeight),
+            color = barColor,
+            topLeft = Offset(left, top),
+            size = Size(barWidthPx, barHeight),
             cornerRadius = CornerRadius(barWidthPx / 2f),
         )
     }

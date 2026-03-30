@@ -21,13 +21,13 @@ import dev.brgr.outspoke.ui.theme.OutspokeTheme
 fun PreferencesScreen(
     viewModel: PreferencesViewModel = viewModel(),
 ) {
-    val triggerMode    by viewModel.triggerMode.collectAsState()
+    val triggerMode by viewModel.triggerMode.collectAsState()
     val vadSensitivity by viewModel.vadSensitivity.collectAsState()
 
     PreferencesContent(
-        triggerMode           = triggerMode,
-        vadSensitivity        = vadSensitivity,
-        onTriggerModeChange   = viewModel::setTriggerMode,
+        triggerMode = triggerMode,
+        vadSensitivity = vadSensitivity,
+        onTriggerModeChange = viewModel::setTriggerMode,
         onVadSensitivityChange = viewModel::setVadSensitivity,
     )
 }
@@ -85,14 +85,14 @@ private fun PreferencesContent(
                 Text("VAD Sensitivity", style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = if (vadSensitivity == 0f) "Off"
-                           else "${(vadSensitivity * 100).toInt()}%",
+                    else "${(vadSensitivity * 100).toInt()}%",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 text = "Filters background noise and silence before transcription. " +
-                       "Set to Off to disable filtering and pass all audio through.",
+                        "Set to Off to disable filtering and pass all audio through.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -119,9 +119,9 @@ private fun PreferencesContent(
 private fun PreferencesHoldVadOffPreview() {
     OutspokeTheme {
         PreferencesContent(
-            triggerMode            = "HOLD",
-            vadSensitivity         = 0f,
-            onTriggerModeChange    = {},
+            triggerMode = "HOLD",
+            vadSensitivity = 0f,
+            onTriggerModeChange = {},
             onVadSensitivityChange = {},
         )
     }
@@ -132,9 +132,9 @@ private fun PreferencesHoldVadOffPreview() {
 private fun PreferencesTapToggleHighVadPreview() {
     OutspokeTheme {
         PreferencesContent(
-            triggerMode            = "TAP_TOGGLE",
-            vadSensitivity         = 0.6f,
-            onTriggerModeChange    = {},
+            triggerMode = "TAP_TOGGLE",
+            vadSensitivity = 0.6f,
+            onTriggerModeChange = {},
             onVadSensitivityChange = {},
         )
     }

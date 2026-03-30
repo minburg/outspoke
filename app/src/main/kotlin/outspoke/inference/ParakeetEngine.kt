@@ -16,22 +16,22 @@ private const val FALLBACK_BLANK_ID = 1024
 
 private object Names {
     // nemo128.onnx  ← verified: expected [waveforms, waveforms_lens]
-    const val PREP_IN_AUDIO    = "waveforms"
-    const val PREP_IN_LENGTH   = "waveforms_lens"
+    const val PREP_IN_AUDIO = "waveforms"
+    const val PREP_IN_LENGTH = "waveforms_lens"
     // Outputs accessed by index: [0] = features, [1] = feature lengths
 
     // encoder-model.int8.onnx  ← verified
-    const val ENC_IN_SIGNAL   = "audio_signal"   // FLOAT [-1, 128, -1]
-    const val ENC_IN_LENGTH   = "length"          // INT64 [-1]
-    const val ENC_OUT_SIGNAL  = "outputs"          // FLOAT [-1, 1024, -1]  (B, D, T)
-    const val ENC_OUT_LEN     = "encoded_lengths"  // INT64 [-1]
+    const val ENC_IN_SIGNAL = "audio_signal"   // FLOAT [-1, 128, -1]
+    const val ENC_IN_LENGTH = "length"          // INT64 [-1]
+    const val ENC_OUT_SIGNAL = "outputs"          // FLOAT [-1, 1024, -1]  (B, D, T)
+    const val ENC_OUT_LEN = "encoded_lengths"  // INT64 [-1]
 
     // decoder_joint-model.int8.onnx  ← verified
-    const val DEC_IN_ENC_OUT    = "encoder_outputs"  // FLOAT [-1, 1024, -1]
-    const val DEC_IN_TARGETS    = "targets"           // INT32 [-1, -1]
+    const val DEC_IN_ENC_OUT = "encoder_outputs"  // FLOAT [-1, 1024, -1]
+    const val DEC_IN_TARGETS = "targets"           // INT32 [-1, -1]
     const val DEC_IN_TARGET_LEN = "target_length"     // INT32 [-1]
-    const val DEC_IN_STATES_1   = "input_states_1"    // FLOAT [2, -1, 640]
-    const val DEC_IN_STATES_2   = "input_states_2"    // FLOAT [2, -1, 640]
+    const val DEC_IN_STATES_1 = "input_states_1"    // FLOAT [2, -1, 640]
+    const val DEC_IN_STATES_2 = "input_states_2"    // FLOAT [2, -1, 640]
     // Outputs accessed by index:
     //   0 → "outputs"         FLOAT [-1,-1,-1, 8198]  (B, T_enc, T_tgt, vocab+dur)
     //   1 → "prednet_lengths" INT32 [-1]
@@ -61,7 +61,8 @@ class ParakeetEngine : SpeechEngine {
     private var numDurations: Int = 0   // derived at load: outputDim - (blankId + 1)
 
 
-    @Volatile override var isLoaded: Boolean = false
+    @Volatile
+    override var isLoaded: Boolean = false
         private set
 
 
@@ -113,7 +114,7 @@ class ParakeetEngine : SpeechEngine {
         //  3. vocabulary.size - 1 - safe heuristic (blank is always the last NeMo token)
         blankId = scanVocabForBlankId()
             ?: parseBlankId(File(modelDir, "config.json"))
-            ?: run {
+                    ?: run {
                 val fallback = (vocabulary.size - 1).coerceAtLeast(0)
                 Log.w(TAG, "blank_id not found in vocab or config.json - using vocabulary.size-1=$fallback")
                 fallback
@@ -145,7 +146,7 @@ class ParakeetEngine : SpeechEngine {
     override fun transcribe(chunk: AudioChunk): TranscriptResult {
         if (!isLoaded) return TranscriptResult.Failure(IllegalStateException("Engine not loaded"))
         return try {
-            val e   = env!!
+            val e = env!!
             val enc = encSession!!
             val dec = decSession!!
 
@@ -173,9 +174,9 @@ class ParakeetEngine : SpeechEngine {
     /** Releases all native ONNX Runtime resources. Safe to call more than once. */
     override fun close() {
         prepSession?.close(); prepSession = null
-        encSession?.close();  encSession  = null
-        decSession?.close();  decSession  = null
-        env?.close();         env         = null
+        encSession?.close(); encSession = null
+        decSession?.close(); decSession = null
+        env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "ParakeetEngine closed")
     }
@@ -242,10 +243,10 @@ class ParakeetEngine : SpeechEngine {
             lenTensor.close()
             val outTensor = result.get(Names.ENC_OUT_SIGNAL)
                 .orElseThrow { RuntimeException("Encoder output '${Names.ENC_OUT_SIGNAL}' not found") }
-                as OnnxTensor
+                    as OnnxTensor
             val lenOut = result.get(Names.ENC_OUT_LEN)
                 .orElseThrow { RuntimeException("Encoder output '${Names.ENC_OUT_LEN}' not found") }
-                as OnnxTensor
+                    as OnnxTensor
             val encLen = lenOut.longBuffer[0].toInt()
             cloneTensor(env, outTensor) to encLen
         }
@@ -285,7 +286,7 @@ class ParakeetEngine : SpeechEngine {
         // Encoder layout: [1, D, T]
         val encShape = encoderOut.info.shape
         val encDim = encShape[1].toInt()   // D = 1024
-        val T      = encodedLength
+        val T = encodedLength
 
         val encData = FloatArray(encoderOut.floatBuffer.remaining())
         encoderOut.floatBuffer.rewind()
@@ -301,18 +302,18 @@ class ParakeetEngine : SpeechEngine {
         val hypothesis = mutableListOf<Int>()
         // Predictor embedding range is [0, blankId), so initialise with 0 (SOS).
         // blankId is a *joint output label* only - never fed into the embedding layer.
-        var prevToken       = 0
-        var t               = 0
-        var maxIter         = T * 20 + 50   // global safety cap
-        var tokensAtFrame   = 0             // per-frame guard against duration=0 loops
+        var prevToken = 0
+        var t = 0
+        var maxIter = T * 20 + 50   // global safety cap
+        var tokensAtFrame = 0             // per-frame guard against duration=0 loops
         val MAX_TOKENS_PER_FRAME = 30
-        val MAX_HYPOTHESIS       = 2000     // ~20-30 s of speech at typical token rate
+        val MAX_HYPOTHESIS = 2000     // ~20-30 s of speech at typical token rate
 
         while (t < T && maxIter-- > 0 && hypothesis.size < MAX_HYPOTHESIS) {
             // Extract one encoder frame: encoder[0, :, t] → frame shape [1, D, 1]
             val frameData = FloatArray(encDim) { d -> encData[d * T + t] }
 
-            val frameTensor  = OnnxTensor.createTensor(
+            val frameTensor = OnnxTensor.createTensor(
                 env, FloatBuffer.wrap(frameData), longArrayOf(1L, encDim.toLong(), 1L)
             )
             // targets and target_length are INT32 (verified from logcat)
@@ -330,11 +331,11 @@ class ParakeetEngine : SpeechEngine {
             )
 
             val inputs = mapOf(
-                Names.DEC_IN_ENC_OUT    to frameTensor,
-                Names.DEC_IN_TARGETS    to targetTensor,
+                Names.DEC_IN_ENC_OUT to frameTensor,
+                Names.DEC_IN_TARGETS to targetTensor,
                 Names.DEC_IN_TARGET_LEN to targetLenTensor,
-                Names.DEC_IN_STATES_1   to statesTensor1,
-                Names.DEC_IN_STATES_2   to statesTensor2,
+                Names.DEC_IN_STATES_1 to statesTensor1,
+                Names.DEC_IN_STATES_2 to statesTensor2,
             )
 
             try {
@@ -447,6 +448,7 @@ class ParakeetEngine : SpeechEngine {
                         if (isNotEmpty()) append(' ')
                         append(effective)
                     }
+
                     else -> append(effective)
                 }
             }

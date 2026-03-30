@@ -38,7 +38,7 @@ class ModelDownloadManager(
         modelDir.mkdirs()
 
         val success = when (val source = modelInfo.source) {
-            is DownloadSource.Files      -> downloadFiles(modelDir, source)      { emit(it) }
+            is DownloadSource.Files -> downloadFiles(modelDir, source) { emit(it) }
             is DownloadSource.ZipArchive -> downloadZip(modelDir, source) { emit(it) }
         }
 
@@ -72,10 +72,10 @@ class ModelDownloadManager(
 
         for (remoteFile in source.files) {
             val finalFile = File(modelDir, remoteFile.filename)
-            val tempFile  = File(modelDir, "${remoteFile.filename}.tmp")
+            val tempFile = File(modelDir, "${remoteFile.filename}.tmp")
 
             try {
-                val request  = Request.Builder().url(remoteFile.url(source.baseUrl)).build()
+                val request = Request.Builder().url(remoteFile.url(source.baseUrl)).build()
                 val response = client.newCall(request).execute()
 
                 if (!response.isSuccessful) {
@@ -115,7 +115,7 @@ class ModelDownloadManager(
                         Log.e(
                             TAG,
                             "SHA-256 mismatch for ${remoteFile.filename}: " +
-                            "expected=${remoteFile.sha256} actual=$actual",
+                                    "expected=${remoteFile.sha256} actual=$actual",
                         )
                         return false
                     }
@@ -154,7 +154,7 @@ class ModelDownloadManager(
         val zipTemp = File(modelDir, "download.zip.tmp")
 
         try {
-            val request  = Request.Builder().url(source.url).build()
+            val request = Request.Builder().url(source.url).build()
             val response = client.newCall(request).execute()
 
             if (!response.isSuccessful) {
@@ -227,14 +227,14 @@ class ModelDownloadManager(
             var entry = zis.nextEntry
             while (entry != null) {
                 // Normalise separators and strip leading slashes.
-                val name    = entry.name.replace('\\', '/').trimStart('/')
+                val name = entry.name.replace('\\', '/').trimStart('/')
                 val outFile = File(destDir, name)
 
                 // Prevent zip-slip: every resolved path must be under destDir.
                 val outCanonical = outFile.canonicalPath
                 require(
                     outCanonical == canonicalDest ||
-                    outCanonical.startsWith(canonicalDest + File.separator)
+                            outCanonical.startsWith(canonicalDest + File.separator)
                 ) { "Zip entry escapes target directory: $name" }
 
                 if (entry.isDirectory) {

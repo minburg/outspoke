@@ -24,7 +24,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeTheme
 fun ModelScreen(
     viewModel: ModelViewModel = viewModel(),
 ) {
-    val modelStates   by viewModel.modelStates.collectAsState()
+    val modelStates by viewModel.modelStates.collectAsState()
     val selectedModel by viewModel.selectedModelId.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -38,14 +38,14 @@ fun ModelScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         ModelListContent(
-            modelStates   = modelStates,
+            modelStates = modelStates,
             selectedModel = selectedModel,
-            modifier      = Modifier.padding(padding),
-            onDownload    = { viewModel.startDownload(it) },
-            onCancel      = { viewModel.cancelDownload(it) },
-            onDelete      = { viewModel.deleteModel(it) },
-            onRetry       = { viewModel.startDownload(it) },
-            onSelect      = { viewModel.selectModel(it) },
+            modifier = Modifier.padding(padding),
+            onDownload = { viewModel.startDownload(it) },
+            onCancel = { viewModel.cancelDownload(it) },
+            onDelete = { viewModel.deleteModel(it) },
+            onRetry = { viewModel.startDownload(it) },
+            onSelect = { viewModel.selectModel(it) },
         )
     }
 }
@@ -74,24 +74,24 @@ private fun ModelListContent(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "Download a model and tap \"Set as Active\" to use it for transcription. " +
-                       "Only one model is loaded at a time.",
+                        "Only one model is loaded at a time.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         items(ModelRegistry.all, key = { it.id.name }) { modelInfo ->
-            val state      = modelStates[modelInfo.id] ?: ModelState.NotDownloaded
+            val state = modelStates[modelInfo.id] ?: ModelState.NotDownloaded
             val isSelected = selectedModel == modelInfo.id
             ModelCard(
-                modelInfo  = modelInfo,
-                state      = state,
+                modelInfo = modelInfo,
+                state = state,
                 isSelected = isSelected,
                 onDownload = { onDownload(modelInfo.id) },
-                onCancel   = { onCancel(modelInfo.id) },
-                onDelete   = { onDelete(modelInfo.id) },
-                onRetry    = { onRetry(modelInfo.id) },
-                onSelect   = { onSelect(modelInfo.id) },
+                onCancel = { onCancel(modelInfo.id) },
+                onDelete = { onDelete(modelInfo.id) },
+                onRetry = { onRetry(modelInfo.id) },
+                onSelect = { onSelect(modelInfo.id) },
             )
         }
     }
@@ -110,13 +110,13 @@ private fun ModelCard(
 ) {
     val borderColor = when {
         isSelected -> MaterialTheme.colorScheme.primary
-        else       -> MaterialTheme.colorScheme.outlineVariant
+        else -> MaterialTheme.colorScheme.outlineVariant
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        border   = BorderStroke(width = if (isSelected) 2.dp else 1.dp, color = borderColor),
-        colors   = CardDefaults.cardColors(
+        border = BorderStroke(width = if (isSelected) 2.dp else 1.dp, color = borderColor),
+        colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
             else
@@ -137,27 +137,27 @@ private fun ModelCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text  = modelInfo.displayName,
+                        text = modelInfo.displayName,
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text  = "~${modelInfo.approximateSizeMb} MB",
+                        text = "~${modelInfo.approximateSizeMb} MB",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (isSelected) {
                     Icon(
-                        imageVector  = Icons.Default.CheckCircle,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Active model",
-                        tint  = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp),
                     )
                 }
             }
 
             Text(
-                text  = modelInfo.description,
+                text = modelInfo.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -165,9 +165,9 @@ private fun ModelCard(
             // State-specific actions
             when (state) {
                 is ModelState.NotDownloaded -> NotDownloadedActions(onDownload)
-                is ModelState.Downloading   -> DownloadingActions(state.progressFraction, onCancel)
-                is ModelState.Ready         -> ReadyActions(isSelected, onSelect, onDelete)
-                is ModelState.Corrupted     -> CorruptedActions(onRetry)
+                is ModelState.Downloading -> DownloadingActions(state.progressFraction, onCancel)
+                is ModelState.Ready -> ReadyActions(isSelected, onSelect, onDelete)
+                is ModelState.Corrupted -> CorruptedActions(onRetry)
             }
         }
     }
@@ -176,7 +176,7 @@ private fun ModelCard(
 @Composable
 private fun NotDownloadedActions(onDownload: () -> Unit) {
     Button(
-        onClick  = onDownload,
+        onClick = onDownload,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(Icons.Default.Download, contentDescription = null)
@@ -200,7 +200,7 @@ private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text  = "${(progress * 100).toInt()}%",
+                text = "${(progress * 100).toInt()}%",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -212,7 +212,7 @@ private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
             )
         }
         OutlinedButton(
-            onClick  = onCancel,
+            onClick = onCancel,
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Cancel") }
     }
@@ -232,16 +232,16 @@ private fun ReadyActions(
     ) {
         if (!isSelected) {
             Button(
-                onClick  = onSelect,
+                onClick = onSelect,
                 modifier = Modifier.weight(1f),
             ) {
                 Text("Set as Active")
             }
         } else {
             Text(
-                text     = "Active model",
-                style    = MaterialTheme.typography.labelMedium,
-                color    = MaterialTheme.colorScheme.primary,
+                text = "Active model",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .weight(1f)
                     .align(Alignment.CenterVertically),
@@ -249,7 +249,7 @@ private fun ReadyActions(
         }
         OutlinedButton(
             onClick = { isDeleteDialogVisible = true },
-            colors  = ButtonDefaults.outlinedButtonColors(
+            colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
         ) {
@@ -277,13 +277,13 @@ private fun CorruptedActions(onRetry: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
-            imageVector  = Icons.Default.Error,
+            imageVector = Icons.Default.Error,
             contentDescription = null,
-            tint  = MaterialTheme.colorScheme.error,
+            tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(18.dp),
         )
         Text(
-            text  = "Download failed or corrupted",
+            text = "Download failed or corrupted",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.weight(1f),
@@ -304,7 +304,7 @@ private fun DeleteConfirmDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Confirm Deletion") },
-        text  = { Text("Are you sure you want to delete this model? This action cannot be undone.") },
+        text = { Text("Are you sure you want to delete this model? This action cannot be undone.") },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -324,21 +324,21 @@ private fun DeleteConfirmDialog(
 }
 
 private val previewModelSmall = ModelInfo(
-    id                = ModelId.PARAKEET_V3,
-    displayName       = "Parakeet-V3 (Default)",
-    description       = "Fast and compact English on-device ASR. Recommended for most devices.",
+    id = ModelId.PARAKEET_V3,
+    displayName = "Parakeet-V3 (Default)",
+    description = "Fast and compact English on-device ASR. Recommended for most devices.",
     approximateSizeMb = 700,
-    source            = DownloadSource.ZipArchive("https://example.com"),
-    requiredFiles     = listOf("model.onnx"),
+    source = DownloadSource.ZipArchive("https://example.com"),
+    requiredFiles = listOf("model.onnx"),
 )
 
 private val previewModelLarge = ModelInfo(
-    id                = ModelId.WHISPER_SMALL,
-    displayName       = "Whisper Large-v3 Turbo (INT8)",
-    description       = "OpenAI Whisper Large-v3 with a turbo decoder. Multilingual, INT8 (~1.1 GB).",
+    id = ModelId.WHISPER_SMALL,
+    displayName = "Whisper Large-v3 Turbo (INT8)",
+    description = "OpenAI Whisper Large-v3 with a turbo decoder. Multilingual, INT8 (~1.1 GB).",
     approximateSizeMb = 1_037,
-    source            = DownloadSource.ZipArchive("https://example.com"),
-    requiredFiles     = listOf("encoder.onnx", "decoder.onnx"),
+    source = DownloadSource.ZipArchive("https://example.com"),
+    requiredFiles = listOf("encoder.onnx", "decoder.onnx"),
 )
 
 @Preview(showBackground = true, name = "Model Screen · Mixed States")
@@ -347,7 +347,7 @@ private fun ModelListContentPreview() {
     OutspokeTheme {
         ModelListContent(
             modelStates = mapOf(
-                ModelId.PARAKEET_V3  to ModelState.Ready,
+                ModelId.PARAKEET_V3 to ModelState.Ready,
                 ModelId.WHISPER_SMALL to ModelState.NotDownloaded,
             ),
             selectedModel = ModelId.PARAKEET_V3,
@@ -361,8 +361,8 @@ private fun ModelListContentPreview() {
 private fun ModelCardNotDownloadedPreview() {
     OutspokeTheme {
         ModelCard(
-            modelInfo  = previewModelSmall,
-            state      = ModelState.NotDownloaded,
+            modelInfo = previewModelSmall,
+            state = ModelState.NotDownloaded,
             isSelected = false,
             onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
         )
@@ -374,8 +374,8 @@ private fun ModelCardNotDownloadedPreview() {
 private fun ModelCardDownloadingPreview() {
     OutspokeTheme {
         ModelCard(
-            modelInfo  = previewModelLarge,
-            state      = ModelState.Downloading(0.45f),
+            modelInfo = previewModelLarge,
+            state = ModelState.Downloading(0.45f),
             isSelected = false,
             onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
         )
@@ -387,8 +387,8 @@ private fun ModelCardDownloadingPreview() {
 private fun ModelCardReadySelectedPreview() {
     OutspokeTheme {
         ModelCard(
-            modelInfo  = previewModelSmall,
-            state      = ModelState.Ready,
+            modelInfo = previewModelSmall,
+            state = ModelState.Ready,
             isSelected = true,
             onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
         )
@@ -400,8 +400,8 @@ private fun ModelCardReadySelectedPreview() {
 private fun ModelCardReadyNotSelectedPreview() {
     OutspokeTheme {
         ModelCard(
-            modelInfo  = previewModelLarge,
-            state      = ModelState.Ready,
+            modelInfo = previewModelLarge,
+            state = ModelState.Ready,
             isSelected = false,
             onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
         )
@@ -413,8 +413,8 @@ private fun ModelCardReadyNotSelectedPreview() {
 private fun ModelCardCorruptedPreview() {
     OutspokeTheme {
         ModelCard(
-            modelInfo  = previewModelSmall,
-            state      = ModelState.Corrupted,
+            modelInfo = previewModelSmall,
+            state = ModelState.Corrupted,
             isSelected = false,
             onDownload = {}, onCancel = {}, onDelete = {}, onRetry = {}, onSelect = {},
         )

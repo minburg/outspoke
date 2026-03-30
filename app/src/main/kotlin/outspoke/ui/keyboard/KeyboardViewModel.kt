@@ -83,15 +83,18 @@ class KeyboardViewModel(
             EngineState.Unloaded -> _uiState.value = KeyboardUiState.EngineLoading(
                 "Model not downloaded - open Outspoke to download"
             )
+
             EngineState.Loading -> _uiState.value = KeyboardUiState.EngineLoading(
                 "Loading transcription engine…"
             )
+
             EngineState.Ready -> {
                 // Clear any engine-driven blocking state so the user can start recording.
                 if (_uiState.value is KeyboardUiState.EngineLoading) {
                     _uiState.value = KeyboardUiState.Idle
                 }
             }
+
             is EngineState.Error -> _uiState.value = KeyboardUiState.Error(
                 "Engine failed to load: ${state.message}"
             )
@@ -192,6 +195,7 @@ class KeyboardViewModel(
                                 _uiState.value = KeyboardUiState.Processing(result.text)
                                 textInjector?.setPartial(result.text)
                             }
+
                             is TranscriptResult.Final -> {
                                 Log.d(TAG, "Final transcript: \"${result.text}\"")
                                 textInjector?.commitFinal(result.text)
@@ -199,6 +203,7 @@ class KeyboardViewModel(
                                 _uiState.value = KeyboardUiState.Idle
                                 captureJob = null
                             }
+
                             is TranscriptResult.Failure -> {
                                 Log.e(TAG, "Transcription failure", result.cause)
                                 _isContinuousMode.value = false
@@ -208,6 +213,18 @@ class KeyboardViewModel(
                             }
                         }
                     }
+
+                // The flow completed normally. If still in Transcribing (or Listening), it
+                // means VAD filtered out all audio (nothing was said) so InferenceRepository
+                // emitted no Final result. Reset to Idle so the button becomes usable again.
+                if (_uiState.value == KeyboardUiState.Transcribing ||
+                    _uiState.value == KeyboardUiState.Listening
+                ) {
+                    Log.d(TAG, "Transcription flow ended with no Final result — resetting to Idle")
+                    _isContinuousMode.value = false
+                    _uiState.value = KeyboardUiState.Idle
+                    captureJob = null
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SecurityException) {
@@ -247,7 +264,8 @@ class KeyboardViewModel(
         // The collect loop in onRecordStart() will transition back to Idle (and commit
         // the text) once Final arrives.
         if (_uiState.value is KeyboardUiState.Listening ||
-            _uiState.value is KeyboardUiState.Processing) {
+            _uiState.value is KeyboardUiState.Processing
+        ) {
             _uiState.value = KeyboardUiState.Transcribing
         }
     }

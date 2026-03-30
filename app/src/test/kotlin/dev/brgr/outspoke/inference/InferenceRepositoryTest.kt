@@ -79,9 +79,9 @@ class InferenceRepositoryTest {
         // Then
         assertEquals(2, results.size)
         assertTrue("First result should be Partial", results[0] is TranscriptResult.Partial)
-        assertEquals("hello", (results[0] as TranscriptResult.Partial).text)
+        assertEquals("Hello", (results[0] as TranscriptResult.Partial).text)
         assertTrue("Second result should be Final", results[1] is TranscriptResult.Final)
-        assertEquals("hello", (results[1] as TranscriptResult.Final).text)
+        assertEquals("Hello", (results[1] as TranscriptResult.Final).text)
     }
 
     // ── Mid-stream promotion rules ────────────────────────────────────────────
@@ -123,7 +123,7 @@ class InferenceRepositoryTest {
     fun `given engine returns Failure, when stream ends, then failure is emitted`() = runTest {
         // Given
         val cause = RuntimeException("model error")
-        val repo  = InferenceRepository(fakeEngine(TranscriptResult.Failure(cause)))
+        val repo = InferenceRepository(fakeEngine(TranscriptResult.Failure(cause)))
 
         // When - half-second chunk skips mid-stream partial; only end-of-stream fires
         val results = repo.transcribe(flowOf(halfSecondChunk())).toList()
@@ -137,17 +137,18 @@ class InferenceRepositoryTest {
     // ── Window capping ────────────────────────────────────────────────────────
 
     @Test
-    fun `given more than 30 seconds of audio, when collected, then inference still completes without error`() = runTest {
-        // Given - 32 chunks × 1 s = 32 s, exceeds MAX_WINDOW_SAMPLES (30 s)
-        val repo   = InferenceRepository(fakeEngine(TranscriptResult.Final("long dictation")))
-        val chunks = List(32) { oneSecondChunk() }
+    fun `given more than 30 seconds of audio, when collected, then inference still completes without error`() =
+        runTest {
+            // Given - 32 chunks × 1 s = 32 s, exceeds MAX_WINDOW_SAMPLES (30 s)
+            val repo = InferenceRepository(fakeEngine(TranscriptResult.Final("long dictation")))
+            val chunks = List(32) { oneSecondChunk() }
 
-        // When - should not throw; old audio is silently dropped
-        val results = repo.transcribe(chunks.asFlow()).toList()
+            // When - should not throw; old audio is silently dropped
+            val results = repo.transcribe(chunks.asFlow()).toList()
 
-        // Then - at least one final result is emitted at stream end
-        assertTrue(results.last() is TranscriptResult.Final)
-    }
+            // Then - at least one final result is emitted at stream end
+            assertTrue(results.last() is TranscriptResult.Final)
+        }
 }
 
 

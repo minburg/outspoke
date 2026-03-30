@@ -4,7 +4,6 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.util.Log
-import java.io.File
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 
@@ -15,15 +14,15 @@ private const val TAG = "SileroVadFilter"
  *
  * Silero provides highly accurate frame-level speech probabilities. We wrap this
  * raw probability stream with exactly the same onset, pre-roll, and hangover smoothing
- * logic used in the energy-based [VadFilter].
+ * logic used in the energy-based [RMSVadFilter].
  *
  * The `h` and `c` RNN state tensors are preserved across chunks in a continuous recording
  * session, and reset when [flush] is called.
  */
 class SileroVadFilter(
-    private val modelBytes: ByteArray,
+    modelBytes: ByteArray,
     private val threshold: Float = 0.3f
-) : IVadFilter {
+) : VadFilter {
 
     private enum class State { SILENCE, SPEECH }
 
@@ -67,9 +66,14 @@ class SileroVadFilter(
             try {
                 // Silero requires float32 samples in range [-1.0, 1.0].
                 val floatSamples = FloatArray(REQUIRED_SAMPLES) { i -> chunk.samples[i] / 32_768f }
-                
-                val inputTensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(floatSamples), longArrayOf(1, REQUIRED_SAMPLES.toLong()))
-                val srTensor = OnnxTensor.createTensor(e, LongBuffer.wrap(longArrayOf(SAMPLE_RATE.toLong())), longArrayOf(1))
+
+                val inputTensor = OnnxTensor.createTensor(
+                    e,
+                    FloatBuffer.wrap(floatSamples),
+                    longArrayOf(1, REQUIRED_SAMPLES.toLong())
+                )
+                val srTensor =
+                    OnnxTensor.createTensor(e, LongBuffer.wrap(longArrayOf(SAMPLE_RATE.toLong())), longArrayOf(1))
                 val hTensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(hState), longArrayOf(2, 1, 64))
                 val cTensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(cState), longArrayOf(2, 1, 64))
 
@@ -83,7 +87,7 @@ class SileroVadFilter(
                 s.run(inputs).use { result ->
                     val outputTensor = result.get("output").get() as OnnxTensor
                     speechProb = outputTensor.floatBuffer[0]
-                    
+
                     val hnTensor = result.get("hn").get() as OnnxTensor
                     hnTensor.floatBuffer.get(hState)
                     val cnTensor = result.get("cn").get() as OnnxTensor
@@ -155,11 +159,11 @@ class SileroVadFilter(
         hangoverFrames = 0
         onsetCount = 0
         leadIn.clear()
-        
+
         // Reset RNN state for the next recording session
         hState.fill(0f)
         cState.fill(0f)
-        
+
         return wasSpeech
     }
 
@@ -170,13 +174,16 @@ class SileroVadFilter(
 
     companion object {
         private const val SAMPLE_RATE = 16_000
+
         /** 30 ms window at 16 kHz = 480 samples. Required by Silero v4 ONNX. */
         private const val REQUIRED_SAMPLES = 480
-        
+
         /** 2 frames × 30 ms = 60 ms — eliminates single-frame false triggers. */
         private const val ONSET_FRAMES = 2
+
         /** 15 frames × 30 ms = 450 ms — captures onset phonemes before speech gate opened. */
         private const val LEAD_IN_FRAMES = 15
+
         /** 15 frames × 30 ms = 450 ms — captures trailing soft syllables. */
         private const val HANGOVER_FRAMES = 15
     }
