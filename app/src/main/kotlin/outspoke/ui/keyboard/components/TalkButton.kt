@@ -70,15 +70,20 @@ fun TalkButton(
     modifier: Modifier = Modifier,
     triggerMode: String = "HOLD",
     enabled: Boolean = true,
+    previewForceLockHint: Boolean = false, // For previews: force lock hint visible
 ) {
     val effectiveListening = isListening && enabled
     val isContinuousActive = isContinuous && effectiveListening
 
     // True while the user's finger is down in HOLD mode (drives the lock hint visibility).
     var isHolding by remember { mutableStateOf(false) }
-
     // ── Drag-progress state (0 = no drag, 1 = threshold reached) ─────────────
     var dragProgress by remember { mutableFloatStateOf(0f) }
+    // For preview: force lock hint visible
+    if (previewForceLockHint) {
+        isHolding = true
+        dragProgress = 0.5f
+    }
 
     // Reset holding state if the button becomes disabled mid-gesture.
     LaunchedEffect(enabled) {

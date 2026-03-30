@@ -67,6 +67,7 @@ fun KeyboardScreen(
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
     modifier: Modifier = Modifier,
+    previewForceLockHint: Boolean = false,
 ) {
     Column(
         modifier = modifier.fillMaxWidth()
@@ -89,9 +90,11 @@ fun KeyboardScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(modifier = Modifier.weight(1f)) {}
+                if (uiState is KeyboardUiState.Error) {
+                    Box(modifier = Modifier.weight(1f)) {}
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
 
-                Spacer(modifier = Modifier.width(8.dp))
                 StatusIndicator(
                     uiState = uiState,
                     onOpenCompanionApp = onOpenCompanionApp,
@@ -163,6 +166,7 @@ fun KeyboardScreen(
                 onRecordStop = onRecordStop,
                 onContinuousModeEnabled = onContinuousModeEnabled,
                 enabled = uiState !is KeyboardUiState.EngineLoading && uiState !is KeyboardUiState.Error && uiState !is KeyboardUiState.Transcribing,
+                previewForceLockHint = previewForceLockHint,
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -233,6 +237,7 @@ private fun KeyboardScreenPreviewScaffold(
     isContinuous: Boolean = false,
     isWhisperEngine: Boolean = false,
     whisperLanguage: String = "auto",
+    showLockHint: Boolean = false,
 ) {
     OutspokeKeyboardTheme {
         Box(modifier = Modifier.height(220.dp)) {
@@ -253,6 +258,7 @@ private fun KeyboardScreenPreviewScaffold(
                 onNewline = {},
                 onSwitchKeyboard = {},
                 onOpenCompanionApp = {},
+                previewForceLockHint = showLockHint,
             )
         }
     }
@@ -261,7 +267,7 @@ private fun KeyboardScreenPreviewScaffold(
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardScreenIdlePreview() {
-    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle)
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle, showLockHint = false)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
@@ -271,13 +277,14 @@ private fun KeyboardScreenWhisperIdlePreview() {
         uiState = KeyboardUiState.Idle,
         isWhisperEngine = true,
         whisperLanguage = "de",
+        showLockHint = true,
     )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardScreenListeningPreview() {
-    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Listening, amplitude = 0.6f)
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Listening, amplitude = 0.6f, showLockHint = true)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
@@ -287,17 +294,18 @@ private fun KeyboardScreenContinuousPreview() {
         uiState = KeyboardUiState.Listening,
         amplitude = 0.4f,
         isContinuous = true,
+        showLockHint = true,
     )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardScreenProcessingPreview() {
-    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Processing("Hello world…"))
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Processing("Hello world…"), showLockHint = true)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardScreenErrorPreview() {
-    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Error("Microphone permission denied"))
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Error("Microphone permission denied"), showLockHint = false)
 }

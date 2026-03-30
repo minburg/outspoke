@@ -32,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun KeyboardActionButton(
@@ -51,12 +52,12 @@ fun KeyboardActionButton(
             onClick()
 
             // Initial delay before starting the rapid fire (standard keyboard behavior)
-            delay(500)
+            delay(500.milliseconds)
 
             // Continuous loop while button is held
-            while (isPressed) {
+            while (true) {
                 onClick()
-                delay(60) // Speed of deletion (60ms is roughly standard)
+                delay(60.milliseconds) // Speed of deletion (60ms is roughly standard)
             }
         }
     }
