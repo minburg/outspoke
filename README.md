@@ -22,11 +22,11 @@ It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.
 
 ## Requirements
 
-| Requirement | Minimum |
-|---|---|
-| Android version | 14 (API 34) |
-| RAM | 4 GB recommended |
-| Free storage | ~750 MB (for model files) |
+| Requirement | Minimum                                                                |
+|---|------------------------------------------------------------------------|
+| Android version | 13 (API 33)                                                            |
+| RAM | 4 GB recommended                                                       |
+| Free storage | ~750 MB (for model files)                                              |
 | Permissions | `RECORD_AUDIO`, `INTERNET` (model download only), `POST_NOTIFICATIONS` |
 
 > The `INTERNET` permission is used **once** to download the model from Hugging Face. After that, the keyboard works fully offline.

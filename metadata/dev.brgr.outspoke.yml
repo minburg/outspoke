@@ -5,7 +5,6 @@ Categories:
 License: GPL-3.0-only
 
 AuthorName: minburg
-AuthorEmail: dgdf
 SourceCode: https://github.com/minburg/outspoke
 IssueTracker: https://github.com/minburg/outspoke/issues
 Changelog: https://github.com/minburg/outspoke/releases
@@ -24,7 +23,7 @@ Description: |-
   The model file (~700 MB) is downloaded once over the internet and stored
   locally; the keyboard then works fully offline.
 
-  Requires Android 14 (API 34) or higher.
+  Requires Android 13 (API 33) or higher.
 
 AntiFeatures:
   NonFreeNet:
@@ -40,7 +39,7 @@ CurrentVersionCode: 1
 
 # SHA-256 fingerprint of the APK signing certificate — no colons, lowercase.
 # Retrieve it with: apksigner verify --print-certs app-release.apk | grep SHA-256
-AllowedAPKSigningKeys: <sha256-fingerprint-of-your-release-signing-key>
+AllowedAPKSigningKeys: 1E:E2:43:3E:BF:79:58:42:00:FB:FC:F0:1C:F3:23:E5:87:6F:D4:91:39:57:0F:E6:90:44:8E:7C:33:04:E3:88
 
 # Detects new releases from git tags matching "v<version>" (e.g. v0.2.0).
 AutoUpdateMode: Version v%v
