@@ -94,7 +94,7 @@ jobs:
 
       # Print the SHA-256 fingerprint of the signing certificate so it can be
       # copied into the metadata/dev.brgr.outspoke.yml AllowedAPKSigningKeys field.
-      # keytool is available wherever JDK is — no extra tools needed.
+      # keytool is available wherever JDK is - no extra tools needed.
       - name: Print signing certificate SHA-256 fingerprint
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}

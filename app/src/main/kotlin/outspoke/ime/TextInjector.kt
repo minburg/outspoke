@@ -80,7 +80,7 @@ class TextInjector(
      *
      * When [findNewContent] returns empty (the model drifted past the committed prefix
      * in a way we cannot reconcile), [setPartial] calls [InputConnection.finishComposingText]
-     * which permanently commits whatever is in the composing span — without going through
+     * which permanently commits whatever is in the composing span - without going through
      * the normal freeze path.  Without this tracker, [committedWords] would be stale and
      * the next successful partial would re-commit those same words, producing visible
      * duplication.  Updating [committedWords] from this list on every forced-finish call
@@ -103,7 +103,7 @@ class TextInjector(
 
     /**
      * Strips non-alphanumeric boundary characters from a single word token for
-     * comparison purposes only — the original word is kept in all output.
+     * comparison purposes only - the original word is kept in all output.
      * e.g. `"again."` → `"again"`, `"I'm"` → `"i'm"`, `"And"` → `"and"`
      */
     private fun String.normalizeWord(): String = lowercase().trim { !it.isLetterOrDigit() }
@@ -158,7 +158,7 @@ class TextInjector(
             }
         }
 
-        // No alignment found — the transcript has completely diverged.
+        // No alignment found - the transcript has completely diverged.
         // Return empty so we do not corrupt the already-committed text.
 
         // Interior-scan fallback: after an audio trim the model may start with 1–3
@@ -211,7 +211,7 @@ class TextInjector(
     /**
      * Show [text] as provisional composing text (underlined, uncommitted).
      *
-     * If the editor does not support composing text this is a no-op — the full
+     * If the editor does not support composing text this is a no-op - the full
      * transcript will be delivered via [commitFinal] when the utterance ends.
      * Duplicate calls with the same [text] value are skipped to reduce binder overhead.
      *
@@ -274,7 +274,7 @@ class TextInjector(
             composingWords = mutableTail
             inputConnection.setComposingText(mutableTail.joinToString(" "), 1)
         } else {
-            // All new content was frozen — nothing remains for the composing span.
+            // All new content was frozen - nothing remains for the composing span.
             composingWords = emptyList()
             inputConnection.finishComposingText()
         }
@@ -283,7 +283,7 @@ class TextInjector(
     /**
      * Commit [text] as final, confirmed text.
      *
-     * Only the words not yet frozen (beyond [committedWords]) are written — the
+     * Only the words not yet frozen (beyond [committedWords]) are written - the
      * permanently committed prefix is left untouched. The suffix-overlap algorithm
      * correctly finds the new tail even when the final inference result has drifted
      * and starts from a different word than the frozen prefix.

@@ -178,13 +178,13 @@ class SileroVadFilter(
         /** 30 ms window at 16 kHz = 480 samples. Required by Silero v4 ONNX. */
         private const val REQUIRED_SAMPLES = 480
 
-        /** 2 frames × 30 ms = 60 ms — eliminates single-frame false triggers. */
+        /** 2 frames × 30 ms = 60 ms - eliminates single-frame false triggers. */
         private const val ONSET_FRAMES = 2
 
-        /** 15 frames × 30 ms = 450 ms — captures onset phonemes before speech gate opened. */
+        /** 15 frames × 30 ms = 450 ms - captures onset phonemes before speech gate opened. */
         private const val LEAD_IN_FRAMES = 15
 
-        /** 15 frames × 30 ms = 450 ms — captures trailing soft syllables. */
+        /** 15 frames × 30 ms = 450 ms - captures trailing soft syllables. */
         private const val HANGOVER_FRAMES = 15
     }
 }

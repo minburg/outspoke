@@ -29,7 +29,7 @@ private val MISSING_SENTENCE_SPACE_RE = Regex("""([.!?])([A-Za-zÀ-ÖØ-öø-ÿ]
 
 /**
  * Strips all leading/trailing non-alphanumeric characters from a single word token
- * for comparison purposes only — the original word is kept in the output.
+ * for comparison purposes only - the original word is kept in the output.
  * e.g. "Sachen," → "sachen", "kann.." → "kann", "gut!" → "gut"
  */
 private fun String.normalizedForComparison(): String =
@@ -295,7 +295,7 @@ private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30   // 30 s = 480 000 samp
  * Minimum audio passed to the final inference pass.
  * Clips shorter than 1 second are padded to 1.25 seconds (20 000 samples). Very short
  * inputs give the encoder too few frames and Parakeet returns blank or spurious tokens.
- * Zero-padding is decoded as silence — TDT advances through blank frames without emitting
+ * Zero-padding is decoded as silence - TDT advances through blank frames without emitting
  * speech tokens. (Reference pipeline: < 1 s → padded to 1.25 s.)
  */
 private const val MIN_FINAL_SAMPLES = SAMPLE_RATE * 5 / 4  // 1.25 s = 20 000 samples
@@ -374,7 +374,7 @@ private fun longestCommonPrefixLength(wordLists: List<List<String>>): Int {
  * **Sequential inference**: each partial inference runs directly inside the collect
  * loop (no concurrent [kotlinx.coroutines.launch]). The AudioRecord is unaffected
  * because it writes into the [Channel.UNLIMITED] buffer that sits between the capture
- * flow and this collect loop — the recorder never suspends while inference runs.
+ * flow and this collect loop - the recorder never suspends while inference runs.
  *
  * **Stable-chunk commits**: after each partial the last [STABLE_STRIDES] word lists are
  * compared. If their longest common prefix is long enough, the corresponding audio at
@@ -446,7 +446,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
             windowSamples += incoming.samples.size
             strideAccum += incoming.samples.size
 
-            // Hard ceiling — evict oldest audio once the window hits 30 s.
+            // Hard ceiling - evict oldest audio once the window hits 30 s.
             var evicted = false
             while (windowSamples > MAX_WINDOW_SAMPLES) {
                 windowSamples -= window.removeFirst().size
@@ -466,7 +466,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                     Log.d(
                         TAG, "[STRIDE] stride ready (strideAccum=${strideAccum.toSec()})" +
                                 " but window=${windowSamples.toSec()} < MIN_SAMPLES=${MIN_SAMPLES.toSec()}" +
-                                " — still accumulating"
+                                " - still accumulating"
                     )
                     strideWaitLogged = true
                 }
@@ -476,7 +476,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 strideWaitLogged = false  // reset for the next accumulation period
                 strideAccum = 0
                 val chunk = buildChunk()
-                Log.d(TAG, "[STRIDE] firing — window=${chunk.samples.size.toSec()}")
+                Log.d(TAG, "[STRIDE] firing - window=${chunk.samples.size.toSec()}")
 
                 // Run inference synchronously.  The AudioRecord coroutine is not
                 // blocked because it writes into the Channel.UNLIMITED buffer above.
@@ -491,7 +491,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                 when {
                     cleaned is TranscriptResult.Partial && cleaned.text.isBlank() ->
-                        Log.d(TAG, "[PARTIAL] discarded — blank after cleaning")
+                        Log.d(TAG, "[PARTIAL] discarded - blank after cleaning")
 
                     cleaned is TranscriptResult.Partial ->
                         Log.d(TAG, "[PARTIAL] clean  = \"${cleaned.text}\"")
@@ -514,12 +514,12 @@ class InferenceRepository(private val engine: SpeechEngine) {
                     if (recentPartialWords.size < STABLE_STRIDES) {
                         Log.d(
                             TAG, "[STABLE] need $STABLE_STRIDES strides of history," +
-                                    " have ${recentPartialWords.size} — waiting"
+                                    " have ${recentPartialWords.size} - waiting"
                         )
                     } else if (windowSamples <= TRIGGER_WINDOW_SAMPLES) {
                         Log.d(
                             TAG, "[STABLE] window=${windowSamples.toSec()}" +
-                                    " ≤ TRIGGER=${TRIGGER_WINDOW_SAMPLES.toSec()} — no trim needed"
+                                    " ≤ TRIGGER=${TRIGGER_WINDOW_SAMPLES.toSec()} - no trim needed"
                         )
                     } else {
                         val stableCount = longestCommonPrefixLength(recentPartialWords.toList())
@@ -528,7 +528,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                         if (stableCount == 0) {
                             Log.d(
                                 TAG, "[STABLE] no common prefix across last $STABLE_STRIDES" +
-                                        " strides (words diverged) — no trim"
+                                        " strides (words diverged) - no trim"
                             )
                         } else {
                             // When stableCount < totalWords the model is still decoding the
@@ -557,7 +557,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                             if (dropSamples >= MIN_TRIM_SAMPLES) {
                                 val windowBefore = windowSamples.toSec()
                                 trimWindowFront(dropSamples)
-                                Log.d(TAG, "[STABLE] TRIM — window $windowBefore → ${windowSamples.toSec()}")
+                                Log.d(TAG, "[STABLE] TRIM - window $windowBefore → ${windowSamples.toSec()}")
 
                                 // Clear history so we don't immediately retrigger on
                                 // the same stable prefix in the next stride.
@@ -565,7 +565,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                             } else {
                                 Log.d(
                                     TAG, "[STABLE] drop=${dropSamples.toSec()}" +
-                                            " < MIN_TRIM=${MIN_TRIM_SAMPLES.toSec()} — skipping trim"
+                                            " < MIN_TRIM=${MIN_TRIM_SAMPLES.toSec()} - skipping trim"
                                 )
                             }
                         }
@@ -574,7 +574,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
             }
         }
 
-        // No partialJobs to join — inference is sequential inside the collect loop above.
+        // No partialJobs to join - inference is sequential inside the collect loop above.
 
         if (windowSamples > 0) {
             // Pad to at least MIN_FINAL_SAMPLES so the encoder has enough frames for

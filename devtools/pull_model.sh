@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# pull_model.sh — pull Parakeet-V3 model files OUT of the app's internal
+# pull_model.sh - pull Parakeet-V3 model files OUT of the app's internal
 # storage back to your local machine.
 #
 # Run this BEFORE a manual uninstall so you can re-push quickly afterwards.

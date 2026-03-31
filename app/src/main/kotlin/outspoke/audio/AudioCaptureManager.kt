@@ -23,7 +23,7 @@ private const val CHUNK_SAMPLES = 480
 
 /**
  * Maximum silence frames pumped through the VAD during the trailing drain phase.
- * 20 frames × 30 ms = 600 ms — generously above [RMSVadFilter]'s 15-frame / 450 ms hangover
+ * 20 frames × 30 ms = 600 ms - generously above [RMSVadFilter]'s 15-frame / 450 ms hangover
  * so the hangover always expires before this cap is hit.
  */
 private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20

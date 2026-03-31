@@ -21,18 +21,18 @@ import kotlin.math.ln
  *
  * ### Three smoothing layers (reference: Handy pipeline SmoothedVad)
  *
- * **Layer A — Onset Gate ([ONSET_FRAMES] = 2 frames / 60 ms)**
+ * **Layer A - Onset Gate ([ONSET_FRAMES] = 2 frames / 60 ms)**
  * The energy must exceed [threshold] for 2 consecutive frames before the pipeline
  * transitions to IN_SPEECH. Suppresses single-frame activations from plosive pops,
  * finger taps, and brief noise events.
  *
- * **Layer B — Pre-roll buffer ([LEAD_IN_FRAMES] = 15 frames / 450 ms)**
+ * **Layer B - Pre-roll buffer ([LEAD_IN_FRAMES] = 15 frames / 450 ms)**
  * A ring buffer of the last 15+1 frames is always maintained during silence. When the
  * onset gate fires, the entire buffer (including the onset gate frames themselves) is
  * emitted before the triggering frame. This captures the first consonant/phoneme of the
- * word that triggered the gate — the word would otherwise be truncated.
+ * word that triggered the gate - the word would otherwise be truncated.
  *
- * **Layer C — Hangover ([HANGOVER_FRAMES] = 15 frames / 450 ms)**
+ * **Layer C - Hangover ([HANGOVER_FRAMES] = 15 frames / 450 ms)**
  * After energy first drops below threshold, the filter continues emitting frames as SPEECH
  * for 15 more frames (450 ms). Captures trailing soft syllables (-ing, -ed, -s) and brief
  * inter-word pauses that momentarily dip below the threshold.
@@ -76,7 +76,7 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
                 if (rms >= threshold) {
                     onsetCount++
                     if (onsetCount >= ONSET_FRAMES) {
-                        // Onset gate confirmed — emit pre-roll buffer + triggering frame.
+                        // Onset gate confirmed - emit pre-roll buffer + triggering frame.
                         state = State.SPEECH
                         onsetCount = 0
                         hangoverFrames = 0
@@ -84,11 +84,11 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
                         leadIn.clear()
                         out
                     } else {
-                        // Gate not yet confirmed — chunk already in ring buffer; emit nothing.
+                        // Gate not yet confirmed - chunk already in ring buffer; emit nothing.
                         emptyList()
                     }
                 } else {
-                    // Sub-threshold — reset onset counter, keep buffering.
+                    // Sub-threshold - reset onset counter, keep buffering.
                     onsetCount = 0
                     emptyList()
                 }
@@ -96,21 +96,21 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
 
             State.SPEECH -> {
                 if (rms >= threshold) {
-                    // Active speech — reset hangover counter and emit.
+                    // Active speech - reset hangover counter and emit.
                     hangoverFrames = 0
                     listOf(chunk)
                 } else {
-                    // Energy dropped — start/continue hangover.
+                    // Energy dropped - start/continue hangover.
                     hangoverFrames++
                     if (hangoverFrames >= HANGOVER_FRAMES) {
-                        // Hangover expired — transition to silence.
+                        // Hangover expired - transition to silence.
                         state = State.SILENCE
                         hangoverFrames = 0
                         onsetCount = 0
                         leadIn.clear()
                         emptyList()
                     } else {
-                        // Still within hangover window — keep emitting.
+                        // Still within hangover window - keep emitting.
                         listOf(chunk)
                     }
                 }
@@ -135,19 +135,19 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
     companion object {
         /**
          * Number of consecutive above-threshold frames required before speech onset is
-         * confirmed. 2 frames × 30 ms = 60 ms — eliminates single-frame glitch activations.
+         * confirmed. 2 frames × 30 ms = 60 ms - eliminates single-frame glitch activations.
          */
         private const val ONSET_FRAMES = 2
 
         /**
          * Frames of audio prepended before confirmed speech onset (pre-roll buffer).
-         * 15 frames × 30 ms = 450 ms — captures onset phonemes that preceded the gate.
+         * 15 frames × 30 ms = 450 ms - captures onset phonemes that preceded the gate.
          */
         private const val LEAD_IN_FRAMES = 15
 
         /**
          * Frames of sub-threshold audio tolerated before declaring silence (hangover).
-         * 15 frames × 30 ms = 450 ms — captures trailing soft syllables and brief pauses.
+         * 15 frames × 30 ms = 450 ms - captures trailing soft syllables and brief pauses.
          */
         private const val HANGOVER_FRAMES = 15
     }

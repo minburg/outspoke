@@ -37,7 +37,7 @@ RepoType: git
 CurrentVersion: '0.1.0'
 CurrentVersionCode: 1
 
-# SHA-256 fingerprint of the APK signing certificate — no colons, lowercase.
+# SHA-256 fingerprint of the APK signing certificate - no colons, lowercase.
 # Retrieve it with: apksigner verify --print-certs app-release.apk | grep SHA-256
 AllowedAPKSigningKeys: 1E:E2:43:3E:BF:79:58:42:00:FB:FC:F0:1C:F3:23:E5:87:6F:D4:91:39:57:0F:E6:90:44:8E:7C:33:04:E3:88
 

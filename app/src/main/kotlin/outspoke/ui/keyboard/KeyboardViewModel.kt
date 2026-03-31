@@ -220,7 +220,7 @@ class KeyboardViewModel(
                 if (_uiState.value == KeyboardUiState.Transcribing ||
                     _uiState.value == KeyboardUiState.Listening
                 ) {
-                    Log.d(TAG, "Transcription flow ended with no Final result — resetting to Idle")
+                    Log.d(TAG, "Transcription flow ended with no Final result - resetting to Idle")
                     _isContinuousMode.value = false
                     _uiState.value = KeyboardUiState.Idle
                     captureJob = null

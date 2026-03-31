@@ -81,7 +81,7 @@ class OutspokeInputMethodService :
         if (isBound) {
             Log.d(
                 TAG,
-                "Keyboard idle for ${IDLE_UNLOAD_DELAY_MS / 1000}s — unbinding InferenceService to free model RAM"
+                "Keyboard idle for ${IDLE_UNLOAD_DELAY_MS / 1000}s - unbinding InferenceService to free model RAM"
             )
             unbindService(inferenceServiceConnection)
             isBound = false
@@ -111,13 +111,13 @@ class OutspokeInputMethodService :
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
-            Log.w(TAG, "InferenceService disconnected unexpectedly — attempting rebind")
+            Log.w(TAG, "InferenceService disconnected unexpectedly - attempting rebind")
             inferenceBinder = null
             keyboardViewModel.setInferenceRepository(null)
-            // Show "Loading…" rather than "Model not downloaded" — the model is still present;
+            // Show "Loading…" rather than "Model not downloaded" - the model is still present;
             // the service was killed by the OS (e.g. OOM) and we are about to restart it.
             keyboardViewModel.setEngineState(EngineState.Loading)
-            // isBound stays true — we already held the bind and are re-establishing it.
+            // isBound stays true - we already held the bind and are re-establishing it.
             // BIND_AUTO_CREATE will recreate the service process and reload the engine.
             bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
         }
@@ -158,11 +158,11 @@ class OutspokeInputMethodService :
     override fun onWindowShown() {
         super.onWindowShown()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        // Cancel a pending idle-unload — the user is back before the timeout fired.
+        // Cancel a pending idle-unload - the user is back before the timeout fired.
         handler.removeCallbacks(idleUnloadRunnable)
         // If the timeout already fired and we unloaded, rebind now so the engine reloads.
         if (!isBound) {
-            Log.d(TAG, "Keyboard shown after idle unload — rebinding InferenceService")
+            Log.d(TAG, "Keyboard shown after idle unload - rebinding InferenceService")
             bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
             isBound = true
         }

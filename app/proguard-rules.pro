@@ -21,13 +21,13 @@
 #-renamesourcefileattribute SourceFile
 
 # ---------------------------------------------------------------------------
-# ONNX Runtime — keep all classes and native JNI bindings so R8 does not
+# ONNX Runtime - keep all classes and native JNI bindings so R8 does not
 # strip the symbols that onnxruntime-android.aar calls via JNI.
 # ---------------------------------------------------------------------------
 -keep class ai.onnxruntime.** { *; }
 -keepclassmembers class ai.onnxruntime.** { *; }
 
-# OkHttp / Okio — suppress warnings from internal Kotlin/JVM intrinsics.
+# OkHttp / Okio - suppress warnings from internal Kotlin/JVM intrinsics.
 -dontwarn okhttp3.**
 -dontwarn okio.**
 

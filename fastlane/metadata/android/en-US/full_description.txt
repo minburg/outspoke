@@ -1,9 +1,9 @@
 Outspoke is a free and open-source speech-to-text keyboard for Android.
 
-All transcription happens entirely on your device using the NVIDIA Parakeet ASR model via ONNX Runtime — no audio ever leaves your phone, no account required, and no internet connection is needed after the model is downloaded.
+All transcription happens entirely on your device using the NVIDIA Parakeet ASR model via ONNX Runtime - no audio ever leaves your phone, no account required, and no internet connection is needed after the model is downloaded.
 
 <b>Features</b>
-• Fully on-device inference — completely private
+• Fully on-device inference - completely private
 • Works as a standard Android Input Method (IME) in any app
 • Downloads the model once over Wi-Fi; works offline afterwards
 • No Google Play Services, Firebase, or any third-party telemetry

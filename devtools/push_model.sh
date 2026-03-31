@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# push_model.sh — push Parakeet-V3 model files directly into the app's
+# push_model.sh - push Parakeet-V3 model files directly into the app's
 # internal storage on a connected device / emulator.
 #
 # Prerequisites:
@@ -14,7 +14,7 @@
 #
 #   If no directory is given the script looks in ./model_files/
 #
-# After this runs, open the Outspoke app — ModelStorageManager.isModelReady()
+# After this runs, open the Outspoke app - ModelStorageManager.isModelReady()
 # will return true immediately, no download required.
 #
 # Why this works across reinstalls:
@@ -85,5 +85,5 @@ adb shell "rm -rf ${STAGING_DIR}"
 
 echo ""
 echo "✅  All model files installed to ${INTERNAL_MODEL_DIR}"
-echo "    Open the Outspoke app — the model is ready, no download needed."
+echo "    Open the Outspoke app - the model is ready, no download needed."
 
