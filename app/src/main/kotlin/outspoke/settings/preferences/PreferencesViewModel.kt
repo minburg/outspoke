@@ -25,7 +25,7 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     val vadSensitivity: StateFlow<Float> = prefs.vadSensitivity.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = 0f,
+        initialValue = 0.15f,
     )
 
     fun setVadSensitivity(value: Float) {

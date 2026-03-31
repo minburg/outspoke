@@ -77,7 +77,7 @@ fun TalkButton(
 
     // True while the user's finger is down in HOLD mode (drives the lock hint visibility).
     var isHolding by remember { mutableStateOf(false) }
-    // ── Drag-progress state (0 = no drag, 1 = threshold reached) ─────────────
+    //  Drag-progress state (0 = no drag, 1 = threshold reached)
     var dragProgress by remember { mutableFloatStateOf(0f) }
     // For preview: force lock hint visible
     if (previewForceLockHint) {
@@ -93,7 +93,7 @@ fun TalkButton(
         }
     }
 
-    // ── Base scale: animates on press/release ─────────────────────────────────
+    //  Base scale: animates on press/release
     val baseScale by animateFloatAsState(
         targetValue = when {
             !enabled -> 1f
@@ -104,7 +104,7 @@ fun TalkButton(
         label = "talkButtonBaseScale",
     )
 
-    // ── Continuous-mode pulse ─────────────────────────────────────────────────
+    //  Continuous-mode pulse
     val infiniteTransition = rememberInfiniteTransition(label = "talkButtonContinuousPulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -121,7 +121,7 @@ fun TalkButton(
             (if (isContinuousActive) pulse else 1f) +
             (if (effectiveListening && !isContinuousActive) dragProgress * 0.05f else 0f)
 
-    // ── Colours ───────────────────────────────────────────────────────────────
+    //  Colours
     val backgroundColor by animateColorAsState(
         targetValue = when {
             !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -141,15 +141,15 @@ fun TalkButton(
         label = "talkButtonIconTint",
     )
 
-    // ── Capture latest callbacks so pointerInput coroutine always calls the ──
-    // ── current lambdas without restarting the gesture handler.             ──
+    //  Capture latest callbacks so pointerInput coroutine always calls the 
+    //  current lambdas without restarting the gesture handler.             
     val currentOnRecordStart by rememberUpdatedState(onRecordStart)
     val currentOnRecordStop by rememberUpdatedState(onRecordStop)
     val currentOnContinuousMode by rememberUpdatedState(onContinuousModeEnabled)
     val currentIsContinuous by rememberUpdatedState(isContinuous)
     val currentIsListening by rememberUpdatedState(isListening)
 
-    // ── Root container: fixed 72dp, handles all gestures ─────────────────────
+    //  Root container: fixed 72dp, handles all gestures
     // Box does NOT clip children by default, which lets the LockHint render
     // above the 72dp bounds without affecting layout measurement.
     Box(
@@ -163,7 +163,7 @@ fun TalkButton(
                     awaitPointerEventScope {
                         while (true) {
                             if (triggerMode == "TAP_TOGGLE") {
-                                // ── TAP_TOGGLE mode: tap once to start, tap again to stop ──
+                                //  TAP_TOGGLE mode: tap once to start, tap again to stop 
                                 awaitFirstDown(requireUnconsumed = false)
                                 waitForUpOrCancellation()
                                 if (currentIsListening) {
@@ -172,7 +172,7 @@ fun TalkButton(
                                     currentOnRecordStart()
                                 }
                             } else {
-                                // ── HOLD mode: hold to record, drag up to lock ────────────
+                                //  HOLD mode: hold to record, drag up to lock 
                                 val down = awaitFirstDown(requireUnconsumed = false)
 
                                 if (currentIsContinuous) {
@@ -216,7 +216,7 @@ fun TalkButton(
                 } else Modifier
             ),
     ) {
-        // ── Visual circle (scaled independently of the lock hint) ─────────────
+        //  Visual circle (scaled independently of the lock hint)
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -240,7 +240,7 @@ fun TalkButton(
             )
         }
 
-        // ── Lock hint: floats above without disturbing layout ─────────────────
+        //  Lock hint: floats above without disturbing layout
         // Modifier.layout reports (0, 0) to the parent Box so the button's
         // measured position is never shifted.  The placeable is then placed
         // with a negative Y offset so it renders above the button bounds.
@@ -357,7 +357,7 @@ private fun LockHint(
     }
 }
 
-// ── Previews ──────────────────────────────────────────────────────────────────
+//  Previews 
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111, name = "Idle")
 @Composable

@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
+import android.os.Debug
 import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import org.json.JSONObject
@@ -122,6 +123,11 @@ class VoxtralEngine : SpeechEngine {
 
 
     override fun load(modelDir: File) {
+        val startTime = System.currentTimeMillis()
+        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+        Log.i(TAG, "VoxtralEngine loading from ${modelDir.path}, size=${modelSizeMB}MB")
+        if (modelSizeMB > 1000) Log.w(TAG, "Voxtral model is very large (${modelSizeMB}MB) - may require high RAM")
+
         check(!isLoaded) { "Already loaded; call close() before reloading" }
 
         val opts = OrtSession.SessionOptions().apply {
@@ -175,6 +181,9 @@ class VoxtralEngine : SpeechEngine {
         opts.close()
         isLoaded = true
         Log.d(TAG, "VoxtralEngine ready (modelDir=${modelDir.path})")
+        val elapsed = System.currentTimeMillis() - startTime
+        Log.i(TAG, "VoxtralEngine loaded in ${elapsed}ms")
+        logMemoryUsage()
     }
 
     override fun transcribe(chunk: AudioChunk): TranscriptResult {
@@ -229,6 +238,7 @@ class VoxtralEngine : SpeechEngine {
         env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "VoxtralEngine closed")
+        logMemoryUsage()
     }
 
     /** Converts a 16-bit signed PCM [ShortArray] to float32 normalised to [-1.0, 1.0]. */
@@ -371,9 +381,9 @@ class VoxtralEngine : SpeechEngine {
             for (i in 0 until n step len) {
                 for (k in 0 until halfLen) {
                     val angle = angleStep * k
-                    val wr = cos(angle);
+                    val wr = cos(angle)
                     val wi = sin(angle)
-                    val ur = re[i + k];
+                    val ur = re[i + k]
                     val ui = im[i + k]
                     val vr = wr * re[i + k + halfLen] - wi * im[i + k + halfLen]
                     val vi = wr * im[i + k + halfLen] + wi * re[i + k + halfLen]
@@ -526,7 +536,7 @@ class VoxtralEngine : SpeechEngine {
         val embed = embedSession
             ?: throw RuntimeException("embed_tokens session required - decoder uses inputs_embeds")
 
-        // ── Extract audio embedding data and dimensions ───────────────────────
+        //  Extract audio embedding data and dimensions
         val audioData = FloatArray(audioEmbeds.floatBuffer.remaining())
         audioEmbeds.floatBuffer.rewind()
         audioEmbeds.floatBuffer.get(audioData)
@@ -534,7 +544,7 @@ class VoxtralEngine : SpeechEngine {
         val tAudio = audioShape[1].toInt()
         val hiddenDim = audioShape[2].toInt()
 
-        // ── Resolve special token IDs from the loaded vocabulary ──────────────
+        //  Resolve special token IDs from the loaded vocabulary 
         // findTokenId() also verifies the piece is non-empty at that position.
         val tokenBos = findTokenId("<s>", TOKEN_BOS)
         val tokenInst = findTokenId("[INST]", TOKEN_INST_DEFAULT)
@@ -545,7 +555,7 @@ class VoxtralEngine : SpeechEngine {
         val useInstructionFormat = vocabulary.getOrNull(tokenInst)?.isNotEmpty() == true
         Log.d(TAG, "greedyDecode: useInstructionFormat=$useInstructionFormat")
 
-        // ── Build the full prefill embedding sequence ─────────────────────────
+        //  Build the full prefill embedding sequence
         //
         // Instruction format : [BOS_emb, INST_emb, audio_embs…]  seed=[/INST]
         // Fallback format     : [audio_embs…]                     seed=BOS
@@ -595,7 +605,7 @@ class VoxtralEngine : SpeechEngine {
         val hypothesis = mutableListOf<Int>()
 
         try {
-            // ── Phase 1: Full-context prefill (no logits) ────────────────────
+            //  Phase 1: Full-context prefill (no logits) 
             val prefillInputs = mutableMapOf<String, OnnxTensor>()
             try {
                 prefillInputs[DEC_IN_INPUTS_EMBEDS] = OnnxTensor.createTensor(
@@ -636,7 +646,7 @@ class VoxtralEngine : SpeechEngine {
             // tokens - used to detect when the model is cycling.
             val recentHypothesis = mutableListOf<Int>()
 
-            // ── Phase 2: Autoregressive generation ───────────────────────────
+            //  Phase 2: Autoregressive generation
             // Each step: embed one token → logits [1, 1, vocab_size] (~128 KB, safe).
             // Step 0 feeds the seed ([/INST] or BOS) and produces the first real token.
             for (step in 0 until MAX_NEW_TOKENS) {
@@ -937,5 +947,15 @@ class VoxtralEngine : SpeechEngine {
         session.inputNames.forEach { n -> Log.d(TAG, "  [$n] ${session.inputInfo[n]}") }
         Log.d(TAG, "=== $label outputs ===")
         session.outputNames.forEach { n -> Log.d(TAG, "  [$n] ${session.outputInfo[n]}") }
+    }
+
+    private fun logMemoryUsage() {
+        val runtime = Runtime.getRuntime()
+        val usedMemMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val maxMemMB = runtime.maxMemory() / (1024 * 1024)
+        Log.i(TAG, "VoxtralEngine memory: used=${usedMemMB}MB, max=${maxMemMB}MB")
+        val debugMem = Debug.MemoryInfo()
+        Debug.getMemoryInfo(debugMem)
+        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
     }
 }

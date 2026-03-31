@@ -180,7 +180,7 @@ private fun EngineLoadingIndicator(
     message: String,
     onOpenCompanionApp: (() -> Unit)? = null,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(horizontalAlignment = Alignment.Start) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GradientArcSpinner(modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))

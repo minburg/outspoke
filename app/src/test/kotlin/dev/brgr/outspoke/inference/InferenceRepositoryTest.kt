@@ -19,16 +19,12 @@ import java.io.File
  */
 class InferenceRepositoryTest {
 
-    // ── Fake engine ──────────────────────────────────────────────────────────
-
     private fun fakeEngine(result: TranscriptResult): SpeechEngine = object : SpeechEngine {
         override val isLoaded = true
         override fun load(modelDir: File) = Unit
         override fun transcribe(chunk: AudioChunk) = result
         override fun close() = Unit
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     /** 1-second chunk - meets STRIDE_SAMPLES but not MIN_SAMPLES on its own. */
     private fun oneSecondChunk() = AudioChunk(ShortArray(16_000), timestampMs = 0L)
@@ -38,8 +34,6 @@ class InferenceRepositoryTest {
 
     /** Half-second chunk - below MIN_SAMPLES on its own. */
     private fun halfSecondChunk() = AudioChunk(ShortArray(8_000), timestampMs = 0L)
-
-    // ── No audio ─────────────────────────────────────────────────────────────
 
     @Test
     fun `given no audio chunks, when stream ends, then nothing is emitted`() = runTest {
@@ -52,8 +46,6 @@ class InferenceRepositoryTest {
         // Then
         assertTrue(results.isEmpty())
     }
-
-    // ── Partial threshold ────────────────────────────────────────────────────
 
     @Test
     fun `given less than minimum audio, when stream ends, then only a final is emitted`() = runTest {
@@ -83,8 +75,6 @@ class InferenceRepositoryTest {
         assertTrue("Second result should be Final", results[1] is TranscriptResult.Final)
         assertEquals("Hello", (results[1] as TranscriptResult.Final).text)
     }
-
-    // ── Mid-stream promotion rules ────────────────────────────────────────────
 
     @Test
     fun `given engine returns Final mid-stream, when collected, then it is downcast to Partial`() = runTest {
@@ -117,8 +107,6 @@ class InferenceRepositoryTest {
         )
     }
 
-    // ── Failure propagation ───────────────────────────────────────────────────
-
     @Test
     fun `given engine returns Failure, when stream ends, then failure is emitted`() = runTest {
         // Given
@@ -133,8 +121,6 @@ class InferenceRepositoryTest {
         val failure = results[0] as TranscriptResult.Failure
         assertSame(cause, failure.cause)
     }
-
-    // ── Window capping ────────────────────────────────────────────────────────
 
     @Test
     fun `given more than 30 seconds of audio, when collected, then inference still completes without error`() =

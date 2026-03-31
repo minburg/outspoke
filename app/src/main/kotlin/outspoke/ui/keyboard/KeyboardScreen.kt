@@ -81,7 +81,7 @@ fun KeyboardScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        // ── Top section: status + (optional) language selector + waveform ──────
+        //  Top section: status + (optional) language selector + waveform 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -127,14 +127,14 @@ fun KeyboardScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ── Bottom row: 5 buttons with TalkButton centred ────────────────────
+        //  Bottom row: 5 buttons with TalkButton centred 
         // Left and right groups each have weight(1f) so the centre button stays
         // exactly in the middle regardless of screen width.
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Left group: [Delete All] ──────── [Delete Word]
+            // Left group: [Delete All]  [Delete Word]
             Box(modifier = Modifier.weight(1f)) {
                 // Far-left: delete all text (mirror of the switch-keyboard button)
                 KeyboardActionButton(
@@ -171,7 +171,7 @@ fun KeyboardScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Right group: [Delete Char] ──── [Switch Keyboard]
+            // Right group: [Delete Char]  [Switch Keyboard]
             Box(modifier = Modifier.weight(1f)) {
                 // Adjacent-right: delete single character
                 KeyboardActionButton(

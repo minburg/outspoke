@@ -35,8 +35,6 @@ private val MISSING_SENTENCE_SPACE_RE = Regex("""([.!?])([A-Za-zÀ-ÖØ-öø-ÿ]
 private fun String.normalizedForComparison(): String =
     lowercase().trim { !it.isLetterOrDigit() }
 
-// ── Structured debug-log helpers ─────────────────────────────────────────────
-
 /**
  * Formats a sample count as a human-readable seconds string for log messages,
  * e.g. `32000.toSec()` → `"2.00s"`.
@@ -302,8 +300,6 @@ private const val MAX_WINDOW_SAMPLES = SAMPLE_RATE * 30   // 30 s = 480 000 samp
  */
 private const val MIN_FINAL_SAMPLES = SAMPLE_RATE * 5 / 4  // 1.25 s = 20 000 samples
 
-// ── Stable-chunk commit constants ─────────────────────────────────────────────
-
 /**
  * Number of consecutive strides whose leading words must agree before that prefix
  * is considered "stable" and the corresponding audio is eligible for trimming.
@@ -507,7 +503,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 if (cleaned is TranscriptResult.Partial && cleaned.text.isNotBlank()) {
                     send(cleaned)
 
-                    // ── Stable-chunk commit ───────────────────────────────────────
+                    // -- Stable-chunk commit --
                     // Track the word list for this stride and check whether the
                     // leading words have been stable across the last STABLE_STRIDES
                     // consecutive partials.
@@ -574,7 +570,6 @@ class InferenceRepository(private val engine: SpeechEngine) {
                             }
                         }
                     }
-                    // ── End stable-chunk commit ───────────────────────────────────
                 }
             }
         }

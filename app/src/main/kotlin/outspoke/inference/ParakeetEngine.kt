@@ -10,6 +10,7 @@ import java.io.File
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.nio.LongBuffer
+import android.os.Debug
 
 private const val TAG = "ParakeetEngine"
 private const val FALLBACK_BLANK_ID = 1024
@@ -74,6 +75,11 @@ class ParakeetEngine : SpeechEngine {
      * @throws Exception (OrtException / IOException) if any model file is corrupt.
      */
     override fun load(modelDir: File) {
+        val startTime = System.currentTimeMillis()
+        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+        Log.i(TAG, "ParakeetEngine loading from ${modelDir.path}, size=${modelSizeMB}MB")
+        if (modelSizeMB > 500) Log.w(TAG, "Parakeet model is very large (${modelSizeMB}MB) - may require high RAM")
+
         check(!isLoaded) { "Already loaded; call close() before reloading" }
 
         val opts = OrtSession.SessionOptions().apply {
@@ -132,6 +138,9 @@ class ParakeetEngine : SpeechEngine {
         opts.close()
         isLoaded = true
         Log.d(TAG, "ParakeetEngine ready (modelDir=${modelDir.path})")
+        val elapsed = System.currentTimeMillis() - startTime
+        Log.i(TAG, "ParakeetEngine loaded in ${elapsed}ms")
+        logMemoryUsage()
     }
 
 
@@ -179,6 +188,7 @@ class ParakeetEngine : SpeechEngine {
         env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "ParakeetEngine closed")
+        logMemoryUsage()
     }
 
     /**
@@ -524,5 +534,14 @@ class ParakeetEngine : SpeechEngine {
             null
         }.getOrNull()
     }
-}
 
+    private fun logMemoryUsage() {
+        val runtime = Runtime.getRuntime()
+        val usedMemMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val maxMemMB = runtime.maxMemory() / (1024 * 1024)
+        Log.i(TAG, "ParakeetEngine memory: used=${usedMemMB}MB, max=${maxMemMB}MB")
+        val debugMem = Debug.MemoryInfo()
+        Debug.getMemoryInfo(debugMem)
+        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
+    }
+}

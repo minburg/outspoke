@@ -28,7 +28,7 @@ private const val CHUNK_SAMPLES = 480
  */
 private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20
 
-// ── Adaptive Gain Control (AGC) ──────────────────────────────────────────────
+// -- Adaptive Gain Control (AGC) --
 // VOICE_RECOGNITION disables hardware AGC, so raw RMS values are tiny
 // (speech ≈ 0.003–0.05, shouting ≈ 0.05–0.2 on most devices).  A fixed gain
 // can't cover the range of microphone sensitivities and room volumes, so we

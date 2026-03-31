@@ -1,10 +1,13 @@
 package dev.brgr.outspoke.inference
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
+import android.os.Build
+import android.os.Debug
 import android.os.FileObserver
 import android.os.IBinder
 import android.util.Log
@@ -94,6 +97,12 @@ class InferenceService : LifecycleService() {
             Log.w(TAG, "startForeground rejected - running as bound service without notification", e)
         }
 
+        // Log device and memory info at service startup
+        val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
+        val memInfo = ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
+        Log.i(TAG, "Service created on device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+        Log.i(TAG, "Total RAM: ${memInfo.totalMem / (1024 * 1024)} MB, Avail: ${memInfo.availMem / (1024 * 1024)} MB, LowMem: ${memInfo.lowMemory}")
+
         Log.d(TAG, "Service created - observing selected model preference")
 
         // Observe the selected model preference and reload the engine whenever it changes.
@@ -115,6 +124,7 @@ class InferenceService : LifecycleService() {
         currentEngine?.close()
         currentEngine = null
         currentRepository = null
+        logMemoryUsage()
         Log.d(TAG, "Service destroyed - engine closed")
     }
 
@@ -139,23 +149,37 @@ class InferenceService : LifecycleService() {
                 return
             }
 
+            // Log model file size and available memory before loading
+            val modelDir = ModelStorageManager.getModelDir(applicationContext, modelId)
+            val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+            val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
+            val memInfo = ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
+            Log.i(TAG, "Preparing to load model $modelId, modelDir=${modelDir.path}, size=${modelSizeMB}MB")
+            Log.i(TAG, "Available RAM: ${memInfo.availMem / (1024 * 1024)} MB, LowMem: ${memInfo.lowMemory}")
+            if (modelSizeMB > 500 && memInfo.availMem < modelSizeMB * 2 * 1024 * 1024) {
+                Log.w(TAG, "Device RAM may be insufficient for large model $modelId (model: ${modelSizeMB}MB, avail: ${memInfo.availMem / (1024 * 1024)}MB)")
+            }
+
             _engineState.value = EngineState.Loading
             updateNotification("Loading transcription engine…")
 
+            val startTime = System.currentTimeMillis()
             try {
                 val engine = SpeechEngineFactory.create(modelId)
-                val modelDir = ModelStorageManager.getModelDir(applicationContext, modelId)
                 engine.load(modelDir)
                 currentEngine = engine
                 currentRepository = InferenceRepository(engine)
                 _engineState.value = EngineState.Ready
                 updateNotification("Outspoke ready (${ModelRegistry[modelId].displayName})")
-                Log.d(TAG, "Engine loaded successfully for $modelId")
+                val elapsed = System.currentTimeMillis() - startTime
+                Log.i(TAG, "Engine loaded successfully for $modelId in ${elapsed}ms")
+                logMemoryUsage()
             } catch (e: Exception) {
                 val msg = e.localizedMessage ?: "Unknown error"
                 Log.e(TAG, "Engine load failed for $modelId: $msg", e)
                 _engineState.value = EngineState.Error(msg)
                 updateNotification("Engine failed to load: $msg")
+                logMemoryUsage()
             }
         }
     }
@@ -248,5 +272,14 @@ class InferenceService : LifecycleService() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
         nm.notify(NOTIFICATION_ID, buildNotification(text))
     }
-}
 
+    private fun logMemoryUsage() {
+        val runtime = Runtime.getRuntime()
+        val usedMemMB = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val maxMemMB = runtime.maxMemory() / (1024 * 1024)
+        Log.i(TAG, "App memory usage: used=${usedMemMB}MB, max=${maxMemMB}MB")
+        val debugMem = Debug.MemoryInfo()
+        Debug.getMemoryInfo(debugMem)
+        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
+    }
+}

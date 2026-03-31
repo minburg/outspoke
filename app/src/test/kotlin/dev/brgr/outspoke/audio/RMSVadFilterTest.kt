@@ -27,8 +27,6 @@ class RMSVadFilterTest {
 
     private fun chunk(ts: Long) = AudioChunk(ShortArray(640), timestampMs = ts)
 
-    // ── Silence ──────────────────────────────────────────────────────────────
-
     @Test
     fun `given silence, when rms stays below threshold, then empty list is returned`() {
         // Given / When
@@ -37,8 +35,6 @@ class RMSVadFilterTest {
         // Then
         assertTrue(result.isEmpty())
     }
-
-    // ── Speech onset ─────────────────────────────────────────────────────────
 
     @Test
     fun `given 15 silent chunks in lead-in, when rms crosses threshold twice, then lead-in plus triggers are returned`() {
@@ -74,8 +70,6 @@ class RMSVadFilterTest {
         assertSame(trigger2, result.last())
     }
 
-    // ── Sustained speech ─────────────────────────────────────────────────────
-
     @Test
     fun `given active speech, when rms stays above threshold, then each chunk is emitted individually`() {
         // Given – trigger speech (need two above-threshold frames)
@@ -89,8 +83,6 @@ class RMSVadFilterTest {
         assertEquals(listOf(speechChunk), result)
         assertSame(speechChunk, result.first())
     }
-
-    // ── Hangover ─────────────────────────────────────────────────────────────
 
     @Test
     fun `given active speech, when rms drops, then chunk is still emitted during hangover window`() {
@@ -132,8 +124,6 @@ class RMSVadFilterTest {
         assertEquals(listOf(recoveredChunk), recovered)
         assertSame(recoveredChunk, recovered.first())
     }
-
-    // ── Flush ─────────────────────────────────────────────────────────────────
 
     @Test
     fun `given active speech, when flush is called, then returns true and resets to silence`() {
