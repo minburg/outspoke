@@ -4,8 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +12,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.brgr.outspoke.settings.model.*
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
@@ -148,7 +147,7 @@ private fun ModelCard(
                 }
                 if (isSelected) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = MyIcons.CheckCircle,
                         contentDescription = "Active model",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp),
@@ -179,7 +178,7 @@ private fun NotDownloadedActions(onDownload: () -> Unit) {
         onClick = onDownload,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Icon(Icons.Default.Download, contentDescription = null)
+        Icon(MyIcons.Download, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text("Download")
     }
@@ -205,7 +204,7 @@ private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Icon(
-                imageVector = Icons.Default.Sync,
+                imageVector = MyIcons.Sync,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -253,7 +252,7 @@ private fun ReadyActions(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
         ) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete model")
+            Icon(MyIcons.Delete, contentDescription = "Delete model")
         }
     }
 
@@ -277,7 +276,7 @@ private fun CorruptedActions(onRetry: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
-            imageVector = Icons.Default.Error,
+            imageVector = MyIcons.Error,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(18.dp),
@@ -289,7 +288,7 @@ private fun CorruptedActions(onRetry: () -> Unit) {
             modifier = Modifier.weight(1f),
         )
         OutlinedButton(onClick = onRetry) {
-            Icon(Icons.Default.Refresh, contentDescription = null)
+            Icon(MyIcons.Refresh, contentDescription = null)
             Spacer(Modifier.width(4.dp))
             Text("Retry")
         }

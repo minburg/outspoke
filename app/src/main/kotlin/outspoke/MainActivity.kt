@@ -12,9 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 class MainActivity : ComponentActivity() {
@@ -131,7 +129,7 @@ private fun GrantedContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Filled.Mic,
+            imageVector = MyIcons.Mic,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.primary,
@@ -157,7 +155,7 @@ private fun RationaleContent(onGrant: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Filled.MicOff,
+            imageVector = MyIcons.MicOff,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error,
@@ -187,7 +185,7 @@ private fun PermanentlyDeniedContent(onOpenSettings: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Filled.MicOff,
+            imageVector = MyIcons.MicOff,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error,

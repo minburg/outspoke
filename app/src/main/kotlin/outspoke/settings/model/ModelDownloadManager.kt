@@ -85,7 +85,6 @@ class ModelDownloadManager(
                 }
 
                 val body = response.body
-                    ?: throw RuntimeException("Empty response body for ${remoteFile.filename}")
                 val totalBytes = body.contentLength()
 
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -164,7 +163,6 @@ class ModelDownloadManager(
             }
 
             val body = response.body
-                ?: throw RuntimeException("Empty response body for ZIP archive")
             val totalBytes = body.contentLength()
 
             val digest = if (source.sha256 != null) MessageDigest.getInstance("SHA-256") else null

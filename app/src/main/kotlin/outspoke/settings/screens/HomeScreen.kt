@@ -10,8 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +26,7 @@ import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.inference.InferenceService
 import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /**
@@ -111,7 +110,7 @@ private fun HomeScreenContent(
 
         // 1. IME enabled
         StatusRow(
-            icon = if (isImeEnabled) Icons.Default.Keyboard else Icons.Default.Warning,
+            icon = if (isImeEnabled) MyIcons.Keyboard else MyIcons.Warning,
             iconTint = if (isImeEnabled) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
             title = if (isImeEnabled) "Keyboard enabled" else "Keyboard not enabled",
@@ -123,7 +122,7 @@ private fun HomeScreenContent(
 
         // 2. Microphone permission
         StatusRow(
-            icon = if (hasMicPermission) Icons.Default.Mic else Icons.Default.MicOff,
+            icon = if (hasMicPermission) MyIcons.Mic else MyIcons.MicOff,
             iconTint = if (hasMicPermission) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
             title = if (hasMicPermission) "Microphone access granted"
@@ -136,7 +135,7 @@ private fun HomeScreenContent(
 
         // 3. Model downloaded - always show an action so the model screen stays reachable
         StatusRow(
-            icon = if (isModelReady) Icons.Default.CheckCircle else Icons.Default.CloudDownload,
+            icon = if (isModelReady) MyIcons.CheckCircle else MyIcons.CloudDownload,
             iconTint = if (isModelReady) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
             title = if (isModelReady) "Model ready" else "Model not downloaded",
@@ -161,7 +160,7 @@ private fun HomeScreenContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
-                imageVector = Icons.Default.Settings,
+                imageVector = MyIcons.Settings,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
@@ -267,8 +266,8 @@ private fun HomeScreenPartialSetupPreview() {
 private fun StatusRowDonePreview() {
     OutspokeTheme {
         StatusRow(
-            icon = Icons.Default.CheckCircle,
-            iconTint = androidx.compose.ui.graphics.Color.Unspecified,
+            icon = MyIcons.CheckCircle,
+            iconTint = Color.Unspecified,
             title = "Keyboard enabled",
             subtitle = "Outspoke is in the keyboard list.",
             actionLabel = "Open Settings",
@@ -282,8 +281,8 @@ private fun StatusRowDonePreview() {
 private fun StatusRowPendingPreview() {
     OutspokeTheme {
         StatusRow(
-            icon = Icons.Default.Warning,
-            iconTint = androidx.compose.ui.graphics.Color.Unspecified,
+            icon = MyIcons.Warning,
+            iconTint = Color.Unspecified,
             title = "Keyboard not enabled",
             subtitle = "Add Outspoke in system keyboard settings.",
             actionLabel = "Open Settings",

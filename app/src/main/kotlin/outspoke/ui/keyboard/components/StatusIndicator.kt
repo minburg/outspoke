@@ -9,9 +9,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /**
@@ -78,7 +76,7 @@ fun StatusIndicator(
 @Composable
 private fun IdleIndicator() {
     Icon(
-        imageVector = Icons.Filled.Mic,
+        imageVector = MyIcons.Mic,
         contentDescription = "Idle - tap the button to start dictating",
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(20.dp),
@@ -146,7 +144,7 @@ private fun ErrorIndicator(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = Icons.Filled.Warning,
+                imageVector = MyIcons.Warning,
                 contentDescription = "Error",
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp),

@@ -27,7 +27,7 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
     private val downloadManager = ModelDownloadManager()
     private val prefs = AppPreferences(application)
 
-    private val _modelStates = MutableStateFlow<Map<ModelId, ModelState>>(
+    private val _modelStates = MutableStateFlow(
         // Eagerly check on-disk state so the UI is correct on first render.
         ModelRegistry.all.associate { info ->
             info.id to if (ModelStorageManager.isModelReady(application, info)) {

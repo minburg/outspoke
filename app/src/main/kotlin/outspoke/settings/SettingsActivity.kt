@@ -6,8 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +23,7 @@ import dev.brgr.outspoke.settings.model.ModelStorageManager
 import dev.brgr.outspoke.settings.screens.HomeScreen
 import dev.brgr.outspoke.settings.screens.ModelScreen
 import dev.brgr.outspoke.settings.screens.PreferencesScreen
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
 /** Entry-point for the Outspoke companion / settings app (the launcher icon). */
@@ -74,7 +73,7 @@ private fun SettingsNavHost(navController: NavHostController) {
                     if (currentRoute != SettingsRoutes.HOME) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                imageVector = MyIcons.ArrowBack,
                                 contentDescription = "Back",
                             )
                         }

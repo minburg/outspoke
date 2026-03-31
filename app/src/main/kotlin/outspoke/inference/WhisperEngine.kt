@@ -338,7 +338,7 @@ class WhisperEngine : SpeechEngine {
             for (k in 0 until freqBins) {
                 val f = fftFreqs[k]
                 val w = when {
-                    f < lo || f > hi -> 0.0
+                    f !in lo..hi -> 0.0
                     f <= mid -> (f - lo) / (mid - lo)
                     else -> (hi - f) / (hi - mid)
                 }
@@ -377,9 +377,9 @@ class WhisperEngine : SpeechEngine {
             for (i in 0 until n step len) {
                 for (k in 0 until halfLen) {
                     val angle = angleStep * k
-                    val wr = cos(angle);
+                    val wr = cos(angle)
                     val wi = sin(angle)
-                    val ur = re[i + k];
+                    val ur = re[i + k]
                     val ui = im[i + k]
                     val vr = wr * re[i + k + halfLen] - wi * im[i + k + halfLen]
                     val vi = wr * im[i + k + halfLen] + wi * re[i + k + halfLen]

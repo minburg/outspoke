@@ -76,7 +76,7 @@ class ParakeetEngine : SpeechEngine {
      */
     override fun load(modelDir: File) {
         val startTime = System.currentTimeMillis()
-        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / (1024 * 1024)
         Log.i(TAG, "ParakeetEngine loading from ${modelDir.path}, size=${modelSizeMB}MB")
         if (modelSizeMB > 500) Log.w(TAG, "Parakeet model is very large (${modelSizeMB}MB) - may require high RAM")
 
@@ -296,7 +296,7 @@ class ParakeetEngine : SpeechEngine {
         // Encoder layout: [1, D, T]
         val encShape = encoderOut.info.shape
         val encDim = encShape[1].toInt()   // D = 1024
-        val T = encodedLength
+        val encodedLengthCopy = encodedLength
 
         val encData = FloatArray(encoderOut.floatBuffer.remaining())
         encoderOut.floatBuffer.rewind()
@@ -314,14 +314,14 @@ class ParakeetEngine : SpeechEngine {
         // blankId is a *joint output label* only - never fed into the embedding layer.
         var prevToken = 0
         var t = 0
-        var maxIter = T * 20 + 50   // global safety cap
+        var maxIter = encodedLengthCopy * 20 + 50   // global safety cap
         var tokensAtFrame = 0             // per-frame guard against duration=0 loops
-        val MAX_TOKENS_PER_FRAME = 30
-        val MAX_HYPOTHESIS = 2000     // ~20-30 s of speech at typical token rate
+        val maxTokensPerFrame = 30
+        val maxHypothesis = 2000     // ~20-30 s of speech at typical token rate
 
-        while (t < T && maxIter-- > 0 && hypothesis.size < MAX_HYPOTHESIS) {
+        while (t < encodedLengthCopy && maxIter-- > 0 && hypothesis.size < maxHypothesis) {
             // Extract one encoder frame: encoder[0, :, t] → frame shape [1, D, 1]
-            val frameData = FloatArray(encDim) { d -> encData[d * T + t] }
+            val frameData = FloatArray(encDim) { d -> encData[d * encodedLengthCopy + t] }
 
             val frameTensor = OnnxTensor.createTensor(
                 env, FloatBuffer.wrap(frameData), longArrayOf(1L, encDim.toLong(), 1L)
@@ -392,7 +392,7 @@ class ParakeetEngine : SpeechEngine {
                         if (predictedDur > 0) {
                             t += predictedDur
                             tokensAtFrame = 0
-                        } else if (tokensAtFrame >= MAX_TOKENS_PER_FRAME) {
+                        } else if (tokensAtFrame >= maxTokensPerFrame) {
                             // Safety: force advance when duration=0 emissions pile up on one frame
                             Log.w(TAG, "greedyDecode: stuck at frame $t - forcing advance")
                             t++

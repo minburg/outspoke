@@ -52,8 +52,4 @@ object ModelStorageManager {
     fun deleteModel(context: Context, modelId: ModelId) {
         getModelDir(context, modelId).deleteRecursively()
     }
-
-    /** Legacy no-arg overload - deletes the default model. */
-    fun deleteModel(context: Context): Unit =
-        deleteModel(context, ModelId.DEFAULT)
 }

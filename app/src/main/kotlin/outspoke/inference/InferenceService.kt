@@ -151,7 +151,7 @@ class InferenceService : LifecycleService() {
 
             // Log model file size and available memory before loading
             val modelDir = ModelStorageManager.getModelDir(applicationContext, modelId)
-            val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+            val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / (1024 * 1024)
             val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
             val memInfo = ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
             Log.i(TAG, "Preparing to load model $modelId, modelDir=${modelDir.path}, size=${modelSizeMB}MB")

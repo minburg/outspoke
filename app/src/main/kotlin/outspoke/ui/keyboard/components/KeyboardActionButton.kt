@@ -3,20 +3,9 @@ package dev.brgr.outspoke.ui.keyboard.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.automirrored.outlined.Backspace
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.SubdirectoryArrowLeft
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -30,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
@@ -92,27 +82,27 @@ private fun KeyboardActionButtonAllPreview() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             KeyboardActionButton(
-                icon = Icons.Filled.DeleteForever,
+                icon = MyIcons.DeleteForever,
                 contentDescription = "Delete all",
                 onClick = {},
             )
             KeyboardActionButton(
-                icon = Icons.AutoMirrored.Outlined.Backspace,
+                icon = MyIcons.BackspaceOutlined,
                 contentDescription = "Delete word",
                 onClick = {},
             )
             KeyboardActionButton(
-                icon = Icons.AutoMirrored.Filled.Backspace,
+                icon = MyIcons.Backspace,
                 contentDescription = "Delete char",
                 onClick = {},
             )
             KeyboardActionButton(
-                icon = Icons.Filled.SubdirectoryArrowLeft,
+                icon = MyIcons.SubdirectoryArrowLeft,
                 contentDescription = "Newline",
                 onClick = {},
             )
             KeyboardActionButton(
-                icon = Icons.Filled.Keyboard,
+                icon = MyIcons.Keyboard,
                 contentDescription = "Switch keyboard",
                 onClick = {},
             )
@@ -125,7 +115,7 @@ private fun KeyboardActionButtonAllPreview() {
 private fun KeyboardActionButtonDisabledPreview() {
     OutspokeKeyboardTheme {
         KeyboardActionButton(
-            icon = Icons.AutoMirrored.Filled.Backspace,
+            icon = MyIcons.Backspace,
             contentDescription = "Delete char (disabled)",
             onClick = {},
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),

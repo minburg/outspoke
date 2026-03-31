@@ -119,7 +119,7 @@ class OutspokeInputMethodService :
             keyboardViewModel.setEngineState(EngineState.Loading)
             // isBound stays true — we already held the bind and are re-establishing it.
             // BIND_AUTO_CREATE will recreate the service process and reload the engine.
-            bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
+            bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
         }
     }
 
@@ -145,7 +145,7 @@ class OutspokeInputMethodService :
             ),
         )[KeyboardViewModel::class.java]
 
-        bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
+        bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
         isBound = true
         Log.d(TAG, "InferenceService bind requested")
     }
@@ -163,7 +163,7 @@ class OutspokeInputMethodService :
         // If the timeout already fired and we unloaded, rebind now so the engine reloads.
         if (!isBound) {
             Log.d(TAG, "Keyboard shown after idle unload — rebinding InferenceService")
-            bindService(inferenceServiceIntent(), inferenceServiceConnection, Context.BIND_AUTO_CREATE)
+            bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
             isBound = true
         }
     }

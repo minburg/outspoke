@@ -2,12 +2,6 @@ package dev.brgr.outspoke.ui.keyboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.automirrored.outlined.Backspace
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.SubdirectoryArrowLeft
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -17,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.keyboard.components.*
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /**
@@ -103,7 +98,7 @@ fun KeyboardScreen(
 
                 Box(modifier = Modifier.weight(1f)) {
                     KeyboardActionButton(
-                        icon = Icons.Filled.Keyboard,
+                        icon = MyIcons.Keyboard,
                         contentDescription = "Switch keyboard",
                         onClick = onSwitchKeyboard,
                         modifier = Modifier.align(Alignment.CenterEnd),
@@ -138,14 +133,14 @@ fun KeyboardScreen(
             Box(modifier = Modifier.weight(1f)) {
                 // Far-left: delete all text (mirror of the switch-keyboard button)
                 KeyboardActionButton(
-                    icon = Icons.Filled.DeleteForever,
+                    icon = MyIcons.DeleteForever,
                     contentDescription = "Delete all text",
                     onClick = onDeleteAll,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 // Adjacent-left: delete last word
                 KeyboardActionButton(
-                    icon = Icons.AutoMirrored.Outlined.Backspace,
+                    icon = MyIcons.BackspaceOutlined,
                     contentDescription = "Delete last word",
                     onClick = onDeleteWord,
                     modifier = Modifier.align(Alignment.CenterEnd),
@@ -175,14 +170,14 @@ fun KeyboardScreen(
             Box(modifier = Modifier.weight(1f)) {
                 // Adjacent-right: delete single character
                 KeyboardActionButton(
-                    icon = Icons.AutoMirrored.Filled.Backspace,
+                    icon = MyIcons.Backspace,
                     contentDescription = "Delete character",
                     onClick = onDeleteChar,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
                 // Centre-right: insert newline
                 KeyboardActionButton(
-                    icon = Icons.Filled.SubdirectoryArrowLeft,
+                    icon = MyIcons.SubdirectoryArrowLeft,
                     contentDescription = "New line",
                     onClick = onNewline,
                     modifier = Modifier.align(Alignment.CenterEnd),

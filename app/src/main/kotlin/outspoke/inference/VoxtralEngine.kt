@@ -124,7 +124,7 @@ class VoxtralEngine : SpeechEngine {
 
     override fun load(modelDir: File) {
         val startTime = System.currentTimeMillis()
-        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum() / (1024 * 1024)
+        val modelSizeMB = modelDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / (1024 * 1024)
         Log.i(TAG, "VoxtralEngine loading from ${modelDir.path}, size=${modelSizeMB}MB")
         if (modelSizeMB > 1000) Log.w(TAG, "Voxtral model is very large (${modelSizeMB}MB) - may require high RAM")
 
@@ -341,7 +341,7 @@ class VoxtralEngine : SpeechEngine {
             for (k in 0 until freqBins) {
                 val f = fftFreqs[k]
                 val w = when {
-                    f < lo || f > hi -> 0.0
+                    f !in lo..hi -> 0.0
                     f <= mid -> (f - lo) / (mid - lo)
                     else -> (hi - f) / (hi - mid)
                 }
@@ -605,7 +605,7 @@ class VoxtralEngine : SpeechEngine {
         val hypothesis = mutableListOf<Int>()
 
         try {
-            //  Phase 1: Full-context prefill (no logits) 
+            //  Phase 1: Full-context prefill (no logits)
             val prefillInputs = mutableMapOf<String, OnnxTensor>()
             try {
                 prefillInputs[DEC_IN_INPUTS_EMBEDS] = OnnxTensor.createTensor(

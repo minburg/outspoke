@@ -12,12 +12,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -32,6 +26,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /** How many dp upward the user must drag to engage continuous mode. */
@@ -157,7 +152,7 @@ fun TalkButton(
         modifier = modifier
             .size(72.dp)
             .then(
-                if (enabled) Modifier.pointerInput(triggerMode, enabled) {
+                if (enabled) Modifier.pointerInput(triggerMode, true) {
                     val thresholdPx = CONTINUOUS_DRAG_THRESHOLD_DP * density
 
                     awaitPointerEventScope {
@@ -226,7 +221,7 @@ fun TalkButton(
                 .background(backgroundColor),
         ) {
             Icon(
-                imageVector = if (isContinuousActive) Icons.Filled.Stop else Icons.Filled.Mic,
+                imageVector = if (isContinuousActive) MyIcons.Stop else MyIcons.Mic,
                 contentDescription = when {
                     !enabled -> "Talk button disabled - engine not ready"
                     isContinuousActive -> "Stop continuous recording"
@@ -338,7 +333,7 @@ private fun LockHint(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = lockAlpha)),
         ) {
             Icon(
-                imageVector = if (dragProgress >= 0.85f) Icons.Filled.Lock else Icons.Outlined.Lock,
+                imageVector = if (dragProgress >= 0.85f) MyIcons.Lock else MyIcons.LockOutlined,
                 contentDescription = null,
                 tint = lockColor,
                 modifier = Modifier.size(40.dp),
@@ -347,7 +342,7 @@ private fun LockHint(
 
         // Upward chevron: bounces to signal the swipe-up gesture.
         Icon(
-            imageVector = Icons.Filled.KeyboardArrowUp,
+            imageVector = MyIcons.KeyboardArrowUp,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
             modifier = Modifier

@@ -45,6 +45,8 @@ class TranscriptResultTest {
         val final = TranscriptResult.Final("hello")
 
         // When / Then
+        // Partial and Final are different types, so they should not be equal even if their text is the same.
+        @Suppress("AssertBetweenInconvertibleTypes")
         assertNotEquals(partial, final)
     }
 

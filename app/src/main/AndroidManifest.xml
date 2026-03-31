@@ -20,7 +20,6 @@
         <activity
                 android:name=".settings.SettingsActivity"
                 android:exported="true"
-                android:label="@string/app_name"
                 android:theme="@style/Theme.Outspoke">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -52,7 +51,12 @@
         <service
                 android:name=".inference.InferenceService"
                 android:foregroundServiceType="microphone"
-                android:exported="false"/>
+                android:exported="false">
+            <!-- Android 14+ foreground service type justification -->
+            <meta-data
+                android:name="android.app.foregroundServiceType.microphone.justification"
+                android:value="Required for real-time speech recognition and transcription." />
+        </service>
 
     </application>
 

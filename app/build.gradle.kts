@@ -23,6 +23,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -42,7 +43,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
         }
     }
@@ -82,9 +83,8 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.03.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+//    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
@@ -97,6 +97,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.03.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
