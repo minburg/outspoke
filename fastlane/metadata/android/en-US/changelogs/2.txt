@@ -1,0 +1,4 @@
+First patch (v0.1.1).
+
+Model downloads now continue in the background even when you switch apps or navigate away. Downloads are also resumable, if your connection drops or you switch between mobile data and wifi, the download picks up where it left off without redownloading. A warning is shown before downloading over mobile data.
+

@@ -1,5 +1,8 @@
 package dev.brgr.outspoke.settings.screens
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -163,7 +167,7 @@ private fun ModelCard(
 
             // State-specific actions
             when (state) {
-                is ModelState.NotDownloaded -> NotDownloadedActions(onDownload)
+                is ModelState.NotDownloaded -> NotDownloadedActions(modelInfo, onDownload)
                 is ModelState.Downloading -> DownloadingActions(state.progressFraction, onCancel)
                 is ModelState.Ready -> ReadyActions(isSelected, onSelect, onDelete)
                 is ModelState.Corrupted -> CorruptedActions(onRetry)
@@ -173,15 +177,74 @@ private fun ModelCard(
 }
 
 @Composable
-private fun NotDownloadedActions(onDownload: () -> Unit) {
+private fun NotDownloadedActions(modelInfo: ModelInfo, onDownload: () -> Unit) {
+    val context = LocalContext.current
+    var showMobileDataDialog by remember { mutableStateOf(false) }
+
     Button(
-        onClick = onDownload,
+        onClick = {
+            if (context.isOnMobileData()) {
+                showMobileDataDialog = true
+            } else {
+                onDownload()
+            }
+        },
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(MyIcons.Download, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text("Download")
     }
+
+    if (showMobileDataDialog) {
+        MobileDataWarningDialog(
+            sizeMb = modelInfo.approximateSizeMb,
+            onConfirm = {
+                showMobileDataDialog = false
+                onDownload()
+            },
+            onDismiss = { showMobileDataDialog = false },
+        )
+    }
+}
+
+/** Returns `true` when the device is connected via cellular but not Wi-Fi. */
+private fun Context.isOnMobileData(): Boolean {
+    val cm = getSystemService(ConnectivityManager::class.java) ?: return false
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) &&
+            !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+}
+
+@Composable
+private fun MobileDataWarningDialog(
+    sizeMb: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = MyIcons.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text("Download over mobile data?") },
+        text = {
+            Text(
+                "This model is ~$sizeMb MB. Downloading now will use your mobile data. " +
+                        "Connect to Wi-Fi to avoid unexpected charges.",
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text("Download anyway") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
@@ -423,7 +486,7 @@ private fun ModelCardCorruptedPreview() {
 @Preview(showBackground = true, name = "Action · Not Downloaded")
 @Composable
 private fun NotDownloadedActionsPreview() {
-    OutspokeTheme { NotDownloadedActions(onDownload = {}) }
+    OutspokeTheme { NotDownloadedActions(modelInfo = previewModelSmall, onDownload = {}) }
 }
 
 @Preview(showBackground = true, name = "Action · Downloading 70%")

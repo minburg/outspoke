@@ -6,7 +6,9 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
             android:allowBackup="true"
@@ -56,6 +58,17 @@
             <meta-data
                 android:name="android.app.foregroundServiceType.microphone.justification"
                 android:value="Required for real-time speech recognition and transcription." />
+        </service>
+
+        <!-- Foreground service that manages model file downloads in the background -->
+        <service
+                android:name=".settings.model.DownloadService"
+                android:foregroundServiceType="dataSync"
+                android:exported="false">
+            <!-- Android 14+ foreground service type justification -->
+            <meta-data
+                    android:name="android.app.foregroundServiceType.dataSync.justification"
+                    android:value="Required for downloading speech recognition model files in the background." />
         </service>
 
     </application>
