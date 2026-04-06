@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.components.*
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
@@ -42,6 +43,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * @param onNewline              Insert a newline at the current cursor position.
  * @param onSwitchKeyboard       Switches the active IME back to the previous keyboard.
  * @param onOpenCompanionApp     Opens the Outspoke companion app (e.g. to grant permission or download the model).
+ * @param diagnostics            Pipeline counters from the most recent recording session.
  */
 @Composable
 fun KeyboardScreen(
@@ -62,6 +64,7 @@ fun KeyboardScreen(
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
     modifier: Modifier = Modifier,
+    diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     previewForceLockHint: Boolean = false,
 ) {
     Column(
@@ -92,6 +95,7 @@ fun KeyboardScreen(
 
                 StatusIndicator(
                     uiState = uiState,
+                    diagnostics = diagnostics,
                     onOpenCompanionApp = onOpenCompanionApp,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -204,6 +208,7 @@ fun KeyboardScreen(
     val triggerMode by viewModel.triggerMode.collectAsState()
     val isWhisperEngine by viewModel.isWhisperEngine.collectAsState()
     val whisperLanguage by viewModel.whisperLanguage.collectAsState()
+    val diagnostics by viewModel.diagnostics.collectAsState()
 
     KeyboardScreen(
         uiState = uiState,
@@ -222,6 +227,7 @@ fun KeyboardScreen(
         onNewline = viewModel::newline,
         onSwitchKeyboard = onSwitchKeyboard,
         onOpenCompanionApp = onOpenCompanionApp,
+        diagnostics = diagnostics,
     )
 }
 

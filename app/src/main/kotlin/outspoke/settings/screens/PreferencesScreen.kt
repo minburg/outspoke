@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -23,12 +24,18 @@ fun PreferencesScreen(
 ) {
     val triggerMode by viewModel.triggerMode.collectAsState()
     val vadSensitivity by viewModel.vadSensitivity.collectAsState()
+    val postprocessingEnabled by viewModel.postprocessingEnabled.collectAsState()
+    val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
 
     PreferencesContent(
         triggerMode = triggerMode,
         vadSensitivity = vadSensitivity,
+        postprocessingEnabled = postprocessingEnabled,
+        showPipelineDiagnostics = showPipelineDiagnostics,
         onTriggerModeChange = viewModel::setTriggerMode,
         onVadSensitivityChange = viewModel::setVadSensitivity,
+        onPostprocessingChange = viewModel::setPostprocessingEnabled,
+        onShowPipelineDiagnosticsChange = viewModel::setShowPipelineDiagnostics,
     )
 }
 
@@ -37,8 +44,12 @@ fun PreferencesScreen(
 private fun PreferencesContent(
     triggerMode: String,
     vadSensitivity: Float,
+    postprocessingEnabled: Boolean,
+    showPipelineDiagnostics: Boolean,
     onTriggerModeChange: (String) -> Unit,
     onVadSensitivityChange: (Float) -> Unit,
+    onPostprocessingChange: (Boolean) -> Unit,
+    onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -110,6 +121,69 @@ private fun PreferencesContent(
                 Text("Aggressive", style = MaterialTheme.typography.labelSmall)
             }
         }
+
+        HorizontalDivider()
+
+        // Post-processing toggle - lets users bypass filler/repetition cleaning for debugging.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Transcript Post-Processing",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Removes filler words (uh, um, hmm), collapses stutters, and cleans up " +
+                        "repeated phrases the model sometimes hallucinates. " +
+                        "Disable to receive the exact raw model output - useful for diagnosing " +
+                        "whether cleaning is responsible for dropped or altered words.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (postprocessingEnabled) "Enabled" else "Disabled (raw output)",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(
+                    checked = postprocessingEnabled,
+                    onCheckedChange = onPostprocessingChange,
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        // Pipeline diagnostics toggle - shows a live summary badge on the keyboard.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Pipeline Diagnostics",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Shows a live badge on the keyboard with counters for window trims, " +
+                        "alignment recoveries, and discarded blank strides. " +
+                        "Useful for diagnosing pipeline issues; off by default.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (showPipelineDiagnostics) "Visible" else "Hidden",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(
+                    checked = showPipelineDiagnostics,
+                    onCheckedChange = onShowPipelineDiagnosticsChange,
+                )
+            }
+        }
     }
 }
 
@@ -121,8 +195,12 @@ private fun PreferencesHoldVadOffPreview() {
         PreferencesContent(
             triggerMode = "HOLD",
             vadSensitivity = 0f,
+            postprocessingEnabled = true,
+            showPipelineDiagnostics = false,
             onTriggerModeChange = {},
             onVadSensitivityChange = {},
+            onPostprocessingChange = {},
+            onShowPipelineDiagnosticsChange = {},
         )
     }
 }
@@ -134,8 +212,12 @@ private fun PreferencesTapToggleHighVadPreview() {
         PreferencesContent(
             triggerMode = "TAP_TOGGLE",
             vadSensitivity = 0.6f,
+            postprocessingEnabled = false,
+            showPipelineDiagnostics = true,
             onTriggerModeChange = {},
             onVadSensitivityChange = {},
+            onPostprocessingChange = {},
+            onShowPipelineDiagnosticsChange = {},
         )
     }
 }

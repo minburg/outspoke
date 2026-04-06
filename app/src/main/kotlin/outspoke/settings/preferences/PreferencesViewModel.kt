@@ -31,5 +31,25 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     fun setVadSensitivity(value: Float) {
         viewModelScope.launch { prefs.setVadSensitivity(value) }
     }
+
+    val postprocessingEnabled: StateFlow<Boolean> = prefs.postprocessingEnabled.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = true,
+    )
+
+    fun setPostprocessingEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setPostprocessingEnabled(enabled) }
+    }
+
+    val showPipelineDiagnostics: StateFlow<Boolean> = prefs.showPipelineDiagnostics.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
+    fun setShowPipelineDiagnostics(enabled: Boolean) {
+        viewModelScope.launch { prefs.setShowPipelineDiagnostics(enabled) }
+    }
 }
 

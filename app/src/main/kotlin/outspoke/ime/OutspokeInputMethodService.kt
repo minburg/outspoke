@@ -280,6 +280,47 @@ class OutspokeInputMethodService :
         Log.d(TAG, "onStartInput - engine: ${inferenceBinder?.getEngineState()?.value}")
     }
 
+    /**
+     * Detects when the focused text field is cleared externally - the primary signal for
+     * "the user pressed Send and the app wiped the EditText".
+     *
+     * Most messaging and chat apps clear the field in-place without triggering
+     * [onFinishInput] / [onStartInput], so this callback is the only reliable hook.
+     *
+     * Strategy: the update is only interesting when the cursor moves to (0, 0).  We then
+     * do a cheap two-byte IPC read to confirm the field is genuinely empty (as opposed to
+     * the user merely clicking at the very start of a non-empty field).  If it is empty we
+     * forward to [KeyboardViewModel.onFieldCleared], which resets [TextInjector] alignment
+     * state and, if recording is active, restarts the capture with a fresh audio window.
+     */
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(
+            oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd
+        )
+
+        // Fast-path exit: the vast majority of selection updates have newSelStart > 0
+        // (cursor after injected text, user tapped elsewhere, etc.).  Skip the IPC calls
+        // unless the cursor landed at position 0.
+        if (newSelStart != 0 || newSelEnd != 0) return
+
+        // Also skip if the selection was already at (0,0) - no meaningful change occurred.
+        if (oldSelStart == 0 && oldSelEnd == 0) return
+
+        // Confirm the field is truly empty (cursor at 0 can also mean the user tapped at
+        // the beginning of a non-empty field).
+        val connection = currentInputConnection ?: return
+        val before = connection.getTextBeforeCursor(1, 0)
+        val after = connection.getTextAfterCursor(1, 0)
+        if (before != null && before.isEmpty() && after != null && after.isEmpty()) {
+            Log.d(TAG, "onUpdateSelection: field cleared externally → onFieldCleared")
+            keyboardViewModel.onFieldCleared()
+        }
+    }
+
     override fun onFinishInput() {
         super.onFinishInput()
         keyboardViewModel.commitPartialAndStop()

@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.brgr.outspoke"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
         versionCode = 2
         versionName = "0.1.1"
@@ -98,6 +98,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.10.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.assertj:assertj-core:3.25.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")

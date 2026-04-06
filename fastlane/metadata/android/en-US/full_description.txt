@@ -12,7 +12,7 @@ All transcription happens entirely on your device using the NVIDIA Parakeet ASR 
 
 <b>Requirements</b>
 
-• Android 13 (API 33) or higher
+• Android 11 (API 30) or higher
 • ~700 MB free storage for the model file
 
 <b>Open Source</b>

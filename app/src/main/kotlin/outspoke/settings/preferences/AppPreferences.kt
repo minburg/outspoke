@@ -3,6 +3,7 @@ package dev.brgr.outspoke.settings.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -73,5 +74,37 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setWhisperLanguage(tag: String) {
         context.dataStore.edit { prefs -> prefs[keyWhisperLanguage] = tag }
+    }
+
+    private val keyPostprocessingEnabled = booleanPreferencesKey("postprocessing_enabled")
+
+    /**
+     * When `true` (default) the transcript post-processing pipeline is active:
+     * filler words are removed, stutters collapsed, repeated phrases deduplicated,
+     * and sentence capitalisation enforced.
+     *
+     * Set to `false` to receive the raw model output unchanged - useful for debugging
+     * whether cleaning is responsible for dropped or altered words.
+     */
+    val postprocessingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyPostprocessingEnabled] ?: true
+    }
+
+    suspend fun setPostprocessingEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyPostprocessingEnabled] = enabled }
+    }
+
+    private val keyShowPipelineDiagnostics = booleanPreferencesKey("show_pipeline_diagnostics")
+
+    /**
+     * When `true`, the keyboard UI displays a live [PipelineDiagnostics] summary badge.
+     * Defaults to `false` - hidden by default to keep the UI clean.
+     */
+    val showPipelineDiagnostics: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyShowPipelineDiagnostics] ?: false
+    }
+
+    suspend fun setShowPipelineDiagnostics(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyShowPipelineDiagnostics] = enabled }
     }
 }

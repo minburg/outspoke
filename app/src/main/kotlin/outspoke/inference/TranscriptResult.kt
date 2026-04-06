@@ -17,5 +17,16 @@ sealed class TranscriptResult {
 
     /** Inference failed. [cause] carries the underlying exception for logging/display. */
     data class Failure(val cause: Throwable) : TranscriptResult()
+
+    /**
+     * The rolling audio window was trimmed to prevent attention drift.
+     *
+     * [TextInjector] must call [resetAfterTrim][dev.brgr.outspoke.ime.TextInjector.resetAfterTrim]
+     * when it receives this so that its committed-word tracking is shrunk to the words most
+     * likely to still be inside the retained tail audio.  Without this, the suffix-overlap
+     * alignment in [setPartial][dev.brgr.outspoke.ime.TextInjector.setPartial] fails for
+     * every stride after the trim and middle sentences are silently dropped.
+     */
+    data object WindowTrimmed : TranscriptResult()
 }
 

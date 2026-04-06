@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
@@ -32,13 +33,17 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 /**
  * Crossfades between six distinct visual states driven by [uiState].
  *
- * - [KeyboardUiState.Idle]          → small grey mic icon
+ * - [KeyboardUiState.Idle]          → small grey mic icon (+ diagnostics badge if non-clean)
  * - [KeyboardUiState.Listening]     → pulsing filled circle (accent colour)
  * - [KeyboardUiState.Processing]    → spinner + partial transcript text
  * - [KeyboardUiState.Transcribing]  → spinner + "Transcribing…" label (mic off, engine busy)
  * - [KeyboardUiState.Error]         → warning icon + error message + "Open Outspoke" action
  * - [KeyboardUiState.EngineLoading] → spinner + loading message + "Open Outspoke" action
  *
+ * @param diagnostics Pipeline counters from the most recent recording session. When non-clean
+ *                    a compact summary (e.g. "2T · 1R") is shown next to the idle mic icon,
+ *                    giving immediate visibility into whether any trims or alignment recoveries
+ *                    fired - without opening logcat.
  * @param onOpenCompanionApp Called when the user taps the "Open Outspoke" action button shown
  *                           in [KeyboardUiState.Error] and [KeyboardUiState.EngineLoading] states.
  */
@@ -46,6 +51,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 fun StatusIndicator(
     uiState: KeyboardUiState,
     modifier: Modifier = Modifier,
+    diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     onOpenCompanionApp: (() -> Unit)? = null,
 ) {
     AnimatedContent(
@@ -56,7 +62,7 @@ fun StatusIndicator(
         modifier = modifier,
     ) { state ->
         when (state) {
-            is KeyboardUiState.Idle -> IdleIndicator()
+            is KeyboardUiState.Idle -> IdleIndicator(diagnostics = diagnostics)
             is KeyboardUiState.Listening -> ListeningIndicator()
             is KeyboardUiState.Processing -> ProcessingIndicator(partial = state.partial)
             is KeyboardUiState.Transcribing -> TranscribingIndicator()
@@ -73,14 +79,34 @@ fun StatusIndicator(
     }
 }
 
+/**
+ * Idle state: mic icon + optional diagnostics badge.
+ *
+ * When [diagnostics] is clean (all counters zero) only the mic icon is shown - the UI
+ * looks exactly as before.  When any counter is non-zero a compact summary appears next
+ * to the icon (e.g. "2T · 1R") as a subtle hint that something noteworthy happened
+ * during the last recording.  The badge uses [MaterialTheme.colorScheme.tertiary] to
+ * stay visible but not alarming.
+ */
 @Composable
-private fun IdleIndicator() {
-    Icon(
-        imageVector = MyIcons.Mic,
-        contentDescription = "Idle - tap the button to start dictating",
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(20.dp),
-    )
+private fun IdleIndicator(diagnostics: PipelineDiagnostics = PipelineDiagnostics()) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = MyIcons.Mic,
+            contentDescription = "Idle - tap the button to start dictating",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        if (!diagnostics.isClean) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = diagnostics.summary(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 @Composable

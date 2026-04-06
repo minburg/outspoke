@@ -8,6 +8,7 @@ import dev.brgr.outspoke.audio.AudioCaptureManager
 import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
+import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.inference.TranscriptResult
 import dev.brgr.outspoke.settings.preferences.AppPreferences
 import dev.brgr.outspoke.ui.keyboard.components.WHISPER_LANGUAGE_OPTIONS
@@ -64,6 +65,26 @@ class KeyboardViewModel(
      */
     val whisperLanguage: StateFlow<String> = appPreferences.whisperLanguage
         .stateIn(viewModelScope, SharingStarted.Eagerly, "auto")
+
+    /**
+     * `true` when the transcript post-processing pipeline (filler removal, stutter collapse,
+     * repetition deduplication, capitalisation) is active.  Defaults to `true`.
+     * Collected eagerly so the live value is always available when recording starts.
+     */
+    val postprocessingEnabled: StateFlow<Boolean> = appPreferences.postprocessingEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Pipeline diagnostic counters for the current or most recent recording session.
+     *
+     * Updated live during recording and kept visible after the session ends so the user
+     * can glance at the keyboard status bar to see if anything unusual happened (trims,
+     * alignment recoveries, blanks discarded) without needing logcat.
+     *
+     * Reset at the start of each new recording in [onRecordStart].
+     */
+    private val _diagnostics = MutableStateFlow(PipelineDiagnostics())
+    val diagnostics: StateFlow<PipelineDiagnostics> = _diagnostics.asStateFlow()
 
     /**
      * Persists [tag] to preferences and immediately forwards it to the loaded engine.
@@ -172,8 +193,17 @@ class KeyboardViewModel(
 
         captureJob?.cancel()
         _uiState.value = KeyboardUiState.Listening
+        _diagnostics.value = PipelineDiagnostics()
 
         captureJob = viewModelScope.launch {
+            // Capture this coroutine's Job reference so the collect lambda can detect
+            // whether it belongs to the currently active session.  If onRecordStart() is
+            // called again (e.g. from onFieldCleared after a "Send"), captureJob is
+            // replaced with the new job; any collect callbacks still queued from the OLD
+            // job see captureJob != myJob and return immediately - preventing stale
+            // partial results from bleeding into the fresh TextInjector state.
+            val myJob = coroutineContext[Job]
+
             try {
                 val repo = inferenceRepository
                 if (repo == null) {
@@ -188,12 +218,27 @@ class KeyboardViewModel(
 
                 // Pipe audio through the inference engine on Dispatchers.Default.
                 // TranscriptResult emissions drive both the UI and text injection.
-                repo.transcribe(audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f))
-                    .collect { result ->
+                repo.transcribe(
+                    audio = audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f),
+                    postprocessingEnabled = postprocessingEnabled.value,
+                ).collect { result ->
+                        // Stale-session guard: if this job has been superseded (e.g. the field
+                        // was cleared and a new session started), discard this result entirely
+                        // so no old-session text is injected into the fresh TextInjector.
+                        if (captureJob != null && captureJob != myJob) return@collect
+
                         when (result) {
                             is TranscriptResult.Partial -> {
                                 _uiState.value = KeyboardUiState.Processing(result.text)
                                 textInjector?.setPartial(result.text)
+                                // Update alignment recovery counter from the injector.
+                                val injector = textInjector
+                                if (injector != null) {
+                                    val d = _diagnostics.value
+                                    if (injector.alignmentRecoveryCount > d.alignmentRecoveries) {
+                                        _diagnostics.value = d.copy(alignmentRecoveries = injector.alignmentRecoveryCount)
+                                    }
+                                }
                             }
 
                             is TranscriptResult.Final -> {
@@ -209,6 +254,16 @@ class KeyboardViewModel(
                                 _isContinuousMode.value = false
                                 _uiState.value = KeyboardUiState.Error(
                                     "Transcription failed: ${result.cause.message}"
+                                )
+                            }
+
+                            // The audio window was trimmed: shrink committedWords so the
+                            // next partial can re-anchor without losing middle sentences.
+                            is TranscriptResult.WindowTrimmed -> {
+                                Log.d(TAG, "WindowTrimmed - resetting TextInjector alignment")
+                                textInjector?.resetAfterTrim()
+                                _diagnostics.value = _diagnostics.value.copy(
+                                    windowTrims = _diagnostics.value.windowTrims + 1
                                 )
                             }
                         }
@@ -267,6 +322,61 @@ class KeyboardViewModel(
             _uiState.value is KeyboardUiState.Processing
         ) {
             _uiState.value = KeyboardUiState.Transcribing
+        }
+    }
+
+    /**
+     * Called when the focused text field is cleared externally - typically because the user
+     * pressed "Send" in a messaging app and the app cleared the [EditText] content.
+     *
+     * Resets [TextInjector] session state so the next recording does not try to align
+     * against stale committed-word tracking that no longer matches the now-empty field.
+     *
+     * If a recording is actively in progress ([KeyboardUiState.Listening] /
+     * [KeyboardUiState.Processing]), the capture job is cancelled and immediately restarted
+     * with a fresh audio window - so the user continues dictating from a clean slate without
+     * needing to toggle the talk button.  [isContinuousMode] is intentionally preserved so
+     * the button stays active in continuous mode across the field-clear event.
+     *
+     * If the engine is still running its final inference pass ([KeyboardUiState.Transcribing]),
+     * the job is cancelled (the result is no longer useful for the emptied field) and the
+     * UI resets to [KeyboardUiState.Idle].
+     */
+    fun onFieldCleared() {
+        Log.d(TAG, "onFieldCleared - resetting TextInjector and restarting audio if recording")
+
+        // Always clear TextInjector state - stale committedWords would cause alignment
+        // failures and potential duplication on the very next partial injection.
+        textInjector?.clear()
+
+        val isActivelyRecording = _uiState.value is KeyboardUiState.Listening ||
+                _uiState.value is KeyboardUiState.Processing
+        val hasInferenceRunning = _uiState.value is KeyboardUiState.Transcribing
+
+        when {
+            isActivelyRecording -> {
+                // Explicitly stop the current audio capture so the old AudioRecord
+                // stops feeding chunks into the channel buffer immediately - without
+                // this, the old capture can keep producing audio for up to one read
+                // cycle (~30 ms) after captureJob.cancel(), and those samples would
+                // end up in the new session's rolling window via the Channel.UNLIMITED
+                // buffer if the old flow hadn't been cancelled yet.
+                audioCaptureManager.stopCapture()
+                // onRecordStart() cancels the existing captureJob internally, which
+                // discards the rolling audio window, and starts a fresh one.
+                // _isContinuousMode is NOT touched so the button stays active.
+                onRecordStart()
+            }
+
+            hasInferenceRunning -> {
+                // Mic is already off but the final inference is still running.
+                // The result is no longer needed (field was just cleared), so cancel it.
+                captureJob?.cancel()
+                captureJob = null
+                _isContinuousMode.value = false
+                _uiState.value = KeyboardUiState.Idle
+            }
+            // Idle / Error / Loading - TextInjector clear above is sufficient.
         }
     }
 

@@ -23,7 +23,7 @@ Description: |-
   The model file (~700 MB) is downloaded once over the internet and stored
   locally; the keyboard then works fully offline.
 
-  Requires Android 13 (API 33) or higher.
+  Requires Android 11 (API 30) or higher.
 
 AntiFeatures:
   NonFreeNet:
