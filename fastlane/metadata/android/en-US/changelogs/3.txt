@@ -1,0 +1,4 @@
+Second patch (v0.1.2).
+
+Transcription has been made more robust and reliable, with fixes for issues that could occur with very long recordings. The app now supports devices running Android 10 and above (previously Android 13+). A diagnostics toggle has been added to the preferences screen.
+
