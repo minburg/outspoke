@@ -5,6 +5,9 @@
   <img src="fastlane/metadata/android/en-US/images/featureGraphic.png" alt="Screenshot 1" width="500" />
 </p>
 
+| [<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroidButtonGreyBorder_nofont.png" alt="Get it at IzzyOnDroid" height="60">](https://apt.izzysoft.de/packages/dev.brgr.outspoke) | [<img src="https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/dev.brgr.outspoke&label=IzzyOnDroid" alt="Get it at IzzyOnDroid" height="30">](https://apt.izzysoft.de/packages/dev.brgr.outspoke) |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
 A privacy-focused speech-to-text keyboard(IME) for Android. Speech recognition runs entirely on-device - no internet needed after the initial model download, no account, no data leaving your phone.
 
 It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference. Voice activity detection uses [Silero VAD v4](https://github.com/snakers4/silero-vad) (also ONNX, also fully on-device) to suppress silence before it ever reaches the ASR model.
