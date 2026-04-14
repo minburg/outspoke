@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.brgr.outspoke.audio.AudioCaptureManager
+import dev.brgr.outspoke.ime.EnterAction
 import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
@@ -29,7 +30,7 @@ class KeyboardViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<KeyboardUiState>(
-        KeyboardUiState.EngineLoading("Loading transcription engine…")
+        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting)
     )
     val uiState: StateFlow<KeyboardUiState> = _uiState.asStateFlow()
 
@@ -87,12 +88,33 @@ class KeyboardViewModel(
     val diagnostics: StateFlow<PipelineDiagnostics> = _diagnostics.asStateFlow()
 
     /**
+     * Whether the pipeline diagnostics badge is visible on the keyboard.
+     * Collected eagerly so the UI always reflects the saved preference on first draw.
+     */
+    val showPipelineDiagnostics: StateFlow<Boolean> = appPreferences.showPipelineDiagnostics
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
      * Persists [tag] to preferences and immediately forwards it to the loaded engine.
      * Safe to call at any time - the engine's [setLanguage] is thread-safe.
      */
     fun setWhisperLanguage(tag: String) {
         inferenceRepository?.setLanguage(tag)
         viewModelScope.launch { appPreferences.setWhisperLanguage(tag) }
+    }
+
+    /**
+     * Whether the first-run keyboard tutorial should currently be visible.
+     * Resolves to `true` on the very first keyboard opening and `false` permanently
+     * after [dismissTutorial] is called.
+     */
+    val showTutorial: StateFlow<Boolean> = appPreferences.keyboardTutorialShown
+        .map { shown -> !shown }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Persists the tutorial as seen so it is never shown again. */
+    fun dismissTutorial() {
+        viewModelScope.launch { appPreferences.setKeyboardTutorialShown(true) }
     }
 
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Unloaded)
@@ -102,11 +124,11 @@ class KeyboardViewModel(
         _engineState.value = state
         when (state) {
             EngineState.Unloaded -> _uiState.value = KeyboardUiState.EngineLoading(
-                "Model not downloaded - open Outspoke to download"
+                KeyboardUiState.LoadingReason.ModelNotDownloaded
             )
 
             EngineState.Loading -> _uiState.value = KeyboardUiState.EngineLoading(
-                "Loading transcription engine…"
+                KeyboardUiState.LoadingReason.EngineStarting
             )
 
             EngineState.Ready -> {
@@ -117,7 +139,8 @@ class KeyboardViewModel(
             }
 
             is EngineState.Error -> _uiState.value = KeyboardUiState.Error(
-                "Engine failed to load: ${state.message}"
+                reason = KeyboardUiState.ErrorReason.EngineLoadFailed,
+                detail = state.message,
             )
         }
     }
@@ -139,8 +162,17 @@ class KeyboardViewModel(
 
     private var textInjector: TextInjector? = null
 
+    private val _enterAction = MutableStateFlow(EnterAction.DONE)
+
+    /**
+     * The context-aware action the Enter key should perform for the currently focused editor.
+     * Updated each time [setTextInjector] is called (i.e. on every [onStartInput]).
+     */
+    val enterAction: StateFlow<EnterAction> = _enterAction.asStateFlow()
+
     fun setTextInjector(injector: TextInjector?) {
         textInjector = injector
+        _enterAction.value = injector?.enterAction ?: EnterAction.DONE
     }
 
     private val _isContinuousMode = MutableStateFlow(false)
@@ -177,6 +209,15 @@ class KeyboardViewModel(
     /** Insert a newline at the current cursor position, replacing any active selection. */
     fun newline() {
         textInjector?.sendNewline()
+    }
+
+    /**
+     * Perform the context-aware Enter action for the currently focused editor.
+     * Inserts a newline for multi-line fields; otherwise triggers the editor's IME action
+     * (search, send, go, done, next) via [InputConnection.performEditorAction].
+     */
+    fun performEnterAction() {
+        textInjector?.performEnterAction()
     }
 
     private var captureJob: Job? = null
@@ -253,15 +294,17 @@ class KeyboardViewModel(
                                 Log.e(TAG, "Transcription failure", result.cause)
                                 _isContinuousMode.value = false
                                 _uiState.value = KeyboardUiState.Error(
-                                    "Transcription failed: ${result.cause.message}"
+                                    reason = KeyboardUiState.ErrorReason.TranscriptionFailed,
+                                    detail = result.cause.message,
                                 )
                             }
 
                             // The audio window was trimmed: shrink committedWords so the
                             // next partial can re-anchor without losing middle sentences.
                             is TranscriptResult.WindowTrimmed -> {
-                                Log.d(TAG, "WindowTrimmed - resetting TextInjector alignment")
-                                textInjector?.resetAfterTrim()
+                                Log.d(TAG, "WindowTrimmed - resetting TextInjector alignment" +
+                                        if (result.stableWords.isNotEmpty()) " (stableWords=${result.stableWords.size}w)" else "")
+                                textInjector?.resetAfterTrim(result.stableWords)
                                 _diagnostics.value = _diagnostics.value.copy(
                                     windowTrims = _diagnostics.value.windowTrims + 1
                                 )
@@ -286,18 +329,22 @@ class KeyboardViewModel(
                 Log.e(TAG, "Microphone permission denied", e)
                 _isContinuousMode.value = false
                 _uiState.value = KeyboardUiState.Error(
-                    "Microphone permission denied - open Outspoke to grant it"
+                    reason = KeyboardUiState.ErrorReason.MicPermissionDenied,
                 )
             } catch (e: IllegalStateException) {
                 Log.e(TAG, "AudioRecord failed to initialise", e)
                 _isContinuousMode.value = false
                 _uiState.value = KeyboardUiState.Error(
-                    "Could not open the microphone: ${e.message}"
+                    reason = KeyboardUiState.ErrorReason.MicInitFailed,
+                    detail = e.message,
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected audio capture error", e)
                 _isContinuousMode.value = false
-                _uiState.value = KeyboardUiState.Error("Audio capture failed: ${e.message}")
+                _uiState.value = KeyboardUiState.Error(
+                    reason = KeyboardUiState.ErrorReason.AudioCaptureFailed,
+                    detail = e.message,
+                )
             }
         }
     }

@@ -17,7 +17,7 @@ interface SpeechEngine {
 
     /**
      * Initialises all inference sessions from [modelDir].
-     * Must be called on a background thread - loading takes 1–3 s on first run.
+     * Must be called on a background thread - loading takes 1-3 s on first run.
      *
      * @throws IllegalStateException if called while already loaded.
      * @throws Exception if any required model file is missing or corrupt.
@@ -47,7 +47,7 @@ interface SpeechEngine {
      *
      * When [tags] is non-empty and the active language is `"auto"`, the engine will only
      * consider these languages during detection instead of the full ~100-language vocabulary.
-     * This dramatically improves reliability when the user only ever speaks 2–4 languages:
+     * This dramatically improves reliability when the user only ever speaks 2-4 languages:
      * the model's cross-attention correctly encodes the language; the constraint just stops
      * it picking an adjacent token (e.g. Spanish = 50262) over the intended one (English = 50259)
      * due to a tiny logit difference on short clips.

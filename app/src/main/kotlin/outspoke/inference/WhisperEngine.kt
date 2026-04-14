@@ -423,7 +423,7 @@ class WhisperEngine : SpeechEngine {
      * argmaxes over the language token range to detect the spoken language.
      *
      * Language tokens occupy the contiguous range `[tokenEnglish, tokenTranscribe - 2]`
-     * (50259–50357 for large-v3 / large-v3-turbo; 99 languages total).
+     * (50259-50357 for large-v3 / large-v3-turbo; 99 languages total).
      *
      * @param candidateTokenIds When non-empty, the argmax is restricted to only these token
      *                          IDs.  Passing a small set (e.g. EN + DE + ES) makes detection
@@ -512,7 +512,7 @@ class WhisperEngine : SpeechEngine {
      *
      * **Language detection** (pre-pass):
      * Feeds `[SOT]` with an empty KV cache and argmaxes over the language token range
-     * (50259–50357) to auto-detect the spoken language.  The KV cache from this pass
+     * (50259-50357) to auto-detect the spoken language.  The KV cache from this pass
      * is discarded immediately - it is only ~1 token, so the cost is negligible compared
      * to the encoder.
      *

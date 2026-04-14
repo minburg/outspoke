@@ -12,9 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.model.*
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
@@ -71,13 +73,12 @@ private fun ModelListContent(
     ) {
         item {
             Text(
-                text = "Speech Recognition Models",
+                text = stringResource(R.string.model_screen_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Download a model and tap \"Set as Active\" to use it for transcription. " +
-                        "Only one model is loaded at a time.",
+                text = stringResource(R.string.model_screen_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -144,7 +145,7 @@ private fun ModelCard(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "~${modelInfo.approximateSizeMb} MB",
+                        text = stringResource(R.string.model_size_format, modelInfo.approximateSizeMb),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -152,7 +153,7 @@ private fun ModelCard(
                 if (isSelected) {
                     Icon(
                         imageVector = MyIcons.CheckCircle,
-                        contentDescription = "Active model",
+                        contentDescription = stringResource(R.string.cd_active_model),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp),
                     )
@@ -193,7 +194,7 @@ private fun NotDownloadedActions(modelInfo: ModelInfo, onDownload: () -> Unit) {
     ) {
         Icon(MyIcons.Download, contentDescription = null)
         Spacer(Modifier.width(8.dp))
-        Text("Download")
+        Text(stringResource(R.string.action_download))
     }
 
     if (showMobileDataDialog) {
@@ -231,18 +232,15 @@ private fun MobileDataWarningDialog(
                 tint = MaterialTheme.colorScheme.error,
             )
         },
-        title = { Text("Download over mobile data?") },
+        title = { Text(stringResource(R.string.dialog_mobile_data_title)) },
         text = {
-            Text(
-                "This model is ~$sizeMb MB. Downloading now will use your mobile data. " +
-                        "Connect to Wi-Fi to avoid unexpected charges.",
-            )
+            Text(stringResource(R.string.dialog_mobile_data_message, sizeMb))
         },
         confirmButton = {
-            Button(onClick = onConfirm) { Text("Download anyway") }
+            Button(onClick = onConfirm) { Text(stringResource(R.string.action_download_anyway)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -276,7 +274,7 @@ private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
         OutlinedButton(
             onClick = onCancel,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Cancel") }
+        ) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 
@@ -297,11 +295,11 @@ private fun ReadyActions(
                 onClick = onSelect,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Set as Active")
+                Text(stringResource(R.string.action_set_as_active))
             }
         } else {
             Text(
-                text = "Active model",
+                text = stringResource(R.string.model_active_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -315,11 +313,10 @@ private fun ReadyActions(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
         ) {
-            Icon(MyIcons.Delete, contentDescription = "Delete model")
+            Icon(MyIcons.Delete, contentDescription = stringResource(R.string.cd_delete_model))
         }
     }
 
-    // Delete confirmation dialog
     if (isDeleteDialogVisible) {
         DeleteConfirmDialog(
             onConfirm = {
@@ -345,7 +342,7 @@ private fun CorruptedActions(onRetry: () -> Unit) {
             modifier = Modifier.size(18.dp),
         )
         Text(
-            text = "Download failed or corrupted",
+            text = stringResource(R.string.model_download_failed),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.weight(1f),
@@ -353,7 +350,7 @@ private fun CorruptedActions(onRetry: () -> Unit) {
         OutlinedButton(onClick = onRetry) {
             Icon(MyIcons.Refresh, contentDescription = null)
             Spacer(Modifier.width(4.dp))
-            Text("Retry")
+            Text(stringResource(R.string.action_retry))
         }
     }
 }
@@ -365,8 +362,8 @@ private fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm Deletion") },
-        text = { Text("Are you sure you want to delete this model? This action cannot be undone.") },
+        title = { Text(stringResource(R.string.dialog_delete_title)) },
+        text = { Text(stringResource(R.string.dialog_delete_message)) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -374,12 +371,12 @@ private fun DeleteConfirmDialog(
                     contentColor = MaterialTheme.colorScheme.error,
                 ),
             ) {
-                Text("Delete")
+                Text(stringResource(R.string.action_delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )

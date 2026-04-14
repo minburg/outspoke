@@ -17,7 +17,7 @@ package dev.brgr.outspoke.ime
  *     the longest suffix of `committed` that is also a prefix of `fresh` is used as
  *     the anchor.  Requires ≥ 2 matching words to avoid single-word false positives
  *     on common tokens ("nicht", "und", "ich").
- *  3. **Interior scan** - after an audio trim the model may emit 1–3 garbage tokens
+ *  3. **Interior scan** - after an audio trim the model may emit 1-3 garbage tokens
  *     before settling into text that overlaps with `committed`.  This layer scans
  *     every interior position in `fresh` looking for the committed tail.  Also
  *     requires ≥ 2 matching words.
@@ -94,7 +94,7 @@ object TranscriptAligner {
         }
 
         // Layer 3 - Interior-scan fallback: after an audio trim the model may start with
-        // 1–3 garbage tokens (e.g. "Angabe" instead of "Spracheingabe") before settling
+        // 1-3 garbage tokens (e.g. "Angabe" instead of "Spracheingabe") before settling
         // into a transcript whose tail overlaps with the committed prefix.  The loop
         // above only checks whether the committed suffix is a *prefix* of fresh (i.e.
         // position 0). Here we scan every interior position in fresh so those leading

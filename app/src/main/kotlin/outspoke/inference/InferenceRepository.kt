@@ -474,7 +474,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
     fun transcribe(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
-    ): Flow<TranscriptResult> = channelFlow {
+    ): Flow<TranscriptResult> = channelFlow<TranscriptResult> {
         val window = ArrayDeque<ShortArray>()
         var windowSamples = 0
         var strideAccum = 0
@@ -576,7 +576,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 // to the next stride that actually emits a real partial (Bug 1A fix).
                 val isContinuation = isContinuationAfterTrim
 
-                val cleaned = when (result) {
+                val cleaned: TranscriptResult = when (result) {
                     is TranscriptResult.Partial -> result.copy(
                         text = if (postprocessingEnabled) result.text.cleanTranscript(isContinuation) else result.text
                     )
@@ -607,7 +607,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 TAG, "[STABLE] SILENCE TRIM ($SILENCE_TRIM_STRIDES blank strides)" +
                                         " - window $windowBefore → ${windowSamples.toSec()}"
                             )
-                            send(TranscriptResult.WindowTrimmed)
+                            send(TranscriptResult.WindowTrimmed())
                             recentPartialWords.clear()
                             isContinuationAfterTrim = true
                             consecutiveBlankStrides = 0
@@ -663,7 +663,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 val windowBefore = windowSamples.toSec()
                                 trimWindowFront(dropSamples)
                                 Log.d(TAG, "[STABLE] FORCE TRIM (diverged) - window $windowBefore → ${windowSamples.toSec()}")
-                                send(TranscriptResult.WindowTrimmed)
+                                send(TranscriptResult.WindowTrimmed())
                                 recentPartialWords.clear()
                                 isContinuationAfterTrim = true
                             } else {
@@ -705,7 +705,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 // tracking to the tail words still inside the new window.
                                 // Without this, the suffix-overlap alignment fails for every
                                 // stride after the trim, silently dropping middle sentences.
-                                send(TranscriptResult.WindowTrimmed)
+                                // P4: carry the confirmed-stable leading words so TextInjector
+                                // can anchor directly without relying on a stale field re-read.
+                                val stableWordList = words.take(safeStableCount)
+                                send(TranscriptResult.WindowTrimmed(stableWords = stableWordList))
 
                                 // Clear history so we don't immediately retrigger on
                                 // the same stable prefix in the next stride.
@@ -747,7 +750,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
             val result = engine.transcribe(finalChunk)
             Log.d(TAG, "[FINAL] raw   = ${result.logLabel()}")
 
-            val cleaned = when (result) {
+            val cleaned: TranscriptResult = when (result) {
                 is TranscriptResult.Partial -> TranscriptResult.Final(
                     if (postprocessingEnabled) result.text.cleanTranscript(isContinuationAfterTrim) else result.text
                 )

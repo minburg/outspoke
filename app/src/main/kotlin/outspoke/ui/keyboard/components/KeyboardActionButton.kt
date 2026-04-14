@@ -31,6 +31,8 @@ fun KeyboardActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    /** When false the button fires once on press and does not auto-repeat while held. */
+    repeatEnabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -41,13 +43,15 @@ fun KeyboardActionButton(
             // First click happens immediately
             onClick()
 
-            // Initial delay before starting the rapid fire (standard keyboard behavior)
-            delay(500.milliseconds)
+            if (repeatEnabled) {
+                // Initial delay before starting the rapid fire (standard keyboard behavior)
+                delay(500.milliseconds)
 
-            // Continuous loop while button is held
-            while (true) {
-                onClick()
-                delay(60.milliseconds) // Speed of deletion (60ms is roughly standard)
+                // Continuous loop while button is held
+                while (true) {
+                    onClick()
+                    delay(60.milliseconds) // Speed of deletion (60ms is roughly standard)
+                }
             }
         }
     }

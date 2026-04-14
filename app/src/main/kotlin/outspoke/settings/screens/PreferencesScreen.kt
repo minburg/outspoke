@@ -1,15 +1,19 @@
 package dev.brgr.outspoke.settings.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.preferences.PreferencesViewModel
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
@@ -36,6 +40,7 @@ fun PreferencesScreen(
         onVadSensitivityChange = viewModel::setVadSensitivity,
         onPostprocessingChange = viewModel::setPostprocessingEnabled,
         onShowPipelineDiagnosticsChange = viewModel::setShowPipelineDiagnostics,
+        onResetTutorial = viewModel::resetTutorial,
     )
 }
 
@@ -50,21 +55,23 @@ private fun PreferencesContent(
     onVadSensitivityChange: (Float) -> Unit,
     onPostprocessingChange: (Boolean) -> Unit,
     onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
+    onResetTutorial: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Trigger Mode",
+                text = stringResource(R.string.pref_trigger_mode_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "How to start and stop voice recording.",
+                text = stringResource(R.string.pref_trigger_mode_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -74,67 +81,32 @@ private fun PreferencesContent(
                     onClick = { onTriggerModeChange("HOLD") },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                 ) {
-                    Text("Hold to Talk")
+                    Text(stringResource(R.string.pref_trigger_hold))
                 }
                 SegmentedButton(
                     selected = triggerMode == "TAP_TOGGLE",
                     onClick = { onTriggerModeChange("TAP_TOGGLE") },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                 ) {
-                    Text("Tap to Toggle")
+                    Text(stringResource(R.string.pref_trigger_tap_toggle))
                 }
             }
         }
 
         HorizontalDivider()
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("VAD Sensitivity", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = if (vadSensitivity == 0f) "Off"
-                    else "${(vadSensitivity * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = "Filters background noise and silence before transcription. " +
-                        "Set to Off to disable filtering and pass all audio through.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = vadSensitivity,
-                onValueChange = onVadSensitivityChange,
-                valueRange = 0f..1f,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Off", style = MaterialTheme.typography.labelSmall)
-                Text("Aggressive", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-
-        HorizontalDivider()
-
-        // Post-processing toggle - lets users bypass filler/repetition cleaning for debugging.
+        // Voice Activity Detection toggle.
+        // Uses SileroVAD to filter out non-speech audio before transcription.
+        // The underlying preference is stored as a float (0 = off, >0 = on) for
+        // backwards compatibility; the toggle writes 0f (off) or 1f (on).
+        val vadEnabled = vadSensitivity > 0f
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Transcript Post-Processing",
+                text = stringResource(R.string.pref_vad_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Removes filler words (uh, um, hmm), collapses stutters, and cleans up " +
-                        "repeated phrases the model sometimes hallucinates. " +
-                        "Disable to receive the exact raw model output - useful for diagnosing " +
-                        "whether cleaning is responsible for dropped or altered words.",
+                text = stringResource(R.string.pref_vad_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -144,7 +116,38 @@ private fun PreferencesContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = if (postprocessingEnabled) "Enabled" else "Disabled (raw output)",
+                    text = if (vadEnabled) stringResource(R.string.state_enabled)
+                    else stringResource(R.string.state_disabled),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(
+                    checked = vadEnabled,
+                    onCheckedChange = { enabled -> onVadSensitivityChange(if (enabled) 1f else 0f) },
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        // Post-processing toggle - lets users bypass filler/repetition cleaning for debugging.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.pref_postprocessing_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.pref_postprocessing_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (postprocessingEnabled) stringResource(R.string.state_enabled)
+                    else stringResource(R.string.pref_postprocessing_disabled_raw),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Switch(
@@ -159,13 +162,11 @@ private fun PreferencesContent(
         // Pipeline diagnostics toggle - shows a live summary badge on the keyboard.
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Pipeline Diagnostics",
+                text = stringResource(R.string.pref_diagnostics_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Shows a live badge on the keyboard with counters for window trims, " +
-                        "alignment recoveries, and discarded blank strides. " +
-                        "Useful for diagnosing pipeline issues; off by default.",
+                text = stringResource(R.string.pref_diagnostics_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -175,13 +176,35 @@ private fun PreferencesContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = if (showPipelineDiagnostics) "Visible" else "Hidden",
+                    text = if (showPipelineDiagnostics) stringResource(R.string.pref_diagnostics_visible)
+                    else stringResource(R.string.pref_diagnostics_hidden),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Switch(
                     checked = showPipelineDiagnostics,
                     onCheckedChange = onShowPipelineDiagnosticsChange,
                 )
+            }
+        }
+
+        HorizontalDivider()
+
+        // Tutorial reset - lets the user (or developer) replay the keyboard walk-through.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.pref_tutorial_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.pref_tutorial_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = onResetTutorial,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.pref_tutorial_reset))
             }
         }
     }
@@ -205,13 +228,13 @@ private fun PreferencesHoldVadOffPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Preferences · Tap Toggle / VAD 60%")
+@Preview(showBackground = true, name = "Preferences · Tap Toggle / VAD On")
 @Composable
-private fun PreferencesTapToggleHighVadPreview() {
+private fun PreferencesTapToggleVadOnPreview() {
     OutspokeTheme {
         PreferencesContent(
             triggerMode = "TAP_TOGGLE",
-            vadSensitivity = 0.6f,
+            vadSensitivity = 1f,
             postprocessingEnabled = false,
             showPipelineDiagnostics = true,
             onTriggerModeChange = {},
@@ -221,4 +244,3 @@ private fun PreferencesTapToggleHighVadPreview() {
         )
     }
 }
-

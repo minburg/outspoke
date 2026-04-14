@@ -51,5 +51,10 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     fun setShowPipelineDiagnostics(enabled: Boolean) {
         viewModelScope.launch { prefs.setShowPipelineDiagnostics(enabled) }
     }
+
+    /** Resets the tutorial-shown flag so it plays again the next time the keyboard opens. */
+    fun resetTutorial() {
+        viewModelScope.launch { prefs.setKeyboardTutorialShown(false) }
+    }
 }
 

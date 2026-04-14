@@ -17,11 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.inference.InferenceService
 import dev.brgr.outspoke.settings.model.ModelRegistry
@@ -103,7 +105,7 @@ private fun HomeScreenContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Setup",
+            text = stringResource(R.string.home_section_setup),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -113,10 +115,11 @@ private fun HomeScreenContent(
             icon = if (isImeEnabled) MyIcons.Keyboard else MyIcons.Warning,
             iconTint = if (isImeEnabled) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
-            title = if (isImeEnabled) "Keyboard enabled" else "Keyboard not enabled",
-            subtitle = if (isImeEnabled) "Outspoke is in the keyboard list."
-            else "Add Outspoke in system keyboard settings.",
-            actionLabel = "Open Settings",
+            title = if (isImeEnabled) stringResource(R.string.home_ime_enabled)
+            else stringResource(R.string.home_ime_not_enabled),
+            subtitle = if (isImeEnabled) stringResource(R.string.home_ime_enabled_subtitle)
+            else stringResource(R.string.home_ime_not_enabled_subtitle),
+            actionLabel = stringResource(R.string.action_open_settings),
             action = if (!isImeEnabled) onOpenImeSettings else null,
         )
 
@@ -125,11 +128,11 @@ private fun HomeScreenContent(
             icon = if (hasMicPermission) MyIcons.Mic else MyIcons.MicOff,
             iconTint = if (hasMicPermission) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
-            title = if (hasMicPermission) "Microphone access granted"
-            else "Microphone permission required",
-            subtitle = if (hasMicPermission) "Audio is processed entirely on-device."
-            else "Tap to grant microphone access.",
-            actionLabel = "Grant Permission",
+            title = if (hasMicPermission) stringResource(R.string.home_mic_granted)
+            else stringResource(R.string.home_mic_required),
+            subtitle = if (hasMicPermission) stringResource(R.string.home_mic_granted_subtitle)
+            else stringResource(R.string.home_mic_required_subtitle),
+            actionLabel = stringResource(R.string.action_grant_permission),
             action = if (!hasMicPermission) onRequestMicPermission else null,
         )
 
@@ -138,10 +141,12 @@ private fun HomeScreenContent(
             icon = if (isModelReady) MyIcons.CheckCircle else MyIcons.CloudDownload,
             iconTint = if (isModelReady) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.error,
-            title = if (isModelReady) "Model ready" else "Model not downloaded",
-            subtitle = if (isModelReady) "A transcription model is installed and ready."
-            else "Download a transcription model to use the keyboard.",
-            actionLabel = if (isModelReady) "Manage" else "Download",
+            title = if (isModelReady) stringResource(R.string.home_model_ready)
+            else stringResource(R.string.home_model_not_downloaded),
+            subtitle = if (isModelReady) stringResource(R.string.home_model_ready_subtitle)
+            else stringResource(R.string.home_model_not_downloaded_subtitle),
+            actionLabel = if (isModelReady) stringResource(R.string.action_manage)
+            else stringResource(R.string.action_download),
             action = onNavigateToModel,
         )
 
@@ -150,7 +155,7 @@ private fun HomeScreenContent(
         Spacer(Modifier.height(4.dp))
 
         Text(
-            text = "Configuration",
+            text = stringResource(R.string.home_section_configuration),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -165,7 +170,7 @@ private fun HomeScreenContent(
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(8.dp))
-            Text("Keyboard Preferences")
+            Text(stringResource(R.string.action_keyboard_preferences))
         }
     }
 }

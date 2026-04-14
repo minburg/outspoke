@@ -6,10 +6,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.R
+import dev.brgr.outspoke.ime.EnterAction
 import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.components.*
 import dev.brgr.outspoke.ui.theme.MyIcons
@@ -40,7 +45,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * @param onDeleteChar           Delete the character immediately before the cursor.
  * @param onDeleteWord           Delete backward to the previous word boundary.
  * @param onDeleteAll            Delete all text in the current editor.
- * @param onNewline              Insert a newline at the current cursor position.
+ * @param onEnterAction          Perform the context-aware Enter action (newline or IME action).
+ * @param enterAction            The semantic action for the Enter key in the current editor.
  * @param onSwitchKeyboard       Switches the active IME back to the previous keyboard.
  * @param onOpenCompanionApp     Opens the Outspoke companion app (e.g. to grant permission or download the model).
  * @param diagnostics            Pipeline counters from the most recent recording session.
@@ -60,12 +66,15 @@ fun KeyboardScreen(
     onDeleteChar: () -> Unit,
     onDeleteWord: () -> Unit,
     onDeleteAll: () -> Unit,
-    onNewline: () -> Unit,
+    onEnterAction: () -> Unit,
+    enterAction: EnterAction = EnterAction.DONE,
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
     modifier: Modifier = Modifier,
     diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     previewForceLockHint: Boolean = false,
+    /** When non-null each button records its [LayoutCoordinates] here for the tutorial. */
+    tutorialPositions: dev.brgr.outspoke.ui.keyboard.components.TutorialPositions? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth()
@@ -103,9 +112,13 @@ fun KeyboardScreen(
                 Box(modifier = Modifier.weight(1f)) {
                     KeyboardActionButton(
                         icon = MyIcons.Keyboard,
-                        contentDescription = "Switch keyboard",
+                        contentDescription = stringResource(R.string.cd_switch_keyboard),
                         onClick = onSwitchKeyboard,
-                        modifier = Modifier.align(Alignment.CenterEnd),
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .onGloballyPositioned { lc ->
+                                tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.SWITCH_KEYBOARD, lc)
+                            },
                     )
                 }
             }
@@ -138,16 +151,24 @@ fun KeyboardScreen(
                 // Far-left: delete all text (mirror of the switch-keyboard button)
                 KeyboardActionButton(
                     icon = MyIcons.DeleteForever,
-                    contentDescription = "Delete all text",
+                    contentDescription = stringResource(R.string.cd_delete_all),
                     onClick = onDeleteAll,
-                    modifier = Modifier.align(Alignment.CenterStart),
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .onGloballyPositioned { lc ->
+                            tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.DELETE_ALL, lc)
+                        },
                 )
                 // Adjacent-left: delete last word
                 KeyboardActionButton(
                     icon = MyIcons.BackspaceOutlined,
-                    contentDescription = "Delete last word",
+                    contentDescription = stringResource(R.string.cd_delete_word),
                     onClick = onDeleteWord,
-                    modifier = Modifier.align(Alignment.CenterEnd),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .onGloballyPositioned { lc ->
+                            tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.DELETE_WORD, lc)
+                        },
                 )
             }
 
@@ -166,6 +187,9 @@ fun KeyboardScreen(
                 onContinuousModeEnabled = onContinuousModeEnabled,
                 enabled = uiState !is KeyboardUiState.EngineLoading && uiState !is KeyboardUiState.Error && uiState !is KeyboardUiState.Transcribing,
                 previewForceLockHint = previewForceLockHint,
+                modifier = Modifier.onGloballyPositioned { lc ->
+                    tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.TALK, lc)
+                },
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -175,16 +199,34 @@ fun KeyboardScreen(
                 // Adjacent-right: delete single character
                 KeyboardActionButton(
                     icon = MyIcons.Backspace,
-                    contentDescription = "Delete character",
+                    contentDescription = stringResource(R.string.cd_delete_char),
                     onClick = onDeleteChar,
-                    modifier = Modifier.align(Alignment.CenterStart),
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .onGloballyPositioned { lc ->
+                            tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.DELETE_CHAR, lc)
+                        },
                 )
-                // Centre-right: insert newline
+                // Centre-right: context-aware Enter action
+                val (enterIcon, enterDescription) = when (enterAction) {
+                    EnterAction.SEARCH  -> MyIcons.Search         to stringResource(R.string.cd_action_search)
+                    EnterAction.GO      -> MyIcons.ArrowForward   to stringResource(R.string.cd_action_go)
+                    EnterAction.NEXT    -> MyIcons.ArrowForward   to stringResource(R.string.cd_action_next)
+                    EnterAction.SEND,
+                    EnterAction.DONE,
+                    EnterAction.NEWLINE -> MyIcons.SubdirectoryArrowLeft to stringResource(R.string.cd_action_enter)
+                }
                 KeyboardActionButton(
-                    icon = MyIcons.SubdirectoryArrowLeft,
-                    contentDescription = "New line",
-                    onClick = onNewline,
-                    modifier = Modifier.align(Alignment.CenterEnd),
+                    icon = enterIcon,
+                    contentDescription = enterDescription,
+                    onClick = onEnterAction,
+                    // Disable auto-repeat for action buttons - search/send/go should only fire once.
+                    repeatEnabled = enterAction == EnterAction.NEWLINE,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .onGloballyPositioned { lc ->
+                            tutorialPositions?.record(dev.brgr.outspoke.ui.keyboard.components.TutorialButtonId.ENTER, lc)
+                        },
                 )
 
             }
@@ -195,6 +237,8 @@ fun KeyboardScreen(
 /**
  * Convenience overload that reads directly from a [KeyboardViewModel]'s state flows.
  * Used by [dev.brgr.outspoke.ime.OutspokeInputMethodService] to set up the content.
+ *
+ * Shows the [KeyboardTutorialOverlay] on first launch until the user dismisses it.
  */
 @Composable
 fun KeyboardScreen(
@@ -208,27 +252,54 @@ fun KeyboardScreen(
     val triggerMode by viewModel.triggerMode.collectAsState()
     val isWhisperEngine by viewModel.isWhisperEngine.collectAsState()
     val whisperLanguage by viewModel.whisperLanguage.collectAsState()
-    val diagnostics by viewModel.diagnostics.collectAsState()
+    val rawDiagnostics by viewModel.diagnostics.collectAsState()
+    val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
+    val enterAction by viewModel.enterAction.collectAsState()
+    val showTutorial by viewModel.showTutorial.collectAsState()
 
-    KeyboardScreen(
-        uiState = uiState,
-        amplitude = amplitude,
-        isContinuous = isContinuous,
-        triggerMode = triggerMode,
-        isWhisperEngine = isWhisperEngine,
-        whisperLanguage = whisperLanguage,
-        onWhisperLanguageSelected = viewModel::setWhisperLanguage,
-        onRecordStart = viewModel::onRecordStart,
-        onRecordStop = viewModel::onRecordStop,
-        onContinuousModeEnabled = viewModel::onContinuousModeEnabled,
-        onDeleteChar = viewModel::deleteChar,
-        onDeleteWord = viewModel::deleteWord,
-        onDeleteAll = viewModel::deleteAll,
-        onNewline = viewModel::newline,
-        onSwitchKeyboard = onSwitchKeyboard,
-        onOpenCompanionApp = onOpenCompanionApp,
-        diagnostics = diagnostics,
-    )
+    // Only surface real diagnostics counters when the user has enabled the badge in settings.
+    val diagnostics = if (showPipelineDiagnostics) rawDiagnostics else PipelineDiagnostics()
+
+    // Shared state that records each button's LayoutCoordinates for the tutorial spotlight.
+    // Created once and kept alive so positions are ready the moment the overlay appears.
+    val tutorialPositions = remember { dev.brgr.outspoke.ui.keyboard.components.TutorialPositions() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight(),
+    ) {
+        KeyboardScreen(
+            uiState = uiState,
+            amplitude = amplitude,
+            isContinuous = isContinuous,
+            triggerMode = triggerMode,
+            isWhisperEngine = isWhisperEngine,
+            whisperLanguage = whisperLanguage,
+            onWhisperLanguageSelected = viewModel::setWhisperLanguage,
+            onRecordStart = viewModel::onRecordStart,
+            onRecordStop = viewModel::onRecordStop,
+            onContinuousModeEnabled = viewModel::onContinuousModeEnabled,
+            onDeleteChar = viewModel::deleteChar,
+            onDeleteWord = viewModel::deleteWord,
+            onDeleteAll = viewModel::deleteAll,
+            onEnterAction = viewModel::performEnterAction,
+            enterAction = enterAction,
+            onSwitchKeyboard = onSwitchKeyboard,
+            onOpenCompanionApp = onOpenCompanionApp,
+            diagnostics = diagnostics,
+            tutorialPositions = tutorialPositions,
+        )
+
+        // Tutorial overlay covers the keyboard on first launch.
+        if (showTutorial) {
+            dev.brgr.outspoke.ui.keyboard.components.KeyboardTutorialOverlay(
+                positions = tutorialPositions,
+                onDismiss = viewModel::dismissTutorial,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+    }
 }
 
 @Composable
@@ -239,6 +310,7 @@ private fun KeyboardScreenPreviewScaffold(
     isWhisperEngine: Boolean = false,
     whisperLanguage: String = "auto",
     showLockHint: Boolean = false,
+    enterAction: EnterAction = EnterAction.DONE,
 ) {
     OutspokeKeyboardTheme {
         Box(modifier = Modifier.height(220.dp)) {
@@ -256,7 +328,8 @@ private fun KeyboardScreenPreviewScaffold(
                 onDeleteChar = {},
                 onDeleteWord = {},
                 onDeleteAll = {},
-                onNewline = {},
+                onEnterAction = {},
+                enterAction = enterAction,
                 onSwitchKeyboard = {},
                 onOpenCompanionApp = {},
                 previewForceLockHint = showLockHint,
@@ -308,5 +381,24 @@ private fun KeyboardScreenProcessingPreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF111111)
 @Composable
 private fun KeyboardScreenErrorPreview() {
-    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Error("Microphone permission denied"), showLockHint = false)
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied), showLockHint = false)
 }
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun KeyboardScreenSearchActionPreview() {
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle, enterAction = EnterAction.SEARCH)
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun KeyboardScreenSendActionPreview() {
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle, enterAction = EnterAction.SEND)
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun KeyboardScreenNewlineActionPreview() {
+    KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle, enterAction = EnterAction.NEWLINE)
+}
+

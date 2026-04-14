@@ -22,9 +22,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.MyIcons
@@ -67,33 +69,49 @@ fun StatusIndicator(
             is KeyboardUiState.Processing -> ProcessingIndicator(partial = state.partial)
             is KeyboardUiState.Transcribing -> TranscribingIndicator()
             is KeyboardUiState.Error -> ErrorIndicator(
-                message = state.message,
+                message = localizedErrorMessage(state),
                 onOpenCompanionApp = onOpenCompanionApp,
             )
 
             is KeyboardUiState.EngineLoading -> EngineLoadingIndicator(
-                message = state.message,
+                message = localizedLoadingMessage(state),
                 onOpenCompanionApp = onOpenCompanionApp,
             )
         }
     }
 }
 
-/**
- * Idle state: mic icon + optional diagnostics badge.
- *
- * When [diagnostics] is clean (all counters zero) only the mic icon is shown - the UI
- * looks exactly as before.  When any counter is non-zero a compact summary appears next
- * to the icon (e.g. "2T · 1R") as a subtle hint that something noteworthy happened
- * during the last recording.  The badge uses [MaterialTheme.colorScheme.tertiary] to
- * stay visible but not alarming.
- */
+/** Maps [KeyboardUiState.Error] to a localized, user-facing message string. */
+@Composable
+private fun localizedErrorMessage(state: KeyboardUiState.Error): String {
+    val primary = stringResource(
+        when (state.reason) {
+            KeyboardUiState.ErrorReason.MicPermissionDenied -> R.string.status_error_mic_permission
+            KeyboardUiState.ErrorReason.MicInitFailed -> R.string.status_error_mic_init
+            KeyboardUiState.ErrorReason.TranscriptionFailed -> R.string.status_error_transcription
+            KeyboardUiState.ErrorReason.AudioCaptureFailed -> R.string.status_error_audio_capture
+            KeyboardUiState.ErrorReason.EngineLoadFailed -> R.string.status_error_engine_load
+        }
+    )
+    return if (state.detail != null) "$primary: ${state.detail}" else primary
+}
+
+/** Maps [KeyboardUiState.EngineLoading] to a localized, user-facing message string. */
+@Composable
+private fun localizedLoadingMessage(state: KeyboardUiState.EngineLoading): String =
+    stringResource(
+        when (state.reason) {
+            KeyboardUiState.LoadingReason.ModelNotDownloaded -> R.string.status_engine_model_missing
+            KeyboardUiState.LoadingReason.EngineStarting -> R.string.status_engine_loading
+        }
+    )
+
 @Composable
 private fun IdleIndicator(diagnostics: PipelineDiagnostics = PipelineDiagnostics()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = MyIcons.Mic,
-            contentDescription = "Idle - tap the button to start dictating",
+            contentDescription = stringResource(R.string.cd_status_idle),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp),
         )
@@ -154,7 +172,7 @@ private fun TranscribingIndicator() {
         GradientArcSpinner(modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "Transcribing…",
+            text = stringResource(R.string.status_transcribing),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -171,7 +189,7 @@ private fun ErrorIndicator(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = MyIcons.Warning,
-                contentDescription = "Error",
+                contentDescription = stringResource(R.string.cd_status_error),
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp),
             )
@@ -190,7 +208,7 @@ private fun ErrorIndicator(
                 modifier = Modifier.height(28.dp),
             ) {
                 Text(
-                    text = "Open Outspoke",
+                    text = stringResource(R.string.action_open_outspoke),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -222,7 +240,7 @@ private fun EngineLoadingIndicator(
                 modifier = Modifier.height(28.dp),
             ) {
                 Text(
-                    text = "Open Outspoke",
+                    text = stringResource(R.string.action_open_outspoke),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -310,7 +328,7 @@ private fun StatusTranscribingPreview() {
 @Composable
 private fun StatusErrorPreview() {
     OutspokeKeyboardTheme {
-        StatusIndicator(uiState = KeyboardUiState.Error("Microphone permission denied"))
+        StatusIndicator(uiState = KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied))
     }
 }
 
@@ -318,6 +336,6 @@ private fun StatusErrorPreview() {
 @Composable
 private fun StatusEngineLoadingPreview() {
     OutspokeKeyboardTheme {
-        StatusIndicator(uiState = KeyboardUiState.EngineLoading("Loading transcription engine…"))
+        StatusIndicator(uiState = KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting))
     }
 }

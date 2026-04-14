@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * Integration tests for realistic "human speech" patterns in [InferenceRepository].
  *
- * Real speakers rarely produce clean continuous sentences. They say 2–3 words, pause to
+ * Real speakers rarely produce clean continuous sentences. They say 2-3 words, pause to
  * think, continue, trail off mid-clause, hesitate with filler sounds, or restart from the
  * beginning. This file models those patterns - all with scripted [FakeSpeechEngine]
  * responses - and verifies that the window-management, trim, and continuation-flag
@@ -87,15 +87,15 @@ class HumanSpeechPipelineTest {
      * stride  0 (window  2 s): size = 1 < STABLE_STRIDES   → waiting
      * stride  1 (window  3 s): size = 2 < STABLE_STRIDES   → waiting
      * stride  2 (window  4 s): size = 3, window ≤ 6 s      → no trim
-     * strides 3–4              window 5–6 s                 → no trim (≤ TRIGGER)
-     * strides 5–9              window 7–11 s, all diverge   → no force trim (≤ 12 s)
+     * strides 3-4              window 5-6 s                 → no trim (≤ TRIGGER)
+     * strides 5-9              window 7-11 s, all diverge   → no force trim (≤ 12 s)
      * stride 10 (window 12 s): 192 000 > 192 000? NO        → no force trim (strict >)
      * stride 11 (window 13 s): 208 000 > 192 000? YES       → FORCE TRIM ✓
      * ```
      */
     @Test
     fun `force trim fires when window exceeds 12s during divergent strides`() = runTest {
-        // 14 calls: strides at window 2 s–14 s plus one final inference.
+        // 14 calls: strides at window 2 s-14 s plus one final inference.
         val engine = FakeSpeechEngine(divergentResponses(14))
         val repo = InferenceRepository(engine)
 
@@ -121,7 +121,7 @@ class HumanSpeechPipelineTest {
      */
     @Test
     fun `first partial after force trim preserves lowercase opening letter`() = runTest {
-        // Responses 0–11: cycle of 5 divergent phrases → force trim fires at stride 11.
+        // Responses 0-11: cycle of 5 divergent phrases → force trim fires at stride 11.
         // Response 12: lowercase-starting continuation to probe the isContinuation flag.
         // Response 13: final inference (unused content, just needs to be non-blank).
         val responses = divergentResponses(12) + listOf(
@@ -200,14 +200,14 @@ class HumanSpeechPipelineTest {
      * stride  0 (window  2 s): history size 1  → waiting
      * stride  1 (window  3 s): size 2           → waiting
      * stride  2 (window  4 s): size 3, w ≤ 6 s → no trim
-     * strides 3–4              w 5–6 s          → no trim (≤ TRIGGER)
+     * strides 3-4              w 5-6 s          → no trim (≤ TRIGGER)
      * stride  5 (window  7 s): size 3, all same →
      *   stableCount = 13 (all 13 words match),  safeStableCount = 13
      *   stableAudioEst = 7 s,  dropSamples = 3 s ≥ 1 s → TRIM
      *   window: 7 s → 4 s,  WindowTrimmed emitted,  isContinuationAfterTrim = true
      * stride  6 (window  5 s): isContinuation = true  → "nochmal…" stays lowercase
      * stride  7 (window  6 s): isContinuation = false → "dann…" gets initial capital
-     * strides 8–9              divergent → prevent second trim
+     * strides 8-9              divergent → prevent second trim
      * ```
      *
      * This validates that capitalisation suppression is a **one-shot** mechanism: it
@@ -271,8 +271,8 @@ class HumanSpeechPipelineTest {
      *
      * **Timing** (`silentAudioFlow(7)` = 6 strides + 1 final = 7 calls):
      * ```
-     * strides 0–2: "..", "...", "."   → cleaned → "" → discarded
-     * strides 3–5: real German sentence → Partial emitted
+     * strides 0-2: "..", "...", "."   → cleaned → "" → discarded
+     * strides 3-5: real German sentence → Partial emitted
      * stride  5 (window 7 s): stable ×3, w > 6 s → regular trim fires
      * call  6: final inference
      * ```
@@ -376,7 +376,7 @@ class HumanSpeechPipelineTest {
      *
      * **Timing** (`silentAudioFlow(12)` = 11 strides + 1 final = 12 calls):
      * ```
-     * strides 0–5  (window 2–7 s):
+     * strides 0-5  (window 2-7 s):
      *   "Ich bin jetzt" stable ×3 at window 7 s
      *   → stableCount=3, safeStableCount=3, stableAudioEst=7 s,
      *     dropSamples=3 s ≥ 1 s → TRIM; window: 7 s → 4 s
@@ -385,9 +385,9 @@ class HumanSpeechPipelineTest {
      * stride  6 (window 5 s): "nein das ist irgendwie falsch." (isContinuation=true)
      *   → stays "nein das ist irgendwie falsch." (no initial capital)
      *
-     * strides 7–8: divergent → no second trim (window < FORCE_TRIM_WINDOW)
+     * strides 7-8: divergent → no second trim (window < FORCE_TRIM_WINDOW)
      *
-     * strides 9–10 (window 8–9 s): completed sentence arrives
+     * strides 9-10 (window 8-9 s): completed sentence arrives
      *
      * call 11: final inference → Final("Ich bin jetzt wirklich sehr müde.")
      * ```
@@ -467,12 +467,12 @@ class HumanSpeechPipelineTest {
      *
      * **Timing** (`silentAudioFlow(16)` = 15 strides + 1 final = 16 calls):
      * ```
-     * strides 0–5: "Ja, das stimmt." stable →
+     * strides 0-5: "Ja, das stimmt." stable →
      *   regular trim at stride 5 (window 7 s → 4 s), WindowTrimmed #1
      *
-     * strides 6–8: three divergent responses (post-trim pause simulation)
+     * strides 6-8: three divergent responses (post-trim pause simulation)
      *
-     * strides 9–14: divergent cycle continues, window rebuilds to 13 s
+     * strides 9-14: divergent cycle continues, window rebuilds to 13 s
      *   → force trim fires around stride 13 (window 13 s → 10 s), WindowTrimmed #2
      *
      * call 15: final inference
@@ -482,8 +482,8 @@ class HumanSpeechPipelineTest {
     @Test
     fun `halting multi-burst delivery triggers both regular and force trim in one session`() = runTest {
         val burstPhrase = TranscriptResult.Final("Ja, das stimmt.")
-        // Responses 0–5: stable burst → regular trim fires at stride 5 (window 7 s)
-        // Responses 6–15: fully divergent cycle → window rebuilds and force trim fires
+        // Responses 0-5: stable burst → regular trim fires at stride 5 (window 7 s)
+        // Responses 6-15: fully divergent cycle → window rebuilds and force trim fires
         val responses: List<TranscriptResult> = List(6) { burstPhrase } + divergentResponses(10)
         val engine = FakeSpeechEngine(responses)
         val repo = InferenceRepository(engine)
@@ -520,7 +520,7 @@ class HumanSpeechPipelineTest {
      *
      * Timing (`silentAudioFlow(11)` = 10 strides + 1 final = 11 calls):
      * ```
-     * strides 0–5 (window 2–7 s): 13-word stable sentence
+     * strides 0-5 (window 2-7 s): 13-word stable sentence
      *   → regular trim fires at stride 5 (window 7 s → 4 s)
      *   → isContinuationAfterTrim = true
      * stride 6 (window 5 s): ".." → cleaned "" → discarded
@@ -625,7 +625,7 @@ class HumanSpeechPipelineTest {
      *
      * Timing (`silentAudioFlow(15)` = 14 strides + 1 final = 15 calls):
      * ```
-     * calls  0–11: 12 divergent → force trim at call 11 (window 13 s → 10 s)
+     * calls  0-11: 12 divergent → force trim at call 11 (window 13 s → 10 s)
      *              isContinuationAfterTrim = true
      * call  12 (window 11 s): ".." → blank → flag consumed - FLAG EATEN
      * call  13 (window 12 s): "weiter geht es dann."

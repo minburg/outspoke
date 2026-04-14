@@ -18,19 +18,35 @@ sealed class KeyboardUiState {
      * Audio capture has ended; the engine is running its final (definitive) inference
      * pass over the complete recording.  The mic button is idle but the talk button is
      * disabled while we wait for the transcript.  No partial text is available yet.
-     *
-     * This state exists to distinguish "engine working, mic off" (e.g. Whisper's
-     * 10-20 s final decode) from "engine working, mic on" ([Processing]).
      */
     object Transcribing : KeyboardUiState()
 
-    /** Something went wrong. [message] is a user-facing description. */
-    data class Error(val message: String) : KeyboardUiState()
+    /**
+     * Something went wrong. [reason] identifies the failure for localized display;
+     * [detail] carries an optional technical detail (e.g. exception message) for
+     * additional context.
+     */
+    data class Error(val reason: ErrorReason, val detail: String? = null) : KeyboardUiState()
 
     /**
      * The inference engine is not yet ready (model missing or still loading).
      * The talk button is disabled while in this state.
+     * [reason] distinguishes between "no model" and "model loading".
      */
-    data class EngineLoading(val message: String) : KeyboardUiState()
-}
+    data class EngineLoading(val reason: LoadingReason) : KeyboardUiState()
 
+    /** Typed reasons for [Error] - mapped to localized strings in the UI layer. */
+    enum class ErrorReason {
+        MicPermissionDenied,
+        MicInitFailed,
+        TranscriptionFailed,
+        AudioCaptureFailed,
+        EngineLoadFailed,
+    }
+
+    /** Typed reasons for [EngineLoading] - mapped to localized strings in the UI layer. */
+    enum class LoadingReason {
+        ModelNotDownloaded,
+        EngineStarting,
+    }
+}

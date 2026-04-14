@@ -154,7 +154,7 @@ cd outspoke
 ./gradlew assembleRelease
 ```
 
-**Requirements:** Android Studio Meerkat / Gradle 8+, JDK 11, Android SDK 34–36.
+**Requirements:** Android Studio Meerkat / Gradle 8+, JDK 11, Android SDK 30-36.
 
 A debug build for sideloading:
 

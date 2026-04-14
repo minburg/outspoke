@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Outspoke</string>
+    <string name="ime_name">Outspoke Voice Keyboard</string>
+    <string name="subtype_en">Deutsch (DE) - Sprache</string>
+
+    <!-- Navigation titles -->
+    <string name="nav_title_model">Modell herunterladen</string>
+    <string name="nav_title_preferences">Einstellungen</string>
+
+    <!-- Common actions -->
+    <string name="action_open_settings">Einstellungen öffnen</string>
+    <string name="action_grant_permission">Berechtigung erteilen</string>
+    <string name="action_download">Herunterladen</string>
+    <string name="action_manage">Verwalten</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_delete">Löschen</string>
+    <string name="action_retry">Erneut versuchen</string>
+    <string name="action_set_as_active">Als aktiv festlegen</string>
+    <string name="action_download_anyway">Trotzdem herunterladen</string>
+    <string name="action_open_outspoke">Outspoke öffnen</string>
+    <string name="action_keyboard_preferences">Tastatureinstellungen</string>
+
+    <!-- Common states -->
+    <string name="state_enabled">Aktiviert</string>
+    <string name="state_disabled">Deaktiviert</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_back">Zurück</string>
+    <string name="cd_switch_keyboard">Tastatur wechseln</string>
+    <string name="cd_delete_all">Gesamten Text löschen</string>
+    <string name="cd_delete_word">Letztes Wort löschen</string>
+    <string name="cd_delete_char">Zeichen löschen</string>
+    <string name="cd_action_search">Suchen</string>
+    <string name="cd_action_go">Los</string>
+    <string name="cd_action_next">Weiter</string>
+    <string name="cd_action_enter">Eingabe</string>
+    <string name="cd_active_model">Aktives Modell</string>
+    <string name="cd_delete_model">Modell löschen</string>
+    <string name="cd_status_idle">Bereit - Schaltfläche drücken zum Diktieren</string>
+    <string name="cd_status_error">Fehler</string>
+
+    <!-- Home screen -->
+    <string name="home_section_setup">Einrichtung</string>
+    <string name="home_section_configuration">Konfiguration</string>
+    <string name="home_ime_enabled">Tastatur aktiviert</string>
+    <string name="home_ime_not_enabled">Tastatur nicht aktiviert</string>
+    <string name="home_ime_enabled_subtitle">Outspoke ist in der Tastaturliste.</string>
+    <string name="home_ime_not_enabled_subtitle">Outspoke in den Systemtastatureinstellungen hinzufügen.</string>
+    <string name="home_mic_granted">Mikrofonzugriff erteilt</string>
+    <string name="home_mic_required">Mikrofonberechtigung erforderlich</string>
+    <string name="home_mic_granted_subtitle">Audio wird vollständig auf dem Gerät verarbeitet.</string>
+    <string name="home_mic_required_subtitle">Tippen, um Mikrofonzugriff zu erteilen.</string>
+    <string name="home_model_ready">Modell bereit</string>
+    <string name="home_model_not_downloaded">Modell nicht heruntergeladen</string>
+    <string name="home_model_ready_subtitle">Ein Transkriptionsmodell ist installiert und bereit.</string>
+    <string name="home_model_not_downloaded_subtitle">Lade ein Transkriptionsmodell herunter, um die Tastatur zu verwenden.</string>
+
+    <!-- Preferences screen -->
+    <string name="pref_trigger_mode_title">Auslösemodus</string>
+    <string name="pref_trigger_mode_subtitle">Wie die Sprachaufnahme gestartet und gestoppt wird.</string>
+    <string name="pref_trigger_hold">Halten zum Sprechen</string>
+    <string name="pref_trigger_tap_toggle">Tippen zum Umschalten</string>
+    <string name="pref_vad_title">Sprachaktivitätserkennung (VAD)</string>
+    <string name="pref_vad_subtitle">Verwendet Silero VAD, um Stille und Hintergrundgeräusche vor der Transkription herauszufiltern. Nur deaktivieren, wenn VAD den Anfang deiner Sprache abschneidet oder leere Ergebnisse erzeugt.</string>
+    <string name="pref_postprocessing_title">Transkript-Nachbearbeitung</string>
+    <string name="pref_postprocessing_subtitle">Entfernt Füllwörter (äh, ähm, hmm), reduziert Stotter und bereinigt wiederholte Phrasen. Deaktivieren, um die direkte Modellausgabe zu erhalten - nützlich zum Diagnostizieren, ob die Bereinigung Wörter weglässt oder verändert.</string>
+    <string name="pref_postprocessing_disabled_raw">Deaktiviert (Rohausgabe)</string>
+    <string name="pref_diagnostics_title">Pipeline-Diagnose</string>
+    <string name="pref_diagnostics_subtitle">Zeigt ein Live-Badge auf der Tastatur mit Zählern für Fensterkürzungen, Ausrichtungswiederherstellungen und verworfene leere Schritte. Nützlich zur Diagnose von Pipeline-Problemen; standardmäßig ausgeblendet.</string>
+    <string name="pref_diagnostics_visible">Sichtbar</string>
+    <string name="pref_diagnostics_hidden">Ausgeblendet</string>
+    <string name="pref_tutorial_title">Tastatur-Tutorial</string>
+    <string name="pref_tutorial_subtitle">Zeigt die Schritt-für-Schritt-Anleitung beim nächsten Öffnen der Tastatur erneut an.</string>
+    <string name="pref_tutorial_reset">Tutorial erneut anzeigen</string>
+
+    <!-- Model screen -->
+    <string name="model_screen_title">Spracherkennungsmodelle</string>
+    <string name="model_screen_subtitle">Lade ein Modell herunter und tippe auf „Als aktiv festlegen", um es für die Transkription zu verwenden. Es wird immer nur ein Modell geladen.</string>
+    <string name="model_size_format">~%d MB</string>
+    <string name="model_active_label">Aktives Modell</string>
+    <string name="model_download_failed">Download fehlgeschlagen oder beschädigt</string>
+    <string name="dialog_delete_title">Löschen bestätigen</string>
+    <string name="dialog_delete_message">Dieses Modell wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="dialog_mobile_data_title">Über mobile Daten herunterladen?</string>
+    <string name="dialog_mobile_data_message">Dieses Modell ist ~%d MB groß. Das Herunterladen verbraucht mobile Daten. Mit WLAN verbinden, um unerwartete Kosten zu vermeiden.</string>
+
+    <!-- Keyboard status messages -->
+    <string name="status_transcribing">Wird transkribiert …</string>
+    <string name="status_engine_model_missing">Modell nicht heruntergeladen - Outspoke öffnen</string>
+    <string name="status_engine_loading">Transkriptions-Engine wird geladen …</string>
+    <string name="status_error_mic_permission">Mikrofonberechtigung fehlt - Outspoke öffnen</string>
+    <string name="status_error_mic_init">Mikrofon konnte nicht geöffnet werden</string>
+    <string name="status_error_transcription">Transkription fehlgeschlagen</string>
+    <string name="status_error_audio_capture">Audioaufnahme fehlgeschlagen</string>
+    <string name="status_error_engine_load">Engine konnte nicht geladen werden</string>
+
+    <!-- First-run keyboard tutorial -->
+    <string name="tutorial_title">So verwendest du Outspoke</string>
+    <string name="tutorial_talk_button_title">Sprechtaste (Mitte)</string>
+    <string name="tutorial_talk_button_desc">Halten zum Aufnehmen, loslassen zum Transkribieren. Im Tipp-Modus: einmal tippen zum Starten, nochmals zum Stoppen.</string>
+    <string name="tutorial_switch_keyboard_title">Tastatur wechseln (oben rechts)</string>
+    <string name="tutorial_switch_keyboard_desc">Wechselt zurück zur vorherigen Tastatur.</string>
+    <string name="tutorial_delete_all_title">Alles löschen (ganz links)</string>
+    <string name="tutorial_delete_all_desc">Löscht das gesamte Textfeld auf einmal.</string>
+    <string name="tutorial_delete_word_title">Wort löschen (links vom Mikrofon)</string>
+    <string name="tutorial_delete_word_desc">Entfernt das letzte Wort.</string>
+    <string name="tutorial_delete_char_title">Zeichen löschen (rechts vom Mikrofon)</string>
+    <string name="tutorial_delete_char_desc">Entfernt das letzte Zeichen.</string>
+    <string name="tutorial_enter_title">Eingabe / Aktion (ganz rechts)</string>
+    <string name="tutorial_enter_desc">Führt die kontextabhängige Aktion aus: Senden, Suchen, Los oder Neue Zeile.</string>
+    <string name="tutorial_skip">Überspringen</string>
+    <string name="tutorial_next">Weiter</string>
+    <string name="tutorial_dismiss">Verstanden!</string>
+</resources>
+

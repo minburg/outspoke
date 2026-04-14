@@ -39,7 +39,7 @@ class GoldenPathTest {
 
     /**
      * Replicates the exact engine response sequence from session 3 of the 2026-04-05 log
-     * (strides 1–5).
+     * (strides 1-5).
      *
      * Before the `LEADING_PUNCT_RE` fix stride 1 committed `","` as the first word.
      * `normalizeWord(",") == ""` can never match any real word, so every subsequent stride
@@ -48,7 +48,7 @@ class GoldenPathTest {
      *
      * With the fix in place:
      *  1. `cleanTranscript` strips the leading comma → stride 1 partial is "Jetzt sehr gut ausgeben."
-     *  2. Strides 2–5 converge on the full sentence and alignment succeeds normally.
+     *  2. Strides 2-5 converge on the full sentence and alignment succeeds normally.
      *  3. The full sentence appears in the field; no stray comma is present.
      */
     @Test
@@ -77,7 +77,7 @@ class GoldenPathTest {
             when (result) {
                 is TranscriptResult.Partial -> injector.setPartial(result.text)
                 is TranscriptResult.Final -> injector.commitFinal(result.text)
-                is TranscriptResult.WindowTrimmed -> injector.resetAfterTrim()
+                is TranscriptResult.WindowTrimmed -> injector.resetAfterTrim(result.stableWords)
                 else -> {}
             }
         }
@@ -140,7 +140,7 @@ class GoldenPathTest {
             when (result) {
                 is TranscriptResult.Partial -> injector.setPartial(result.text)
                 is TranscriptResult.Final -> injector.commitFinal(result.text)
-                is TranscriptResult.WindowTrimmed -> injector.resetAfterTrim()
+                is TranscriptResult.WindowTrimmed -> injector.resetAfterTrim(result.stableWords)
                 else -> {}
             }
         }

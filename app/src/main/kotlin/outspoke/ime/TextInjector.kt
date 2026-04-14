@@ -49,7 +49,7 @@ private const val FIELD_SCAN_CHARS = 800
  * commits it to the field.
  *
  * Composing words are inherently provisional - the model has only a single stride of audio
- * context when it produces them and frequently revises the last 1–2 tokens in the very next
+ * context when it produces them and frequently revises the last 1-2 tokens in the very next
  * stride after the audio window shifts.  If those tail words are permanently committed
  * (via [InputConnection.finishComposingText]) and the model then changes them, the field
  * contains a word that no longer appears in any subsequent partial.  [findNewContent]'s
@@ -100,8 +100,14 @@ private const val TRIM_COMPOSING_DROP_TAIL = 2
  */
 class TextInjector(
     private val inputConnection: InputConnection,
-    editorInfo: EditorInfo,
+    private val editorInfo: EditorInfo,
 ) {
+
+    /**
+     * The context-aware action the Enter key should perform for this editor session.
+     * Derived once from [editorInfo] at construction time.
+     */
+    val enterAction: EnterAction = enterActionFrom(editorInfo)
 
     /**
      * True when the target editor supports Android's composing-text protocol.
@@ -249,9 +255,19 @@ class TextInjector(
             //       to the normal path so the composing span can be replaced.
             // Heuristic: if fresh starts with a word that already exists in composingWords
             // the model is still within the current composing span → drift/plateau → skip.
+            // P1 fix: only treat as a genuine plateau when fresh is NOT longer than composing.
+            // If fresh has more words, alignment failed but the content genuinely grew beyond
+            // the composing span - fall through so the span can be replaced/extended.
             if (composingWords.any { it.normalizeWord() == words.first().normalizeWord() }) {
-                Log.d(TAG, "[COMPOSING_ANCHOR] drift/plateau - \"${words.first()}\" already in composing, no update")
-                return
+                if (words.size <= composingWords.size) {
+                    // P2: include word counts so "composing=4w, fresh=12w" is immediately obvious in logs.
+                    Log.d(TAG, "[COMPOSING_ANCHOR] drift/plateau - \"${words.first()}\" already in composing" +
+                            " (composing=${composingWords.size}w, fresh=${words.size}w), no update")
+                    return
+                }
+                // words.size > composingWords.size → not a plateau; fall through to allow replacement.
+                Log.d(TAG, "[COMPOSING_ANCHOR] fresh (${words.size}w) > composing (${composingWords.size}w)" +
+                        " despite empty relativeNew - forcing composing span replace")
             }
             // Fall through: model produced unrelated content - allow composing span replacement.
         }
@@ -471,11 +487,33 @@ class TextInjector(
                     Log.d(TAG, "[COMMIT_FINAL] field-based recovery: +${fieldRemaining.size} new words")
                     inputConnection.commitText(fieldRemaining.joinToString(" "), 1)
                 } else {
-                    // Recovery layer 2: complete alignment failure - preserve the composing
-                    // span via finishComposingText() instead of erasing it with commitText("").
-                    // This ensures whatever the user saw in the UI preview stays in the field.
-                    Log.w(TAG, "[COMMIT_FINAL] complete alignment failure - preserving composing span")
-                    // Fall through to the finishComposingText() call below.
+                    // Recovery layer 2: complete alignment failure.
+                    // P5: try a longest-common-suffix overlap between the field tail and
+                    // finalWords before giving up.  If the field ends with a suffix that
+                    // matches the beginning of the final text, append only the non-overlapping
+                    // remainder so post-trim sentences are never silently dropped.
+                    // (Note: P1 must be applied first to make the field content rich enough
+                    // for this fallback to have meaningful overlap to work with.)
+                    val fieldTail = fieldWords.takeLast(minOf(fieldWords.size, finalWords.size))
+                    var suffixAppended = false
+                    for (overlap in fieldTail.size downTo 1) {
+                        if (fieldTail.takeLast(overlap).zip(finalWords.take(overlap))
+                                .all { (a, b) -> a.normalizeWord() == b.normalizeWord() }) {
+                            val toAppend = finalWords.drop(overlap).joinToString(" ")
+                            if (toAppend.isNotBlank()) {
+                                Log.d(TAG, "[COMMIT_FINAL] suffix fallback: +${finalWords.size - overlap} word(s) beyond field tail")
+                                inputConnection.commitText(toAppend, 1)
+                            }
+                            suffixAppended = true
+                            break
+                        }
+                    }
+                    if (!suffixAppended) {
+                        // All recovery layers exhausted - preserve whatever composing span
+                        // is showing so at minimum the last visible partial stays in the field.
+                        Log.w(TAG, "[COMMIT_FINAL] complete alignment failure - preserving composing span")
+                        // Fall through to the finishComposingText() call below.
+                    }
                 }
             }
         }
@@ -516,7 +554,7 @@ class TextInjector(
      *    that content become the new alignment anchor, guaranteeing the suffix-overlap
      *    algorithm in [setPartial] can find the correct boundary without recovery.
      */
-    fun resetAfterTrim() {
+    fun resetAfterTrim(stableWords: List<String> = emptyList()) {
         // Step 1: commit the stable portion of the composing span, dropping the uncertain tail.
         //
         // commitText() replaces the entire composing span with the provided text.  By passing
@@ -538,23 +576,42 @@ class TextInjector(
                     inputConnection.commitText(" ", 1)
                 }
             }
-            Log.d(TAG, "[TRIM_RESET] froze $safeCount/${composingWords.size} composing word(s) before trim reset (dropped last $TRIM_COMPOSING_DROP_TAIL)")
+            Log.d(TAG, "[TRIM_RESET] froze $safeCount/${composingWords.size} composing word(s)" +
+                    " [${composingWords.take(safeCount).joinToString()}]" +
+                    " before trim reset (dropped last $TRIM_COMPOSING_DROP_TAIL)")
         }
         composingWords = emptyList()
 
         // Step 2: allow the next setPartial to re-establish the composing span unconditionally.
         lastPartial = ""
 
-        // Step 3: re-read field content as the authoritative committed baseline.
-        val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
-        committedWords = if (fieldChars.isNotBlank()) {
-            fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                .takeLast(TAIL_COMMIT_WORDS)
-                .toMutableList()
+        // Step 3: re-anchor committedWords.
+        //
+        // P4 fix: prefer the stable word list carried by WindowTrimmed (confirmed by
+        // InferenceRepository across STABLE_STRIDES consecutive strides) over a field
+        // re-read.  The field may contain only a few words when the composing span was
+        // stuck (RC-3), making the overlap anchor too short for post-trim alignment.
+        // The stable word list is always the correct boundary: post-trim partials start
+        // from audio that immediately follows those trimmed-away words, so suffix-overlap
+        // in setPartial finds the boundary in Layer 1 without recovery.
+        // Fall back to field re-read only for force-trims / silence-trims where no stable
+        // word list was established.
+        if (stableWords.isNotEmpty()) {
+            committedWords = stableWords.takeLast(TAIL_COMMIT_WORDS).toMutableList()
+            Log.d(TAG, "[TRIM_RESET] committedWords anchored from stableWords → ${committedWords.size} word(s)" +
+                    " [${committedWords.joinToString()}]")
         } else {
-            mutableListOf()
+            // Fallback: read field content as the authoritative committed baseline.
+            val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
+            committedWords = if (fieldChars.isNotBlank()) {
+                fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                    .takeLast(TAIL_COMMIT_WORDS)
+                    .toMutableList()
+            } else {
+                mutableListOf()
+            }
+            Log.d(TAG, "[TRIM_RESET] committedWords re-anchored from field → ${committedWords.size} tail word(s)")
         }
-        Log.d(TAG, "[TRIM_RESET] committedWords re-anchored from field → ${committedWords.size} tail word(s)")
     }
 
     /**
@@ -564,6 +621,30 @@ class TextInjector(
     fun sendNewline() {
         lastPartial = ""
         inputConnection.commitText("\n", 1)
+    }
+
+    /**
+     * Perform the context-aware Enter action:
+     * - [EnterAction.NEWLINE] → inserts a newline character.
+     * - All other actions → forwards the corresponding IME action to the editor via
+     *   [InputConnection.performEditorAction], triggering the app's native handler
+     *   (e.g. submitting a search query, sending a chat message, navigating to a URL).
+     */
+    fun performEnterAction() {
+        when (enterAction) {
+            EnterAction.NEWLINE -> sendNewline()
+            else -> {
+                val imeActionCode = when (enterAction) {
+                    EnterAction.SEARCH -> EditorInfo.IME_ACTION_SEARCH
+                    EnterAction.SEND   -> EditorInfo.IME_ACTION_SEND
+                    EnterAction.GO     -> EditorInfo.IME_ACTION_GO
+                    EnterAction.NEXT   -> EditorInfo.IME_ACTION_NEXT
+                    EnterAction.DONE   -> EditorInfo.IME_ACTION_DONE
+                    EnterAction.NEWLINE -> EditorInfo.IME_ACTION_DONE // unreachable
+                }
+                inputConnection.performEditorAction(imeActionCode)
+            }
+        }
     }
 
     /**

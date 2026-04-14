@@ -92,10 +92,10 @@ class TextInjectorTest {
     }
 
     /**
-     * Regression for BUG A (2026-04-05 log, third session, strides 1–5).
+     * Regression for BUG A (2026-04-05 log, third session, strides 1-5).
      *
      * Stride 1 produces a short divergent partial (the comma has already been stripped by
-     * `cleanTranscript` before reaching the injector).  Strides 2–5 then converge on the
+     * `cleanTranscript` before reaching the injector).  Strides 2-5 then converge on the
      * correct full sentence.  The final field must contain the correct sentence without a
      * stray leading comma.
      *
@@ -141,7 +141,7 @@ class TextInjectorTest {
 
     /**
      * Regression for the **empty-committed post-trim erase** bug first seen in the
-     * 2026-04-06 log (lines 25–31).
+     * 2026-04-06 log (lines 25-31).
      *
      * **What happens:**
      * 1. A short sentence (≤ [TextInjector.MUTABLE_WORD_COUNT] words) is built up as

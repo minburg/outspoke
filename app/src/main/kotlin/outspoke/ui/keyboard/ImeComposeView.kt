@@ -87,7 +87,7 @@ private fun ImePreviewScaffold(
                 onDeleteChar = {},
                 onDeleteWord = {},
                 onDeleteAll = {},
-                onNewline = {},
+                onEnterAction = {},
                 onSwitchKeyboard = {},
                 onOpenCompanionApp = {},
             )
@@ -138,12 +138,12 @@ private fun ImeWhisperPreview() {
 @Preview(showBackground = true, backgroundColor = 0xFF111111, name = "IME · Engine Loading")
 @Composable
 private fun ImeEngineLoadingPreview() {
-    ImePreviewScaffold(uiState = KeyboardUiState.EngineLoading("Loading transcription engine…"))
+    ImePreviewScaffold(uiState = KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting))
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111, name = "IME · Error")
 @Composable
 private fun ImeErrorPreview() {
-    ImePreviewScaffold(uiState = KeyboardUiState.Error("Microphone permission denied"))
+    ImePreviewScaffold(uiState = KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied))
 }
 

@@ -385,7 +385,7 @@ private fun TalkButtonContinuousPreview() {
 }
 
 /** Shows all three drag-progress states of [LockHint] side-by-side. */
-@Preview(showBackground = true, backgroundColor = 0xFF111111, name = "LockHint – all states",
+@Preview(showBackground = true, backgroundColor = 0xFF111111, name = "LockHint - all states",
     widthDp = 200, heightDp = 120)
 @Composable
 private fun LockHintPreview() {

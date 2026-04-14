@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -19,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
 import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.inference.InferenceService
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.model.ModelStorageManager
 import dev.brgr.outspoke.settings.screens.HomeScreen
 import dev.brgr.outspoke.settings.screens.ModelScreen
@@ -59,10 +61,10 @@ private fun SettingsNavHost(navController: NavHostController) {
     val currentRoute = backStackEntry?.destination?.route
 
     val title = when (currentRoute) {
-        SettingsRoutes.HOME -> "Outspoke"
-        SettingsRoutes.MODEL -> "Download Model"
-        SettingsRoutes.PREFERENCES -> "Preferences"
-        else -> "Outspoke"
+        SettingsRoutes.HOME -> stringResource(R.string.app_name)
+        SettingsRoutes.MODEL -> stringResource(R.string.nav_title_model)
+        SettingsRoutes.PREFERENCES -> stringResource(R.string.nav_title_preferences)
+        else -> stringResource(R.string.app_name)
     }
 
     Scaffold(
@@ -74,7 +76,7 @@ private fun SettingsNavHost(navController: NavHostController) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 imageVector = MyIcons.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.cd_back),
                             )
                         }
                     }

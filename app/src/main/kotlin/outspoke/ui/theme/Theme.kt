@@ -40,9 +40,8 @@ fun OutspokeTheme(
     )
 }
 
-// Fixed dark colour scheme for the keyboard - never uses dynamic colour or the
-// system light/dark setting so the keyboard always looks consistent.
-private val KeyboardColorScheme = darkColorScheme(
+// Keyboard colour schemes - one for each system theme setting.
+private val KeyboardDarkColorScheme = darkColorScheme(
     primary = KeyboardAccent,
     onPrimary = KeyboardOnAccent,
     background = KeyboardBackground,
@@ -54,13 +53,32 @@ private val KeyboardColorScheme = darkColorScheme(
     error = KeyboardError,
 )
 
+private val KeyboardLightColorScheme = lightColorScheme(
+    primary = KeyboardLightAccent,
+    onPrimary = KeyboardLightOnAccent,
+    background = KeyboardLightBackground,
+    onBackground = KeyboardLightOnSurface,
+    surface = KeyboardLightSurface,
+    onSurface = KeyboardLightOnSurface,
+    surfaceVariant = KeyboardLightSurfaceVariant,
+    onSurfaceVariant = KeyboardLightOnSurfaceVariant,
+    error = KeyboardLightError,
+)
+
+/**
+ * Theme wrapper for the keyboard UI. Follows the system dark/light mode setting so the
+ * keyboard blends naturally on both dark and light-themed devices.
+ */
 @Composable
 fun OutspokeKeyboardTheme(content: @Composable () -> Unit) {
+    val colorScheme = if (isSystemInDarkTheme()) KeyboardDarkColorScheme else KeyboardLightColorScheme
     MaterialTheme(
-        colorScheme = KeyboardColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content,
     )
 }
+
+
 
 

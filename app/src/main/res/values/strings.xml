@@ -2,4 +2,113 @@
     <string name="app_name">Outspoke</string>
     <string name="ime_name">Outspoke Voice Keyboard</string>
     <string name="subtype_en">English (US) - Voice</string>
+
+    <!-- Navigation titles -->
+    <string name="nav_title_model">Download Model</string>
+    <string name="nav_title_preferences">Preferences</string>
+
+    <!-- Common actions -->
+    <string name="action_open_settings">Open Settings</string>
+    <string name="action_grant_permission">Grant Permission</string>
+    <string name="action_download">Download</string>
+    <string name="action_manage">Manage</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_set_as_active">Set as Active</string>
+    <string name="action_download_anyway">Download anyway</string>
+    <string name="action_open_outspoke">Open Outspoke</string>
+    <string name="action_keyboard_preferences">Keyboard Preferences</string>
+
+    <!-- Common states -->
+    <string name="state_enabled">Enabled</string>
+    <string name="state_disabled">Disabled</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_back">Back</string>
+    <string name="cd_switch_keyboard">Switch keyboard</string>
+    <string name="cd_delete_all">Delete all text</string>
+    <string name="cd_delete_word">Delete last word</string>
+    <string name="cd_delete_char">Delete character</string>
+    <string name="cd_action_search">Search</string>
+    <string name="cd_action_go">Go</string>
+    <string name="cd_action_next">Next</string>
+    <string name="cd_action_enter">Enter</string>
+    <string name="cd_active_model">Active model</string>
+    <string name="cd_delete_model">Delete model</string>
+    <string name="cd_status_idle">Idle - tap the button to start dictating</string>
+    <string name="cd_status_error">Error</string>
+
+    <!-- Home screen -->
+    <string name="home_section_setup">Setup</string>
+    <string name="home_section_configuration">Configuration</string>
+    <string name="home_ime_enabled">Keyboard enabled</string>
+    <string name="home_ime_not_enabled">Keyboard not enabled</string>
+    <string name="home_ime_enabled_subtitle">Outspoke is in the keyboard list.</string>
+    <string name="home_ime_not_enabled_subtitle">Add Outspoke in system keyboard settings.</string>
+    <string name="home_mic_granted">Microphone access granted</string>
+    <string name="home_mic_required">Microphone permission required</string>
+    <string name="home_mic_granted_subtitle">Audio is processed entirely on-device.</string>
+    <string name="home_mic_required_subtitle">Tap to grant microphone access.</string>
+    <string name="home_model_ready">Model ready</string>
+    <string name="home_model_not_downloaded">Model not downloaded</string>
+    <string name="home_model_ready_subtitle">A transcription model is installed and ready.</string>
+    <string name="home_model_not_downloaded_subtitle">Download a transcription model to use the keyboard.</string>
+
+    <!-- Preferences screen -->
+    <string name="pref_trigger_mode_title">Trigger Mode</string>
+    <string name="pref_trigger_mode_subtitle">How to start and stop voice recording.</string>
+    <string name="pref_trigger_hold">Hold to Talk</string>
+    <string name="pref_trigger_tap_toggle">Tap to Toggle</string>
+    <string name="pref_vad_title">Voice Activity Detection (VAD)</string>
+    <string name="pref_vad_subtitle">Uses Silero VAD to filter out silence and background noise before transcription. Disable only if VAD is cutting off the start of your speech or producing empty results.</string>
+    <string name="pref_postprocessing_title">Transcript Post-Processing</string>
+    <string name="pref_postprocessing_subtitle">Removes filler words (uh, um, hmm), collapses stutters, and cleans up repeated phrases the model sometimes hallucinates. Disable to receive the exact raw model output - useful for diagnosing whether cleaning is responsible for dropped or altered words.</string>
+    <string name="pref_postprocessing_disabled_raw">Disabled (raw output)</string>
+    <string name="pref_diagnostics_title">Pipeline Diagnostics</string>
+    <string name="pref_diagnostics_subtitle">Shows a live badge on the keyboard with counters for window trims, alignment recoveries, and discarded blank strides. Useful for diagnosing pipeline issues; off by default.</string>
+    <string name="pref_diagnostics_visible">Visible</string>
+    <string name="pref_diagnostics_hidden">Hidden</string>
+    <string name="pref_tutorial_title">Keyboard Tutorial</string>
+    <string name="pref_tutorial_subtitle">Replay the step-by-step button guide the next time you open the keyboard.</string>
+    <string name="pref_tutorial_reset">Show tutorial again</string>
+
+    <!-- Model screen -->
+    <string name="model_screen_title">Speech Recognition Models</string>
+    <string name="model_screen_subtitle">Download a model and tap \"Set as Active\" to use it for transcription. Only one model is loaded at a time.</string>
+    <string name="model_size_format">~%d MB</string>
+    <string name="model_active_label">Active model</string>
+    <string name="model_download_failed">Download failed or corrupted</string>
+    <string name="dialog_delete_title">Confirm Deletion</string>
+    <string name="dialog_delete_message">Are you sure you want to delete this model? This action cannot be undone.</string>
+    <string name="dialog_mobile_data_title">Download over mobile data?</string>
+    <string name="dialog_mobile_data_message">This model is ~%d MB. Downloading now will use your mobile data. Connect to Wi-Fi to avoid unexpected charges.</string>
+
+    <!-- Keyboard status messages -->
+    <string name="status_transcribing">Transcribing…</string>
+    <string name="status_engine_model_missing">Model not downloaded - open Outspoke to download</string>
+    <string name="status_engine_loading">Loading transcription engine…</string>
+    <string name="status_error_mic_permission">Microphone permission denied - open Outspoke to grant it</string>
+    <string name="status_error_mic_init">Could not open the microphone</string>
+    <string name="status_error_transcription">Transcription failed</string>
+    <string name="status_error_audio_capture">Audio capture failed</string>
+    <string name="status_error_engine_load">Engine failed to load</string>
+
+    <!-- First-run keyboard tutorial -->
+    <string name="tutorial_title">How to use Outspoke</string>
+    <string name="tutorial_talk_button_title">Talk Button (centre)</string>
+    <string name="tutorial_talk_button_desc">Hold to record, release to transcribe. In Tap-to-Toggle mode, tap once to start and again to stop.</string>
+    <string name="tutorial_switch_keyboard_title">Switch Keyboard (top right)</string>
+    <string name="tutorial_switch_keyboard_desc">Returns to your previous keyboard.</string>
+    <string name="tutorial_delete_all_title">Delete All (far left)</string>
+    <string name="tutorial_delete_all_desc">Clears the entire text field at once.</string>
+    <string name="tutorial_delete_word_title">Delete Word (left of mic)</string>
+    <string name="tutorial_delete_word_desc">Removes the last word.</string>
+    <string name="tutorial_delete_char_title">Delete Character (right of mic)</string>
+    <string name="tutorial_delete_char_desc">Removes the last character.</string>
+    <string name="tutorial_enter_title">Enter / Action (far right)</string>
+    <string name="tutorial_enter_desc">Performs the context-aware action: send, search, go, or insert a newline.</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_next">Next</string>
+    <string name="tutorial_dismiss">Got it!</string>
 </resources>
