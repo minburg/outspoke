@@ -7,6 +7,7 @@ import android.view.inputmethod.InputConnection
 import dev.brgr.outspoke.ime.TranscriptAligner.findNewContent
 import dev.brgr.outspoke.ime.TranscriptAligner.normalizeWord
 import dev.brgr.outspoke.ime.TranscriptAligner.splitToWords
+import dev.brgr.outspoke.ime.TranscriptAligner.wordsMatch
 
 private const val TAG = "TextInjector"
 
@@ -464,7 +465,7 @@ class TextInjector(
                     val finalCoveredByComposing = finalWords.isNotEmpty() &&
                         savedComposing.size >= finalWords.size &&
                         savedComposing.takeLast(finalWords.size).zip(finalWords).all { (a, b) ->
-                            a.normalizeWord() == b.normalizeWord()
+                            wordsMatch(a, b)
                         }
 
                     if (finalCoveredByComposing) {
@@ -498,7 +499,7 @@ class TextInjector(
                     var suffixAppended = false
                     for (overlap in fieldTail.size downTo 1) {
                         if (fieldTail.takeLast(overlap).zip(finalWords.take(overlap))
-                                .all { (a, b) -> a.normalizeWord() == b.normalizeWord() }) {
+                                .all { (a, b) -> wordsMatch(a, b) }) {
                             val toAppend = finalWords.drop(overlap).joinToString(" ")
                             if (toAppend.isNotBlank()) {
                                 Log.d(TAG, "[COMMIT_FINAL] suffix fallback: +${finalWords.size - overlap} word(s) beyond field tail")
@@ -587,29 +588,29 @@ class TextInjector(
 
         // Step 3: re-anchor committedWords.
         //
-        // P4 fix: prefer the stable word list carried by WindowTrimmed (confirmed by
-        // InferenceRepository across STABLE_STRIDES consecutive strides) over a field
-        // re-read.  The field may contain only a few words when the composing span was
-        // stuck (RC-3), making the overlap anchor too short for post-trim alignment.
-        // The stable word list is always the correct boundary: post-trim partials start
-        // from audio that immediately follows those trimmed-away words, so suffix-overlap
-        // in setPartial finds the boundary in Layer 1 without recovery.
-        // Fall back to field re-read only for force-trims / silence-trims where no stable
-        // word list was established.
+        // Always re-read the field after the composing commit above - the field is the
+        // single source of truth and includes composing words committed during Step 1
+        // that may extend beyond the stableWords boundary.  Using stableWords alone
+        // caused a duplication bug: stableWords ends at word N, but Step 1 may have
+        // committed words N+1, N+2 ... to the field; the next partial's findNewContent
+        // then saw those words as "new content" and appended them again.
+        //
+        // stableWords is kept as a fallback: when the composing span was stuck and
+        // committed little permanent text, the field re-read may return fewer words
+        // than stableWords (RC-3).  In that case stableWords gives a richer anchor.
+        val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
+        val fieldAnchor = if (fieldChars.isNotBlank()) {
+            fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                .takeLast(TAIL_COMMIT_WORDS).toMutableList()
+        } else mutableListOf()
+
         if (stableWords.isNotEmpty()) {
-            committedWords = stableWords.takeLast(TAIL_COMMIT_WORDS).toMutableList()
-            Log.d(TAG, "[TRIM_RESET] committedWords anchored from stableWords → ${committedWords.size} word(s)" +
-                    " [${committedWords.joinToString()}]")
+            val stableAnchor = stableWords.takeLast(TAIL_COMMIT_WORDS).toMutableList()
+            committedWords = if (fieldAnchor.size >= stableAnchor.size) fieldAnchor else stableAnchor
+            Log.d(TAG, "[TRIM_RESET] committedWords: field=${fieldAnchor.size}w, stable=${stableAnchor.size}w" +
+                    " → ${committedWords.size}w [${committedWords.joinToString()}]")
         } else {
-            // Fallback: read field content as the authoritative committed baseline.
-            val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
-            committedWords = if (fieldChars.isNotBlank()) {
-                fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                    .takeLast(TAIL_COMMIT_WORDS)
-                    .toMutableList()
-            } else {
-                mutableListOf()
-            }
+            committedWords = fieldAnchor
             Log.d(TAG, "[TRIM_RESET] committedWords re-anchored from field → ${committedWords.size} tail word(s)")
         }
     }

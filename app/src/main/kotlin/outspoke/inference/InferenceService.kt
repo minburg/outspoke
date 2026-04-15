@@ -86,7 +86,7 @@ class InferenceService : LifecycleService() {
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
-                buildNotification("Loading transcription engine…"),
+                buildNotification(getString(R.string.notif_engine_loading)),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
             )
         } catch (e: SecurityException) {
@@ -145,7 +145,7 @@ class InferenceService : LifecycleService() {
             if (!ModelStorageManager.isModelReady(applicationContext, modelId)) {
                 Log.w(TAG, "Model $modelId files not present - engine stays Unloaded")
                 _engineState.value = EngineState.Unloaded
-                updateNotification("Model not downloaded - open Outspoke to download")
+                updateNotification(getString(R.string.notif_model_not_downloaded))
                 return
             }
 
@@ -161,7 +161,7 @@ class InferenceService : LifecycleService() {
             }
 
             _engineState.value = EngineState.Loading
-            updateNotification("Loading transcription engine…")
+            updateNotification(getString(R.string.notif_engine_loading))
 
             val startTime = System.currentTimeMillis()
             try {
@@ -170,7 +170,7 @@ class InferenceService : LifecycleService() {
                 currentEngine = engine
                 currentRepository = InferenceRepository(engine)
                 _engineState.value = EngineState.Ready
-                updateNotification("Outspoke ready (${ModelRegistry[modelId].displayName})")
+                updateNotification(getString(R.string.notif_engine_ready, ModelRegistry[modelId].displayName))
                 val elapsed = System.currentTimeMillis() - startTime
                 Log.i(TAG, "Engine loaded successfully for $modelId in ${elapsed}ms")
                 logMemoryUsage()
@@ -178,7 +178,7 @@ class InferenceService : LifecycleService() {
                 val msg = e.localizedMessage ?: "Unknown error"
                 Log.e(TAG, "Engine load failed for $modelId: $msg", e)
                 _engineState.value = EngineState.Error(msg)
-                updateNotification("Engine failed to load: $msg")
+                updateNotification(getString(R.string.notif_engine_failed, msg))
                 logMemoryUsage()
             }
         }
@@ -249,10 +249,10 @@ class InferenceService : LifecycleService() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Outspoke Voice Transcription",
+            getString(R.string.notif_channel_name),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shown while the voice transcription engine is active"
+            description = getString(R.string.notif_channel_desc)
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)

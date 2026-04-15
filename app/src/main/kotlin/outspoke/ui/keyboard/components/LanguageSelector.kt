@@ -22,7 +22,6 @@ val WHISPER_LANGUAGE_OPTIONS: List<Pair<String, String>> = listOf(
     "auto" to "Auto",
     "en" to "EN",
     "de" to "DE",
-    "es" to "ES",
 )
 
 /**

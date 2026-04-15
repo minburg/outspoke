@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">Outspoke</string>
     <string name="ime_name">Outspoke Voice Keyboard</string>
-    <string name="subtype_en">Deutsch (DE) - Sprache</string>
+    <string name="subtype_en">Englisch (US) - Sprache</string>
+    <string name="subtype_de">Deutsch (DE) - Sprache</string>
 
     <!-- Navigation titles -->
     <string name="nav_title_model">Modell herunterladen</string>
@@ -84,6 +85,14 @@
     <string name="dialog_delete_message">Dieses Modell wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</string>
     <string name="dialog_mobile_data_title">Über mobile Daten herunterladen?</string>
     <string name="dialog_mobile_data_message">Dieses Modell ist ~%d MB groß. Das Herunterladen verbraucht mobile Daten. Mit WLAN verbinden, um unerwartete Kosten zu vermeiden.</string>
+
+    <!-- Inference service notifications -->
+    <string name="notif_channel_name">Outspoke Sprachtranskription</string>
+    <string name="notif_channel_desc">Wird angezeigt, solange die Spracherkennungs-Engine aktiv ist</string>
+    <string name="notif_engine_loading">Transkriptions-Engine wird geladen\u2026</string>
+    <string name="notif_model_not_downloaded">Modell nicht heruntergeladen - Outspoke öffnen</string>
+    <string name="notif_engine_ready">Outspoke bereit (%s)</string>
+    <string name="notif_engine_failed">Engine konnte nicht geladen werden: %s</string>
 
     <!-- Keyboard status messages -->
     <string name="status_transcribing">Wird transkribiert …</string>

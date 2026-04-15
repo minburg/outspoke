@@ -39,6 +39,49 @@ object TranscriptAligner {
         trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
 
     /**
+     * Computes Levenshtein edit distance between two strings using two rolling rows (O(n) space).
+     */
+    private fun levenshtein(a: String, b: String): Int {
+        if (a == b) return 0
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+        var prev = IntArray(b.length + 1) { it }
+        var curr = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            curr[0] = i
+            for (j in 1..b.length) {
+                curr[j] = if (a[i - 1] == b[j - 1]) prev[j - 1]
+                          else 1 + minOf(prev[j], curr[j - 1], prev[j - 1])
+            }
+            val tmp = prev; prev = curr; curr = tmp
+        }
+        return prev[b.length]
+    }
+
+    /**
+     * Returns true when two word tokens should be treated as the same word during overlap
+     * detection. Words are first normalized via [normalizeWord]. Exact matches always pass.
+     * For longer words a small number of character edits is also accepted, covering cases
+     * where the model refines a word slightly across strides (e.g. "schreibt" vs "schreibe").
+     *
+     * Allowed edits by normalized length:
+     *  - 0-3 chars: exact match only (prevents "und"/"ins", "der"/"die" false positives)
+     *  - 4-5 chars: 1 edit
+     *  - 6+ chars: 2 edits
+     */
+    internal fun wordsMatch(a: String, b: String): Boolean {
+        val na = a.normalizeWord()
+        val nb = b.normalizeWord()
+        if (na == nb) return true
+        val maxEdits = when {
+            minOf(na.length, nb.length) <= 3 -> 0
+            minOf(na.length, nb.length) <= 5 -> 1
+            else -> 2
+        }
+        return maxEdits > 0 && levenshtein(na, nb) <= maxEdits
+    }
+
+    /**
      * Given the words already committed to the field and the words in the newest
      * transcript, returns only the *new* content that follows the committed prefix.
      *
@@ -47,6 +90,10 @@ object TranscriptAligner {
      * starts later than the committed prefix. This function finds the longest suffix of
      * [committed] that is also a prefix of [fresh] (the overlap), then returns everything
      * in [fresh] that comes after that overlap.
+     *
+     * Word comparison uses [wordsMatch], which allows 1-2 character edits for longer
+     * words so that minor model refinements (e.g. "schreibt" vs "schreibe") do not
+     * break overlap detection.
      *
      * Examples:
      * ```
@@ -69,26 +116,22 @@ object TranscriptAligner {
 
         // Layer 1 - Happy path: fresh starts right where committed left off.
         if (fresh.size >= committed.size &&
-            committed.indices.all { i ->
-                committed[i].normalizeWord() == fresh[i].normalizeWord()
-            }
+            committed.indices.all { i -> wordsMatch(committed[i], fresh[i]) }
         ) {
             return fresh.drop(committed.size)
         }
 
         // Layer 2 - Model drifted: find the longest suffix of committed that is a prefix of fresh.
-        // Require overlap ≥ 2 words to avoid false-positive matches on common single
+        // Require overlap >= 2 words to avoid false-positive matches on common single
         // words ("nicht", "das", "ich") that appear frequently in German - a single-word
         // coincidence after an audio trim would corrupt the alignment and cascade into
         // repeated "complete alignment failure" commits.  The interior-scan fallback
-        // below also uses ≥ 2 for the same reason.
+        // below also uses >= 2 for the same reason.
         val maxOverlap = minOf(committed.size, fresh.size)
         for (overlap in maxOverlap downTo 2) {
             val committedTail = committed.takeLast(overlap)
             val freshHead = fresh.take(overlap)
-            if (committedTail.indices.all { i ->
-                    committedTail[i].normalizeWord() == freshHead[i].normalizeWord()
-                }) {
+            if (committedTail.indices.all { i -> wordsMatch(committedTail[i], freshHead[i]) }) {
                 return fresh.drop(overlap)
             }
         }
@@ -107,9 +150,7 @@ object TranscriptAligner {
             val tail = committed.takeLast(overlapLen)
             val scanLimit = fresh.size - overlapLen
             for (startPos in 1..scanLimit) {
-                if (tail.indices.all { i ->
-                        tail[i].normalizeWord() == fresh[startPos + i].normalizeWord()
-                    }) {
+                if (tail.indices.all { i -> wordsMatch(tail[i], fresh[startPos + i]) }) {
                     return fresh.drop(startPos + overlapLen)
                 }
             }

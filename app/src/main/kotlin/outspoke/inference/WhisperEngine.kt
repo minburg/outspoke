@@ -8,6 +8,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
+import java.util.Locale
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.*
 
@@ -496,7 +497,7 @@ class WhisperEngine : SpeechEngine {
                 val gap = bestLogit - secondBest
                 Log.d(
                     TAG, "detectLanguage: token=$bestLang " +
-                            "(${vocabulary.getOrNull(bestLang)}) gap=${"%.2f".format(gap)}"
+                            "(${vocabulary.getOrNull(bestLang)}) gap=${"%.2f".format(Locale.ROOT, gap)}"
                 )
                 return bestLang
             } finally {

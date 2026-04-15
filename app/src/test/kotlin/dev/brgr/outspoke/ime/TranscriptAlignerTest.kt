@@ -3,6 +3,7 @@ package dev.brgr.outspoke.ime
 import dev.brgr.outspoke.ime.TranscriptAligner.findNewContent
 import dev.brgr.outspoke.ime.TranscriptAligner.normalizeWord
 import dev.brgr.outspoke.ime.TranscriptAligner.splitToWords
+import dev.brgr.outspoke.ime.TranscriptAligner.wordsMatch
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
@@ -16,12 +17,13 @@ import org.junit.Test
  * Test groups:
  *  1. [splitToWords] - whitespace handling
  *  2. [normalizeWord] - boundary punctuation stripping + case folding
- *  3. [findNewContent] Layer 1 - full prefix match (happy path)
- *  4. [findNewContent] Layer 2 - suffix-prefix overlap (model drift)
- *  5. [findNewContent] Layer 3 - interior scan (post-trim junk tokens)
- *  6. Divergence - complete mismatch returns empty
- *  7. Minimum-overlap-2 guard - single-word coincidences are rejected
- *  8. Regression anchors for specific bugs
+ *  3. [wordsMatch] - fuzzy comparison with edit-distance tolerance
+ *  4. [findNewContent] Layer 1 - full prefix match (happy path)
+ *  5. [findNewContent] Layer 2 - suffix-prefix overlap (model drift)
+ *  6. [findNewContent] Layer 3 - interior scan (post-trim junk tokens)
+ *  7. Divergence - complete mismatch returns empty
+ *  8. Minimum-overlap-2 guard - single-word coincidences are rejected
+ *  9. Regression anchors for specific bugs
  */
 class TranscriptAlignerTest {
 
@@ -89,6 +91,82 @@ class TranscriptAlignerTest {
     fun `normalizeWord preserves digits`() {
         assertThat("test123.".normalizeWord()).isEqualTo("test123")
     }
+
+    // wordsMatch
+
+    @Test
+    fun `wordsMatch exact same word`() {
+        assertThat(wordsMatch("Hallo", "Hallo")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch case insensitive exact`() {
+        assertThat(wordsMatch("Hallo", "hallo")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch trailing hyphen stripped before comparison`() {
+        // "Groß-" and "Groß" both normalize to "groß" - should match exactly
+        assertThat(wordsMatch("Groß-", "Groß")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch 1-edit long word is accepted`() {
+        // "schreibt" vs "schreibe": 1 substitution, length 8 - within the 2-edit budget
+        assertThat(wordsMatch("schreibt", "schreibe")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch 2-edit long word is accepted`() {
+        // "Satzzeichen" (11 chars) vs "Satzeichen" (10 chars): 1 deletion - within budget
+        assertThat(wordsMatch("Satzzeichen", "Satzeichen")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch edit distance exceeds budget is rejected`() {
+        // "Montag" (6 chars, budget 2) vs "Freitag" (7 chars): edit distance 4
+        assertThat(wordsMatch("Montag", "Freitag")).isFalse()
+    }
+
+    @Test
+    fun `wordsMatch short word requires exact match`() {
+        // "der" and "die" are 3 chars each - 1 edit but length 3 means budget is 0
+        assertThat(wordsMatch("der", "die")).isFalse()
+    }
+
+    @Test
+    fun `wordsMatch 4-char word allows 1 edit`() {
+        // "gute" vs "guten": 1 insertion, length 4 - budget is 1
+        assertThat(wordsMatch("gute", "guten")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch 4-char word rejects 2 edits`() {
+        // "gute" vs "bose": 2 substitutions, length 4 - budget is 1
+        assertThat(wordsMatch("gute", "bose")).isFalse()
+    }
+
+    @Test
+    fun `wordsMatch both empty strings are equal`() {
+        assertThat(wordsMatch("", "")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch pure punctuation tokens match each other`() {
+        // Both normalize to "" - exact match
+        assertThat(wordsMatch(",", ";")).isTrue()
+    }
+
+    @Test
+    fun `wordsMatch fuzzy overlap bridges 1-edit in layer 2`() {
+        // "schreibt" in committed vs "schreibe" in fresh: 1-edit fuzzy match
+        // should allow the 2-word overlap to succeed
+        val committed = listOf("der", "Typ", "schreibt", "groß")
+        val fresh = listOf("Typ", "schreibe", "groß", "und", "mehr")
+        assertThat(findNewContent(committed, fresh)).containsExactly("und", "mehr")
+    }
+
+    // findNewContent Layer 1
 
     @Test
     fun `layer 1 - empty committed returns all of fresh`() {

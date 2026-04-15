@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import java.util.Locale
 
 private const val TAG = "InferenceRepository"
 private const val SAMPLE_RATE = 16_000
@@ -57,7 +58,7 @@ private fun String.normalizedForComparison(): String =
  * Formats a sample count as a human-readable seconds string for log messages,
  * e.g. `32000.toSec()` → `"2.00s"`.
  */
-private fun Int.toSec(): String = "%.2fs".format(this / SAMPLE_RATE.toFloat())
+private fun Int.toSec(): String = "%.2fs".format(Locale.ROOT, this / SAMPLE_RATE.toFloat())
 
 /**
  * Short one-liner representation of a [TranscriptResult] for logcat output.
