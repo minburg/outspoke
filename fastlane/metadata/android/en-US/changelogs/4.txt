@@ -1,0 +1,3 @@
+Third patch (v0.1.3).
+
+Further improved the accuracy of the transcriptions. Now the app supports light and dark theme depending on Android setting, also different locale, English and German, and short tutorial view when opening the keyboard for the first time so every button is explained.
