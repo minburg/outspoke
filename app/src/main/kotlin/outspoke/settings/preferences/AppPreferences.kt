@@ -121,4 +121,22 @@ class AppPreferences(private val context: Context) {
     suspend fun setKeyboardTutorialShown(shown: Boolean) {
         context.dataStore.edit { prefs -> prefs[keyKeyboardTutorialShown] = shown }
     }
+
+    private val keyDebugAudioDumpEnabled = booleanPreferencesKey("debug_audio_dump_enabled")
+
+    /**
+     * **Debug builds only.** When `true`, the pipeline writes WAV files to the app's
+     * external files directory so the engineer can listen to what the model actually hears:
+     *  - `debug_vad_output.wav` — everything that passed VAD gating (Tap 1).
+     *  - `debug_stride_NNN.wav` — the exact window fed to `engine.transcribe()` per stride (Tap 2).
+     *
+     * Defaults to `false`. The preference toggle is only shown in debug builds.
+     */
+    val debugAudioDumpEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyDebugAudioDumpEnabled] ?: false
+    }
+
+    suspend fun setDebugAudioDumpEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyDebugAudioDumpEnabled] = enabled }
+    }
 }

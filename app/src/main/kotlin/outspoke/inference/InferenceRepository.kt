@@ -2,6 +2,7 @@ package dev.brgr.outspoke.inference
 
 import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
+import dev.brgr.outspoke.audio.DebugAudioDumper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -471,10 +472,14 @@ class InferenceRepository(private val engine: SpeechEngine) {
      *   stutter collapse, repetition deduplication, capitalisation) are skipped and the raw
      *   model output is emitted as-is.  Useful for debugging whether cleaning causes drops.
      *   Defaults to `true` (post-processing active).
+     * @param debugAudioDumper When non-null (debug builds only), each stride window fed to
+     *   `engine.transcribe()` is written as a numbered WAV file (Tap 2). Pair with the VAD
+     *   output tap in [dev.brgr.outspoke.audio.AudioCaptureManager] for full pipeline coverage.
      */
     fun transcribe(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
+        debugAudioDumper: DebugAudioDumper? = null,
     ): Flow<TranscriptResult> = channelFlow<TranscriptResult> {
         val window = ArrayDeque<ShortArray>()
         var windowSamples = 0
@@ -567,6 +572,9 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 val chunk = buildChunk()
                 Log.d(TAG, "[STRIDE] firing - window=${chunk.samples.size.toSec()}")
 
+                // Tap 2: dump the exact window being fed to the model for this stride.
+                debugAudioDumper?.dumpStrideWindow(chunk.samples)
+
                 // Run inference synchronously.  The AudioRecord coroutine is not
                 // blocked because it writes into the Channel.UNLIMITED buffer above.
                 val result = engine.transcribe(chunk)
@@ -629,7 +637,6 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                     send(cleaned)
 
-                    // -- Stable-chunk commit --
                     // Track the word list for this stride and check whether the
                     // leading words have been stable across the last STABLE_STRIDES
                     // consecutive partials.
@@ -747,6 +754,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 TAG, "[FINAL] window=${rawChunk.samples.size.toSec()}" +
                         if (padded) " → padded to ${finalChunk.samples.size.toSec()}" else " (no padding needed)"
             )
+
+            // Tap 2 (final flush): also dump the stop-flush window so short utterances
+            // that never triggered a regular stride cycle are still captured in a stride file.
+            debugAudioDumper?.dumpStrideWindow(finalChunk.samples)
 
             val result = engine.transcribe(finalChunk)
             Log.d(TAG, "[FINAL] raw   = ${result.logLabel()}")

@@ -74,6 +74,12 @@
     <string name="pref_tutorial_subtitle">Replay the step-by-step button guide the next time you open the keyboard.</string>
     <string name="pref_tutorial_reset">Show tutorial again</string>
 
+    <!-- Debug Audio Dump — visible in debug builds only -->
+    <string name="pref_debug_audio_dump_title">Debug: Audio Tap</string>
+    <string name="pref_debug_audio_dump_subtitle">Writes WAV files to external storage so you can listen to what the model hears. Tap 1 (debug_vad_output.wav): everything that passed VAD gating. Tap 2 (debug_stride_NNN.wav): the exact window fed to the model per stride. Pull files with: adb pull /sdcard/Android/data/dev.brgr.outspoke/files/debug_audio/</string>
+    <string name="pref_debug_audio_dump_enabled">Recording to disk</string>
+    <string name="pref_debug_audio_dump_disabled">Off</string>
+
     <!-- Model screen -->
     <string name="model_screen_title">Speech Recognition Models</string>
     <string name="model_screen_subtitle">Download a model and tap \"Set as Active\" to use it for transcription. Only one model is loaded at a time.</string>

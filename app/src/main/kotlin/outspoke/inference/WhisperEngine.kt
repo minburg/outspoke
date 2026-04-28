@@ -597,7 +597,6 @@ class WhisperEngine : SpeechEngine {
         var prevResult: OrtSession.Result? = null
 
         try {
-            // -- Phase 1: seed call - use_cache_branch=0 --
             val firstInputs = mutableMapOf<String, OnnxTensor>()
             try {
                 firstInputs[DEC_IN_INPUT_IDS] = OnnxTensor.createTensor(
@@ -650,7 +649,6 @@ class WhisperEngine : SpeechEngine {
                 }
                 hypothesis.add(firstToken)
 
-                // -- Phase 2: autoregressive loop - use_cache_branch=1 --
                 var currentToken = firstToken
                 for (step in 0 until MAX_NEW_TOKENS - 1) {
                     // Guard against the ONNX KV-cache reshape crash that occurs when the

@@ -95,6 +95,14 @@ class KeyboardViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
+     * **Debug builds only.** When `true`, the pipeline writes WAV files so the engineer
+     * can listen to what the model hears. Collected eagerly so the value is always
+     * available as a snapshot when recording starts.
+     */
+    val debugAudioDumpEnabled: StateFlow<Boolean> = appPreferences.debugAudioDumpEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
      * Persists [tag] to preferences and immediately forwards it to the loaded engine.
      * Safe to call at any time - the engine's [setLanguage] is thread-safe.
      */
@@ -250,8 +258,10 @@ class KeyboardViewModel(
                 if (repo == null) {
                     // Inference repo not yet bound - capture for amplitude feedback only.
                     Log.w(TAG, "No InferenceRepository - capturing audio without transcription")
-                    audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f)
-                        .collect { /* amplitude updated internally */ }
+                    audioCaptureManager.startCapture(
+                        vadSensitivity = vadSensitivity.value * 0.4f,
+                        debugAudioDumpEnabled = debugAudioDumpEnabled.value,
+                    ).collect { /* amplitude updated internally */ }
                     // Flow completed naturally (stopCapture called); no inference to wait for.
                     _uiState.value = KeyboardUiState.Idle
                     return@launch
@@ -260,8 +270,12 @@ class KeyboardViewModel(
                 // Pipe audio through the inference engine on Dispatchers.Default.
                 // TranscriptResult emissions drive both the UI and text injection.
                 repo.transcribe(
-                    audio = audioCaptureManager.startCapture(vadSensitivity = vadSensitivity.value * 0.4f),
+                    audio = audioCaptureManager.startCapture(
+                        vadSensitivity = vadSensitivity.value * 0.4f,
+                        debugAudioDumpEnabled = debugAudioDumpEnabled.value,
+                    ),
                     postprocessingEnabled = postprocessingEnabled.value,
+                    debugAudioDumper = if (debugAudioDumpEnabled.value) audioCaptureManager.debugAudioDumper else null,
                 ).collect { result ->
                         // Stale-session guard: if this job has been superseded (e.g. the field
                         // was cleared and a new session started), discard this result entirely

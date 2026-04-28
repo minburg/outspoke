@@ -33,3 +33,4 @@ google-services.json
 # Android Profiling
 *.hprof
 /local/
+/.github/copilot-instructions.md

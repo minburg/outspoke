@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.brgr.outspoke.BuildConfig
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.preferences.PreferencesViewModel
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
@@ -30,16 +31,19 @@ fun PreferencesScreen(
     val vadSensitivity by viewModel.vadSensitivity.collectAsState()
     val postprocessingEnabled by viewModel.postprocessingEnabled.collectAsState()
     val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
+    val debugAudioDumpEnabled by viewModel.debugAudioDumpEnabled.collectAsState()
 
     PreferencesContent(
         triggerMode = triggerMode,
         vadSensitivity = vadSensitivity,
         postprocessingEnabled = postprocessingEnabled,
         showPipelineDiagnostics = showPipelineDiagnostics,
+        debugAudioDumpEnabled = debugAudioDumpEnabled,
         onTriggerModeChange = viewModel::setTriggerMode,
         onVadSensitivityChange = viewModel::setVadSensitivity,
         onPostprocessingChange = viewModel::setPostprocessingEnabled,
         onShowPipelineDiagnosticsChange = viewModel::setShowPipelineDiagnostics,
+        onDebugAudioDumpChange = viewModel::setDebugAudioDumpEnabled,
         onResetTutorial = viewModel::resetTutorial,
     )
 }
@@ -51,10 +55,12 @@ private fun PreferencesContent(
     vadSensitivity: Float,
     postprocessingEnabled: Boolean,
     showPipelineDiagnostics: Boolean,
+    debugAudioDumpEnabled: Boolean = false,
     onTriggerModeChange: (String) -> Unit,
     onVadSensitivityChange: (Float) -> Unit,
     onPostprocessingChange: (Boolean) -> Unit,
     onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
+    onDebugAudioDumpChange: (Boolean) -> Unit = {},
     onResetTutorial: () -> Unit = {},
 ) {
     Column(
@@ -205,6 +211,39 @@ private fun PreferencesContent(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.pref_tutorial_reset))
+            }
+        }
+
+        // Debug: Audio Tap - only visible in debug builds so it never ships to end users.
+        if (BuildConfig.DEBUG) {
+            HorizontalDivider()
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.pref_debug_audio_dump_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    text = stringResource(R.string.pref_debug_audio_dump_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = if (debugAudioDumpEnabled) stringResource(R.string.pref_debug_audio_dump_enabled)
+                        else stringResource(R.string.pref_debug_audio_dump_disabled),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Switch(
+                        checked = debugAudioDumpEnabled,
+                        onCheckedChange = onDebugAudioDumpChange,
+                    )
+                }
             }
         }
     }

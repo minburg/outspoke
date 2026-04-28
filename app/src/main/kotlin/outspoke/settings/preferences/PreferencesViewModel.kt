@@ -56,5 +56,15 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     fun resetTutorial() {
         viewModelScope.launch { prefs.setKeyboardTutorialShown(false) }
     }
+
+    val debugAudioDumpEnabled: StateFlow<Boolean> = prefs.debugAudioDumpEnabled.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = false,
+    )
+
+    fun setDebugAudioDumpEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setDebugAudioDumpEnabled(enabled) }
+    }
 }
 

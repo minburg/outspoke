@@ -28,7 +28,6 @@ private const val CHUNK_SAMPLES = 480
  */
 private const val HANGOVER_DRAIN_SAFETY_FRAMES = 20
 
-// -- Adaptive Gain Control (AGC) --
 // VOICE_RECOGNITION disables hardware AGC, so raw RMS values are tiny
 // (speech ≈ 0.003-0.05, shouting ≈ 0.05-0.2 on most devices).  A fixed gain
 // can't cover the range of microphone sensitivities and room volumes, so we
@@ -66,6 +65,13 @@ private const val AGC_DECAY = 0.985f
 class AudioCaptureManager(private val context: Context) {
 
     private val _amplitude = MutableStateFlow(0f)
+
+    /**
+     * Shared [DebugAudioDumper] instance for this manager. Callers can pass this to
+     * [dev.brgr.outspoke.inference.InferenceRepository.transcribe] so both pipeline
+     * taps (VAD output + stride window) write to the same session folder.
+     */
+    val debugAudioDumper: DebugAudioDumper by lazy { DebugAudioDumper(context) }
 
     /**
      * Set to `true` by [stopCapture] to end the read loop on the next iteration.
@@ -111,7 +117,7 @@ class AudioCaptureManager(private val context: Context) {
      */
     // Permission is checked manually via PermissionHelper before AudioRecord is created.
     @SuppressLint("MissingPermission")
-    fun startCapture(vadSensitivity: Float = 0f): Flow<AudioChunk> = channelFlow {
+    fun startCapture(vadSensitivity: Float = 0f, debugAudioDumpEnabled: Boolean = false): Flow<AudioChunk> = channelFlow {
         if (!PermissionHelper.hasRecordPermission(context)) {
             throw SecurityException(
                 "RECORD_AUDIO permission is not granted. " +
@@ -155,6 +161,11 @@ class AudioCaptureManager(private val context: Context) {
 
         val buffer = ShortArray(CHUNK_SAMPLES)
 
+        // Tap 1: Start the debug audio session before capture begins.
+        if (debugAudioDumpEnabled) {
+            debugAudioDumper.startSession(sampleRate = SAMPLE_RATE)
+        }
+
         try {
             recorder.startRecording()
             Log.d(TAG, "AudioRecord started - chunk=$CHUNK_SAMPLES samples, buf=$bufferBytes bytes")
@@ -168,7 +179,11 @@ class AudioCaptureManager(private val context: Context) {
                         _amplitude.value = normaliseAmplitude(rms)
 
                         val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
-                        for (c in toSend) send(c)
+                        for (c in toSend) {
+                            // Tap 1: record each chunk that survived VAD gating.
+                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            send(c)
+                        }
                     }
 
                     read == AudioRecord.ERROR_DEAD_OBJECT -> {
@@ -200,7 +215,10 @@ class AudioCaptureManager(private val context: Context) {
                         val chunk = AudioChunk(samples = buffer.copyOf(drained))
                         val rms = calculateRms(chunk.samples)
                         val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
-                        for (c in toSend) send(c)
+                        for (c in toSend) {
+                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            send(c)
+                        }
                     }
                 } while (drained > 0)
                 Log.d(TAG, "AudioRecord hardware buffer drained")
@@ -213,7 +231,10 @@ class AudioCaptureManager(private val context: Context) {
                     var safetyFrames = HANGOVER_DRAIN_SAFETY_FRAMES
                     while (vad.isSpeechActive && safetyFrames-- > 0) {
                         val toSend = vad.process(silence, 0f)
-                        for (c in toSend) send(c)
+                        for (c in toSend) {
+                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            send(c)
+                        }
                     }
                     Log.d(TAG, "VAD hangover drain complete (framesLeft=$safetyFrames)")
                 }
@@ -225,6 +246,8 @@ class AudioCaptureManager(private val context: Context) {
             recorder.stop()
             recorder.release()
             _amplitude.value = 0f
+            // Tap 1: finalize the VAD output WAV file so it can be pulled from disk.
+            if (debugAudioDumpEnabled) debugAudioDumper.endSession()
             Log.d(TAG, "AudioRecord stopped and released")
         }
     }.flowOn(Dispatchers.IO)
