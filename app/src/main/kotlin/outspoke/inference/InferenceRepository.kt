@@ -246,71 +246,40 @@ internal fun String.applySentenceCapitalization(skipInitialCapitalize: Boolean =
 }
 
 /**
- * Removes common model artefacts from a raw transcript:
- *  - Filler words
- *  - single word stutters (>= 3 repeats)
- *  - Consecutive repeated phrases (model hallucination loops)
+ * Applies only structural (alignment-safe) transforms to a raw transcript — no word
+ * removal.  Safe to use as the alignment anchor because it never changes the word count:
  *  - Leading dots / ellipsis: `"...Hello"` → `"Hello"`
- *  - Leading commas / semicolons: `", jetzt sehr gut"` → `"jetzt sehr gut"` (mid-sentence start artefact)
+ *  - Leading commas / semicolons: `", jetzt sehr gut"` → `"jetzt sehr gut"`
  *  - Trailing multiple dots: `"Hello..."` → `"Hello."`
  *  - Missing space after sentence-ending punctuation: `"gut.Ich"` → `"gut. Ich"`
- *  - Enforces sentence boundary capitalization.
- *  - Strings that contain no alphanumeric content are discarded entirely.
+ *  - Sentence boundary capitalization.
+ *  - Strings with no alphanumeric content are discarded entirely.
  *
  * @param isContinuation When `true`, the very first letter of the result is **not**
- *   capitalized.  Pass `true` immediately after an audio window trim, because the new
- *   partial starts mid-sentence and capitalizing the first word (e.g. `"Sind vielleicht
- *   noch falsch…"`) would be incorrect.  Sentence-internal capitalization (letters after
- *   `.`, `!`, `?`) is unaffected.
- *
- * Each transformation step is logged as `[CLEAN:*]` when it actually changes the
- * text, making it easy to trace which artefacts the model introduced in a given run.
+ *   capitalized (used after an audio window trim).
  */
-internal fun String.cleanTranscript(isContinuation: Boolean = false): String {
+internal fun String.cleanTranscriptStructural(isContinuation: Boolean = false): String {
     if (isBlank()) {
         Log.d(TAG, "[CLEAN] blank input → discarded")
         return ""
     }
     val input = trim()
 
-    // Step 1: remove filler words (language aware, defaults to English)
-    val afterFillers = input.removeFillerWords()
-    if (afterFillers != input) Log.d(TAG, "[CLEAN:FILLERS]     \"$input\" → \"$afterFillers\"")
+    val afterLeadDots = input.replace(LEADING_DOTS_RE, "")
+    if (afterLeadDots != input) Log.d(TAG, "[CLEAN:LEAD_DOTS]   \"$input\" → \"$afterLeadDots\"")
 
-    // Step 2: collapse >=3 single word stutters
-    val afterStutters = afterFillers.collapseStutters()
-    if (afterStutters != afterFillers) Log.d(TAG, "[CLEAN:STUTTER]     \"$afterFillers\" → \"$afterStutters\"")
-
-    // Step 3: collapse consecutive repeated phrases (hallucination loops)
-    val afterDedup = afterStutters.collapseRepeatedPhrases()
-    if (afterDedup != afterStutters) Log.d(TAG, "[CLEAN:PHRASES]     \"$afterStutters\" → \"$afterDedup\"")
-
-    // Step 4: strip artefact leading dots / ellipsis.
-    val afterLeadDots = afterDedup.replace(LEADING_DOTS_RE, "")
-    if (afterLeadDots != afterDedup) Log.d(TAG, "[CLEAN:LEAD_DOTS]   \"$afterDedup\" → \"$afterLeadDots\"")
-
-    // Step 5: strip leading standalone punctuation (comma/semicolon mid-sentence artefact).
-    // A leading comma normalises to "" in TextInjector and permanently breaks alignment
-    // for every subsequent stride once it is frozen as a committed word.
     val afterLeadPunct = afterLeadDots.replace(LEADING_PUNCT_RE, "")
     if (afterLeadPunct != afterLeadDots) Log.d(TAG, "[CLEAN:LEAD_PUNCT]  \"$afterLeadDots\" → \"$afterLeadPunct\"")
 
-    // Step 6: reduce trailing 2+ dots to a single dot.
     val afterTrailDots = afterLeadPunct.replace(TRAILING_DOTS_RE, ".")
     if (afterTrailDots != afterLeadPunct) Log.d(TAG, "[CLEAN:TRAIL_DOTS]  \"$afterLeadPunct\" → \"$afterTrailDots\"")
 
-    // Step 7: restore missing space after sentence-ending punctuation before a letter.
     val afterSentSpace = afterTrailDots.replace(MISSING_SENTENCE_SPACE_RE, "$1 $2").trim()
     if (afterSentSpace != afterTrailDots.trim()) Log.d(
         TAG,
         "[CLEAN:SENT_SPACE]  \"${afterTrailDots.trim()}\" → \"$afterSentSpace\""
     )
 
-    // Step 8: capitalize first word of sentences.
-    // When isContinuation=true the partial starts mid-sentence (right after an audio trim),
-    // so skip capitalizing the very first letter to avoid e.g. "Sind vielleicht…".
-    // Sentence-internal capitalization (after '.', '!', '?') is always applied so that
-    // a new sentence beginning within the same partial is correctly capitalized regardless.
     val afterCaps = afterSentSpace.applySentenceCapitalization(skipInitialCapitalize = isContinuation)
     if (afterCaps != afterSentSpace) Log.d(TAG, "[CLEAN:CAPITALIZE]  \"$afterSentSpace\" → \"$afterCaps\"")
 
@@ -320,6 +289,38 @@ internal fun String.cleanTranscript(isContinuation: Boolean = false): String {
     } else {
         afterCaps
     }
+}
+
+/**
+ * Full transcript cleaning: applies word-count-changing display transforms (filler word
+ * removal, stutter collapse, phrase deduplication) followed by structural transforms via
+ * [cleanTranscriptStructural].
+ *
+ * Use this for stable-chunk word tracking and for final display in the text field.
+ * Do NOT use it as the alignment anchor inside [InferenceRepository.transcribe] — the
+ * word-count changes it introduces can cause alignment divergence in [TextInjector] when
+ * the model inconsistently emits filler words across consecutive strides.
+ *
+ * @param isContinuation Passed through to [cleanTranscriptStructural] to suppress
+ *   initial-letter capitalisation after an audio window trim.
+ */
+internal fun String.cleanTranscript(isContinuation: Boolean = false): String {
+    if (isBlank()) {
+        Log.d(TAG, "[CLEAN] blank input → discarded")
+        return ""
+    }
+    val input = trim()
+
+    val afterFillers = input.removeFillerWords()
+    if (afterFillers != input) Log.d(TAG, "[CLEAN:FILLERS]     \"$input\" → \"$afterFillers\"")
+
+    val afterStutters = afterFillers.collapseStutters()
+    if (afterStutters != afterFillers) Log.d(TAG, "[CLEAN:STUTTER]     \"$afterFillers\" → \"$afterStutters\"")
+
+    val afterDedup = afterStutters.collapseRepeatedPhrases()
+    if (afterDedup != afterStutters) Log.d(TAG, "[CLEAN:PHRASES]     \"$afterStutters\" → \"$afterDedup\"")
+
+    return afterDedup.cleanTranscriptStructural(isContinuation)
 }
 
 /**
@@ -437,6 +438,60 @@ private fun longestCommonPrefixLength(wordLists: List<List<String>>): Int {
     return count
 }
 
+private fun ShortArray.rms(): Float {
+    if (isEmpty()) return 0f
+    val sum = fold(0.0) { acc, s -> acc + s.toDouble() * s }
+    return (Math.sqrt(sum / size) / Short.MAX_VALUE).toFloat()
+}
+
+/**
+ * Scans [window] chunk boundaries for a VAD-quiet (low-energy) cut point within
+ * [[minDrop], [maxDrop]], anchored to [targetDrop].
+ *
+ * Priority:
+ *  1. Latest silence at or before [targetDrop] — ensures we never slice into the speech
+ *     that immediately follows the stable-text boundary.
+ *  2. Earliest silence after [targetDrop] up to [maxDrop] — secondary fallback when no
+ *     silence precedes the target; trimming a little past the estimate is still better
+ *     than cutting mid-phoneme.
+ *  3. [targetDrop] itself — proportional estimate used verbatim only when no silence at
+ *     all is found in the valid range.
+ *
+ * Cutting at a silence boundary prevents slicing an active phoneme and eliminates the
+ * hallucinations Parakeet produces when its window starts mid-consonant.
+ */
+private fun findSilenceCutPoint(
+    window: ArrayDeque<ShortArray>,
+    targetDrop: Int,
+    minDrop: Int,
+    maxDrop: Int,
+): Int {
+    val silenceThreshold = 0.02f
+    var cumulative = 0
+    var lastSilenceBeforeTarget = -1
+    var firstSilenceAfterTarget = -1
+
+    for (chunk in window) {
+        cumulative += chunk.size
+        if (cumulative < minDrop) continue
+        if (cumulative > maxDrop) break
+        val rms = chunk.rms()
+        if (rms < silenceThreshold) {
+            if (cumulative <= targetDrop) {
+                lastSilenceBeforeTarget = cumulative
+            } else if (firstSilenceAfterTarget < 0) {
+                firstSilenceAfterTarget = cumulative
+            }
+        }
+    }
+
+    return when {
+        lastSilenceBeforeTarget >= minDrop -> lastSilenceBeforeTarget
+        firstSilenceAfterTarget in minDrop..maxDrop -> firstSilenceAfterTarget
+        else -> targetDrop
+    }
+}
+
 /**
  * Bridges the audio capture pipeline to any [SpeechEngine] with a sliding-window
  * strategy that keeps the window from growing long enough to cause Parakeet attention
@@ -502,6 +557,12 @@ class InferenceRepository(private val engine: SpeechEngine) {
         // already fired once for the current wait period (fires every 40 ms otherwise).
         var strideWaitLogged = false
 
+        // Dynamic stride length (Fix 6): doubled to 2 s when consecutive strides diverge
+        // without a stable prefix.  Giving the model a larger audio bite before the next
+        // inference often resolves uncertainty caused by hesitant speech or a long sentence,
+        // allowing a natural stable-chunk trim to fire.  Reset to baseline on every trim.
+        var dynamicStrideSamples = STRIDE_SAMPLES
+
         fun buildChunk(): AudioChunk {
             val merged = ShortArray(windowSamples)
             var pos = 0
@@ -536,6 +597,41 @@ class InferenceRepository(private val engine: SpeechEngine) {
         }
 
         audio.buffer(Channel.UNLIMITED).collect { incoming ->
+            if (incoming.isSilenceBoundary) {
+                if (windowSamples >= MIN_FINAL_SAMPLES) {
+                    Log.d(TAG, "[BOUNDARY] utterance boundary — flushing ${windowSamples.toSec()} as Final")
+                    val rawChunk = buildChunk()
+                    val finalChunk = if (rawChunk.samples.size < MIN_FINAL_SAMPLES)
+                        AudioChunk(rawChunk.samples.copyOf(MIN_FINAL_SAMPLES))
+                    else rawChunk
+                    val result = engine.transcribe(finalChunk)
+                    val isContinuation = isContinuationAfterTrim
+                    val cleaned: TranscriptResult = when (result) {
+                        is TranscriptResult.Partial -> TranscriptResult.Final(
+                            text = if (postprocessingEnabled) result.text.cleanTranscriptStructural(isContinuation) else result.text,
+                            isUtteranceBoundary = true,
+                        )
+                        is TranscriptResult.Final -> result.copy(
+                            text = if (postprocessingEnabled) result.text.cleanTranscriptStructural(isContinuation) else result.text,
+                            isUtteranceBoundary = true,
+                        )
+                        else -> result
+                    }
+                    Log.d(TAG, "[BOUNDARY] Final = ${cleaned.logLabel()}")
+                    send(cleaned)
+                } else if (windowSamples > 0) {
+                    Log.d(TAG, "[BOUNDARY] utterance boundary — window too short (${windowSamples.toSec()}), discarding")
+                }
+                window.clear()
+                windowSamples = 0
+                strideAccum = 0
+                recentPartialWords.clear()
+                isContinuationAfterTrim = false
+                consecutiveBlankStrides = 0
+                strideWaitLogged = false
+                return@collect
+            }
+
             window.addLast(incoming.samples)
             windowSamples += incoming.samples.size
             strideAccum += incoming.samples.size
@@ -555,7 +651,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
             // Log once (not every chunk) when a stride boundary is crossed but
             // MIN_SAMPLES is not yet met.
-            if (strideAccum >= STRIDE_SAMPLES && windowSamples < MIN_SAMPLES) {
+            if (strideAccum >= dynamicStrideSamples && windowSamples < MIN_SAMPLES) {
                 if (!strideWaitLogged) {
                     Log.d(
                         TAG, "[STRIDE] stride ready (strideAccum=${strideAccum.toSec()})" +
@@ -566,7 +662,7 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 }
             }
 
-            if (windowSamples >= MIN_SAMPLES && strideAccum >= STRIDE_SAMPLES) {
+            if (windowSamples >= MIN_SAMPLES && strideAccum >= dynamicStrideSamples) {
                 strideWaitLogged = false  // reset for the next accumulation period
                 strideAccum = 0
                 val chunk = buildChunk()
@@ -585,13 +681,24 @@ class InferenceRepository(private val engine: SpeechEngine) {
                 // to the next stride that actually emits a real partial (Bug 1A fix).
                 val isContinuation = isContinuationAfterTrim
 
+                // Structural cleaning is used for the emitted text so that TextInjector
+                // aligns on text whose word count matches what the model produced.
+                // Full cleaning (including filler/stutter/dedup) is computed separately
+                // for the stable-chunk word tracking, which benefits from consistent
+                // word-count reduction across consecutive strides.
+                val rawText = when (result) {
+                    is TranscriptResult.Partial -> result.text
+                    is TranscriptResult.Final -> result.text
+                    else -> ""
+                }
+                val structuralText = if (postprocessingEnabled)
+                    rawText.cleanTranscriptStructural(isContinuation) else rawText
+                val fullCleanedText = if (postprocessingEnabled)
+                    rawText.cleanTranscript(isContinuation) else rawText
+
                 val cleaned: TranscriptResult = when (result) {
-                    is TranscriptResult.Partial -> result.copy(
-                        text = if (postprocessingEnabled) result.text.cleanTranscript(isContinuation) else result.text
-                    )
-                    is TranscriptResult.Final -> TranscriptResult.Partial(
-                        if (postprocessingEnabled) result.text.cleanTranscript(isContinuation) else result.text
-                    )
+                    is TranscriptResult.Partial -> result.copy(text = structuralText)
+                    is TranscriptResult.Final -> TranscriptResult.Partial(structuralText)
                     else -> result
                 }
 
@@ -617,9 +724,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                         " - window $windowBefore → ${windowSamples.toSec()}"
                             )
                             send(TranscriptResult.WindowTrimmed())
-                            recentPartialWords.clear()
-                            isContinuationAfterTrim = true
-                            consecutiveBlankStrides = 0
+                                recentPartialWords.clear()
+                                isContinuationAfterTrim = true
+                                consecutiveBlankStrides = 0
+                                dynamicStrideSamples = STRIDE_SAMPLES
                         }
                     }
                 }
@@ -637,12 +745,33 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                     send(cleaned)
 
-                    // Track the word list for this stride and check whether the
-                    // leading words have been stable across the last STABLE_STRIDES
-                    // consecutive partials.
-                    val words = cleaned.text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                    // Use fully-cleaned word list (filler/stutter/dedup applied) for
+                    // stable-chunk tracking so consecutive strides normalise to the same
+                    // words regardless of filler inconsistency.
+                    val words = fullCleanedText.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
                     recentPartialWords.addLast(words)
                     if (recentPartialWords.size > STABLE_STRIDES) recentPartialWords.removeFirst()
+
+                    val endsWithSentence = cleaned.text.trimEnd().lastOrNull()
+                        ?.let { it == '.' || it == '!' || it == '?' } == true
+                    if (endsWithSentence && recentPartialWords.size >= 2) {
+                        val terminalWord = words.lastOrNull()?.normalizedForComparison()
+                        val prevTerminalWord = recentPartialWords[recentPartialWords.size - 2]
+                            .lastOrNull()?.normalizedForComparison()
+                        if (terminalWord != null && terminalWord == prevTerminalWord) {
+                            Log.d(TAG, "[SENTENCE_FINAL] stable punctuation endpoint → \"${cleaned.text}\"")
+                            send(TranscriptResult.Final(cleaned.text, isUtteranceBoundary = true))
+                            window.clear()
+                            windowSamples = 0
+                            strideAccum = 0
+                            recentPartialWords.clear()
+                            isContinuationAfterTrim = false
+                            consecutiveBlankStrides = 0
+                            strideWaitLogged = false
+                            dynamicStrideSamples = STRIDE_SAMPLES
+                            return@collect
+                        }
+                    }
 
                     if (recentPartialWords.size < STABLE_STRIDES) {
                         Log.d(
@@ -660,13 +789,12 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                         if (stableCount == 0) {
                             // No stride agrees on even a single leading word.  If the window is
-                            // still within reasonable bounds just log and wait - the next stride
-                            // may converge.  But if the window has grown past FORCE_TRIM_WINDOW_SAMPLES
-                            // we're in a divergence loop (typically caused by a long pause or very
-                            // hesitant speech): trim aggressively back to TRIGGER + MIN_CONTEXT so
-                            // the model gets a shorter, cleaner context to re-anchor on.
+                            // still within reasonable bounds, double the stride so the next
+                            // inference sees a larger audio bite — often this resolves the
+                            // uncertainty without a forced trim.  If the window has grown past
+                            // FORCE_TRIM_WINDOW_SAMPLES we're in a divergence loop: trim
+                            // aggressively back to TRIGGER + MIN_CONTEXT.
                             if (windowSamples > FORCE_TRIM_WINDOW_SAMPLES) {
-                                // dropSamples = window - (TRIGGER + MIN_CONTEXT) ≥ FORCE_TRIM - 10s = 2s > MIN_TRIM (1s)
                                 val dropSamples = windowSamples - (TRIGGER_WINDOW_SAMPLES + MIN_CONTEXT_SAMPLES)
                                 val windowBefore = windowSamples.toSec()
                                 trimWindowFront(dropSamples)
@@ -674,11 +802,20 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 send(TranscriptResult.WindowTrimmed())
                                 recentPartialWords.clear()
                                 isContinuationAfterTrim = true
+                                dynamicStrideSamples = STRIDE_SAMPLES
                             } else {
-                                Log.d(
-                                    TAG, "[STABLE] no common prefix across last $STABLE_STRIDES" +
-                                            " strides (words diverged) - no trim"
-                                )
+                                if (dynamicStrideSamples == STRIDE_SAMPLES) {
+                                    dynamicStrideSamples = STRIDE_SAMPLES * 2
+                                    Log.d(
+                                        TAG, "[STABLE] no common prefix - doubling stride to" +
+                                                " ${dynamicStrideSamples.toSec()} to give model more context"
+                                    )
+                                } else {
+                                    Log.d(
+                                        TAG, "[STABLE] no common prefix across last $STABLE_STRIDES" +
+                                                " strides (words diverged) - stride already at ${dynamicStrideSamples.toSec()}"
+                                    )
+                                }
                             }
                         } else {
                             // When stableCount < totalWords the model is still decoding the
@@ -692,14 +829,22 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
                             // Proportional estimate: stable words occupy roughly
                             // (safeStableCount / totalWords) of the window duration.
-                            // Speech is not perfectly uniform, so we are conservative
-                            // and always retain MIN_CONTEXT_SAMPLES of tail audio.
-                            val stableAudioEst = (safeStableCount.toFloat() / totalWords * windowSamples).toInt()
-                            val dropSamples = maxOf(0, stableAudioEst - MIN_CONTEXT_SAMPLES)
+                            // We then search near that estimate for a low-energy chunk boundary
+                            // so the model's next window always starts on clean audio rather
+                            // than mid-phoneme. Falls back to the proportional estimate if no
+                            // silence boundary is found within the valid trim range.
+                            val proportionalEst = (safeStableCount.toFloat() / totalWords * windowSamples).toInt()
+                            val maxDrop = (windowSamples - MIN_CONTEXT_SAMPLES).coerceAtLeast(0)
+                            val targetDrop = maxOf(0, proportionalEst - MIN_CONTEXT_SAMPLES)
+                            val dropSamples = if (targetDrop >= MIN_TRIM_SAMPLES) {
+                                findSilenceCutPoint(window, targetDrop, MIN_TRIM_SAMPLES, maxDrop)
+                            } else {
+                                targetDrop
+                            }
 
                             Log.d(
                                 TAG, "[STABLE] prefix=$stableCount/$totalWords words stable" +
-                                        " (safe=$safeStableCount, ≈${stableAudioEst.toSec()})," +
+                                        " (safe=$safeStableCount, ≈${proportionalEst.toSec()})," +
                                         " keeping ${MIN_CONTEXT_SAMPLES.toSec()} context" +
                                         " → drop=${dropSamples.toSec()}, min_required=${MIN_TRIM_SAMPLES.toSec()}"
                             )
@@ -725,6 +870,9 @@ class InferenceRepository(private val engine: SpeechEngine) {
                                 // The next partial starts mid-sentence - suppress initial-letter
                                 // capitalisation for that one stride.
                                 isContinuationAfterTrim = true
+
+                                // Trim succeeded: restore baseline stride for the new window.
+                                dynamicStrideSamples = STRIDE_SAMPLES
                             } else {
                                 Log.d(
                                     TAG, "[STABLE] drop=${dropSamples.toSec()}" +
@@ -764,10 +912,10 @@ class InferenceRepository(private val engine: SpeechEngine) {
 
             val cleaned: TranscriptResult = when (result) {
                 is TranscriptResult.Partial -> TranscriptResult.Final(
-                    if (postprocessingEnabled) result.text.cleanTranscript(isContinuationAfterTrim) else result.text
+                    if (postprocessingEnabled) result.text.cleanTranscriptStructural(isContinuationAfterTrim) else result.text
                 )
                 is TranscriptResult.Final -> result.copy(
-                    text = if (postprocessingEnabled) result.text.cleanTranscript(isContinuationAfterTrim) else result.text
+                    text = if (postprocessingEnabled) result.text.cleanTranscriptStructural(isContinuationAfterTrim) else result.text
                 )
                 else -> result
             }

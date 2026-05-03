@@ -56,6 +56,9 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
     /** Frames of sub-threshold audio tolerated since energy dropped (hangover counter). */
     private var hangoverFrames = 0
 
+    /** Frames spent in SILENCE after hangover. Fires one boundary sentinel at SILENCE_BOUNDARY_FRAMES. */
+    private var consecutiveSilenceFrames = 0
+
     /**
      * Ring buffer of up to [LEAD_IN_FRAMES] recent chunks, always maintained during silence.
      * Flushed to inference on speech onset so the very first phoneme is never clipped.
@@ -80,6 +83,7 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
                         state = State.SPEECH
                         onsetCount = 0
                         hangoverFrames = 0
+                        consecutiveSilenceFrames = 0
                         val out = leadIn.toList()
                         leadIn.clear()
                         out
@@ -88,9 +92,14 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
                         emptyList()
                     }
                 } else {
-                    // Sub-threshold - reset onset counter, keep buffering.
                     onsetCount = 0
-                    emptyList()
+                    consecutiveSilenceFrames++
+                    if (consecutiveSilenceFrames == SILENCE_BOUNDARY_FRAMES) {
+                        consecutiveSilenceFrames = 0
+                        listOf(AudioChunk(ShortArray(0), isSilenceBoundary = true))
+                    } else {
+                        emptyList()
+                    }
                 }
             }
 
@@ -128,6 +137,7 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
         state = State.SILENCE
         hangoverFrames = 0
         onsetCount = 0
+        consecutiveSilenceFrames = 0
         leadIn.clear()
         return wasSpeech
     }
@@ -135,20 +145,28 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
     companion object {
         /**
          * Number of consecutive above-threshold frames required before speech onset is
-         * confirmed. 2 frames × 30 ms = 60 ms - eliminates single-frame glitch activations.
+         * confirmed. 1 frame × 30 ms = 30 ms - opens gate on first confirmed speech frame
+         * to avoid clipping onset phonemes.
          */
-        private const val ONSET_FRAMES = 2
+        private const val ONSET_FRAMES = 1
 
         /**
          * Frames of audio prepended before confirmed speech onset (pre-roll buffer).
-         * 15 frames × 30 ms = 450 ms - captures onset phonemes that preceded the gate.
+         * 20 frames × 30 ms = 600 ms - gives model pre-speech silence as acoustic context.
          */
-        private const val LEAD_IN_FRAMES = 15
+        private const val LEAD_IN_FRAMES = 20
 
         /**
          * Frames of sub-threshold audio tolerated before declaring silence (hangover).
          * 15 frames × 30 ms = 450 ms - captures trailing soft syllables and brief pauses.
          */
         private const val HANGOVER_FRAMES = 15
+
+        /**
+         * Frames of continuous SILENCE (after hangover) before emitting a silence-boundary
+         * sentinel. 20 frames × 30 ms = 600 ms. Triggers an utterance boundary reset in
+         * InferenceRepository so the next sentence starts in a fresh, uncontaminated window.
+         */
+        internal const val SILENCE_BOUNDARY_FRAMES = 20
     }
 }

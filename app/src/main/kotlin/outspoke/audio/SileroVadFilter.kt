@@ -36,6 +36,7 @@ class SileroVadFilter(
     private var state = State.SILENCE
     private var onsetCount = 0
     private var hangoverFrames = 0
+    private var consecutiveSilenceFrames = 0
     private val leadIn = ArrayDeque<AudioChunk>(LEAD_IN_FRAMES + 1)
 
     override val isSpeechActive: Boolean get() = state == State.SPEECH
@@ -121,6 +122,7 @@ class SileroVadFilter(
                         state = State.SPEECH
                         onsetCount = 0
                         hangoverFrames = 0
+                        consecutiveSilenceFrames = 0
                         val out = leadIn.toList()
                         leadIn.clear()
                         out
@@ -129,7 +131,13 @@ class SileroVadFilter(
                     }
                 } else {
                     onsetCount = 0
-                    emptyList()
+                    consecutiveSilenceFrames++
+                    if (consecutiveSilenceFrames == SILENCE_BOUNDARY_FRAMES) {
+                        consecutiveSilenceFrames = 0
+                        listOf(AudioChunk(ShortArray(0), isSilenceBoundary = true))
+                    } else {
+                        emptyList()
+                    }
                 }
             }
 
@@ -158,6 +166,7 @@ class SileroVadFilter(
         state = State.SILENCE
         hangoverFrames = 0
         onsetCount = 0
+        consecutiveSilenceFrames = 0
         leadIn.clear()
 
         // Reset RNN state for the next recording session
@@ -178,13 +187,16 @@ class SileroVadFilter(
         /** 30 ms window at 16 kHz = 480 samples. Required by Silero v4 ONNX. */
         private const val REQUIRED_SAMPLES = 480
 
-        /** 2 frames × 30 ms = 60 ms - eliminates single-frame false triggers. */
-        private const val ONSET_FRAMES = 2
+        /** 1 frame × 30 ms = 30 ms - opens gate on first confirmed speech frame to avoid clipping onset phonemes. */
+        private const val ONSET_FRAMES = 1
 
-        /** 15 frames × 30 ms = 450 ms - captures onset phonemes before speech gate opened. */
-        private const val LEAD_IN_FRAMES = 15
+        /** 20 frames × 30 ms = 600 ms - gives model pre-speech silence as acoustic context. */
+        private const val LEAD_IN_FRAMES = 20
 
         /** 15 frames × 30 ms = 450 ms - captures trailing soft syllables. */
         private const val HANGOVER_FRAMES = 15
+
+        /** 20 frames × 30 ms = 600 ms of silence after hangover before emitting an utterance boundary. */
+        internal const val SILENCE_BOUNDARY_FRAMES = 20
     }
 }

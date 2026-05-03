@@ -13,6 +13,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import dev.brgr.outspoke.inference.cleanTranscript
 import androidx.core.view.ViewCompat
 import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistry
@@ -275,7 +276,11 @@ class OutspokeInputMethodService :
         super.onStartInput(attribute, restarting)
         val connection = currentInputConnection ?: return
         keyboardViewModel.setTextInjector(
-            TextInjector(connection, attribute ?: EditorInfo())
+            TextInjector(
+                connection,
+                attribute ?: EditorInfo(),
+                displayCleanFn = { text -> text.cleanTranscript() },
+            )
         )
         Log.d(TAG, "onStartInput - engine: ${inferenceBinder?.getEngineState()?.value}")
     }

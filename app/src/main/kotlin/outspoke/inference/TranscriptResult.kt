@@ -12,8 +12,13 @@ sealed class TranscriptResult {
     /**
      * Final, confirmed transcript for a completed utterance.
      * The keyboard should commit [text] to the active input field.
+     *
+     * [isUtteranceBoundary] is true when this Final was emitted mid-session by the VAD
+     * silence-boundary handler. The recording session is still active and the keyboard
+     * must NOT tear down capture state — only commit the text and continue listening.
+     * When false (the default), this is a true session-ending Final.
      */
-    data class Final(val text: String) : TranscriptResult()
+    data class Final(val text: String, val isUtteranceBoundary: Boolean = false) : TranscriptResult()
 
     /** Inference failed. [cause] carries the underlying exception for logging/display. */
     data class Failure(val cause: Throwable) : TranscriptResult()
@@ -35,4 +40,3 @@ sealed class TranscriptResult {
      */
     data class WindowTrimmed(val stableWords: List<String> = emptyList()) : TranscriptResult()
 }
-

@@ -136,7 +136,7 @@ class AudioCaptureManager(private val context: Context) {
                 Log.w(TAG, "Silero VAD model not found in raw resources. Falling back to Energy VAD.", e)
                 RMSVadFilter(vadSensitivity)
             }
-        } else null
+        } else null.also { Log.d(TAG, "VAD disabled due to vadSensitivity being $vadSensitivity") }
 
         val minBufferBytes = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
@@ -147,7 +147,7 @@ class AudioCaptureManager(private val context: Context) {
         val bufferBytes = maxOf(minBufferBytes, CHUNK_SAMPLES * 2 * 2)
 
         val recorder = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,  // optimised for speech recognition
+            MediaRecorder.AudioSource.DEFAULT,
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
@@ -180,8 +180,9 @@ class AudioCaptureManager(private val context: Context) {
 
                         val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
                         for (c in toSend) {
-                            // Tap 1: record each chunk that survived VAD gating.
-                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            if (!c.isSilenceBoundary && debugAudioDumpEnabled) {
+                                debugAudioDumper.appendVadChunk(c.samples)
+                            }
                             send(c)
                         }
                     }
@@ -216,7 +217,9 @@ class AudioCaptureManager(private val context: Context) {
                         val rms = calculateRms(chunk.samples)
                         val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
                         for (c in toSend) {
-                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            if (!c.isSilenceBoundary && debugAudioDumpEnabled) {
+                                debugAudioDumper.appendVadChunk(c.samples)
+                            }
                             send(c)
                         }
                     }
@@ -232,7 +235,9 @@ class AudioCaptureManager(private val context: Context) {
                     while (vad.isSpeechActive && safetyFrames-- > 0) {
                         val toSend = vad.process(silence, 0f)
                         for (c in toSend) {
-                            if (debugAudioDumpEnabled) debugAudioDumper.appendVadChunk(c.samples)
+                            if (!c.isSilenceBoundary && debugAudioDumpEnabled) {
+                                debugAudioDumper.appendVadChunk(c.samples)
+                            }
                             send(c)
                         }
                     }

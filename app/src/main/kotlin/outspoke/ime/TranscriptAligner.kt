@@ -65,19 +65,15 @@ object TranscriptAligner {
      * where the model refines a word slightly across strides (e.g. "schreibt" vs "schreibe").
      *
      * Allowed edits by normalized length:
-     *  - 0-3 chars: exact match only (prevents "und"/"ins", "der"/"die" false positives)
-     *  - 4-5 chars: 1 edit
-     *  - 6+ chars: 2 edits
+     *  - 0-5 chars: exact match only (short words like "they"/"then", "form"/"from" are
+     *    semantically distinct; a single edit on a 4-letter word is a 25% alteration)
+     *  - 6+ chars: 1 edit
      */
     internal fun wordsMatch(a: String, b: String): Boolean {
         val na = a.normalizeWord()
         val nb = b.normalizeWord()
         if (na == nb) return true
-        val maxEdits = when {
-            minOf(na.length, nb.length) <= 3 -> 0
-            minOf(na.length, nb.length) <= 5 -> 1
-            else -> 2
-        }
+        val maxEdits = if (minOf(na.length, nb.length) >= 6) 1 else 0
         return maxEdits > 0 && levenshtein(na, nb) <= maxEdits
     }
 

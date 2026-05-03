@@ -102,6 +102,19 @@ private const val TRIM_COMPOSING_DROP_TAIL = 2
 class TextInjector(
     private val inputConnection: InputConnection,
     private val editorInfo: EditorInfo,
+    /**
+     * Applied to transcript text immediately before it is written to the text field
+     * (via [InputConnection.commitText] or [InputConnection.setComposingText]).
+     *
+     * This separation keeps the internal alignment tracking ([committedWords],
+     * [composingWords]) on the structurally-cleaned model output — which preserves
+     * word positions — while the field only ever receives fully display-cleaned text
+     * (fillers removed, stutters collapsed, repeated phrases deduplicated).
+     *
+     * Defaults to the identity function so tests that construct [TextInjector] directly
+     * do not need to provide a cleaning implementation.
+     */
+    private val displayCleanFn: (String) -> String = { it },
 ) {
 
     /**
@@ -171,10 +184,16 @@ class TextInjector(
         private set
 
     /**
+     * Applies [displayCleanFn] to a word list joined by spaces.
+     * Use this at every [InputConnection.commitText] and [InputConnection.setComposingText]
+     * call site so the text field always shows fully display-cleaned output.
+     */
+    private fun displayClean(words: List<String>): String = displayCleanFn(words.joinToString(" "))
+
+    /**
      * Commits a single space character to the [InputConnection] if the character
      * immediately before the cursor is not already whitespace and we haven't yet
      * injected anything in this recording session.
-     *
      * Only fires once per session ([sessionStarted] guards repeated calls) and only
      * for composing-capable editors to avoid inserting spaces in password or number
      * fields.
@@ -217,6 +236,10 @@ class TextInjector(
         val words = text.splitToWords()
         if (words.isEmpty()) return
 
+        // Display-clean the fresh text for use in field-scan recovery comparisons,
+        // where the field content is already display-cleaned.
+        val freshDisplayWords by lazy { displayCleanFn(text).splitToWords() }
+
         // Inject separator space before first content of this session.
         ensureSessionSeparator()
 
@@ -237,12 +260,12 @@ class TextInjector(
                 val freezeCount = maxOf(0, allNewDisplay.size - MUTABLE_WORD_COUNT)
                 if (freezeCount > 0) {
                     val toFreeze = allNewDisplay.take(freezeCount)
-                    inputConnection.commitText(toFreeze.joinToString(" ") + " ", 1)
+                    inputConnection.commitText(displayClean(toFreeze) + " ", 1)
                     committedWords.addAll(toFreeze)
                 }
                 composingWords = allNewDisplay.drop(freezeCount)
                 if (composingWords.isNotEmpty()) {
-                    inputConnection.setComposingText(composingWords.joinToString(" "), 1)
+                    inputConnection.setComposingText(displayClean(composingWords), 1)
                 } else {
                     composingWords = emptyList()
                     inputConnection.finishComposingText()
@@ -279,10 +302,12 @@ class TextInjector(
         if (newContent.isEmpty()) {
             // Primary alignment failed (tracked committedWords diverged from the model's output).
             // Recovery layer 1: try aligning against the actual field content.
+            // The field holds display-cleaned text, so compare against display-cleaned fresh words
+            // to avoid spurious mismatches from filler words present in structural-cleaned `words`.
             val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
             if (fieldChars.isNotEmpty()) {
                 val fieldWords = fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                val fieldNewContent = findNewContent(fieldWords, words)
+                val fieldNewContent = findNewContent(fieldWords, freshDisplayWords)
                 if (fieldNewContent.isNotEmpty()) {
                     // Successfully realigned against the real field content.
                     // Reset committedWords to match and inject only the new tail.
@@ -307,7 +332,7 @@ class TextInjector(
                     val freezeCount = maxOf(0, allNewDisplay.size - MUTABLE_WORD_COUNT)
                     if (freezeCount > 0) {
                         val toFreeze = allNewDisplay.take(freezeCount)
-                        inputConnection.commitText(toFreeze.joinToString(" ") + " ", 1)
+                        inputConnection.commitText(displayClean(toFreeze) + " ", 1)
                         // savedComposing words are already tracked inside committedWords
                         // (they came from fieldWords).  Only add the fieldNewContent words
                         // that were frozen to avoid double-counting.
@@ -316,7 +341,7 @@ class TextInjector(
                     }
                     composingWords = allNewDisplay.drop(freezeCount)
                     if (composingWords.isNotEmpty()) {
-                        inputConnection.setComposingText(composingWords.joinToString(" "), 1)
+                        inputConnection.setComposingText(displayClean(composingWords), 1)
                     } else {
                         composingWords = emptyList()
                         inputConnection.finishComposingText()
@@ -358,7 +383,7 @@ class TextInjector(
         if (freezeCount > 0) {
             val toFreeze = newContent.take(freezeCount)
             // commitText replaces the current composing span with the frozen words.
-            inputConnection.commitText(toFreeze.joinToString(" ") + " ", 1)
+            inputConnection.commitText(displayClean(toFreeze) + " ", 1)
             committedWords.addAll(toFreeze)
         }
 
@@ -366,7 +391,7 @@ class TextInjector(
         val mutableTail = newContent.drop(freezeCount)
         if (mutableTail.isNotEmpty()) {
             composingWords = mutableTail
-            inputConnection.setComposingText(mutableTail.joinToString(" "), 1)
+            inputConnection.setComposingText(displayClean(mutableTail), 1)
         } else {
             // All new content was frozen - nothing remains for the composing span.
             composingWords = emptyList()
@@ -411,11 +436,14 @@ class TextInjector(
         sessionStarted = false
 
         val finalWords = text.splitToWords()
+        // Display-cleaned version of finalWords for field-scan comparisons (field holds
+        // display-cleaned text).
+        val finalDisplayWords = displayCleanFn(text).splitToWords()
         val remaining = findNewContent(savedCommitted, finalWords)
 
         when {
             remaining.isNotEmpty() -> {
-                val remainingText = remaining.joinToString(" ")
+                val remainingText = displayClean(remaining)
                 if (!wasSessionStarted && remainingText.isNotEmpty() && supportsComposing) {
                     // No partials were shown; inject the separator here if needed.
                     val preceding = inputConnection.getTextBeforeCursor(1, 0)
@@ -449,7 +477,7 @@ class TextInjector(
                         // Final text genuinely extends beyond the composing span.
                         // Commit composing + new words together so that commitText
                         // (which replaces the composing span) includes everything.
-                        val fullText = (savedComposing + composingRemaining).joinToString(" ")
+                        val fullText = displayClean(savedComposing + composingRemaining)
                         Log.d(TAG, "[COMMIT_FINAL] composing-anchor: +${composingRemaining.size} word(s) beyond composing")
                         inputConnection.commitText(fullText, 1)
                         inputConnection.finishComposingText()
@@ -481,28 +509,28 @@ class TextInjector(
 
                 // Recovery layer 1: align against the actual field content so the final
                 // result is never silently dropped due to a stale tracking state.
+                // The field holds display-cleaned text; use finalDisplayWords so both sides
+                // of the comparison are display-cleaned.
                 val fieldChars = inputConnection.getTextBeforeCursor(FIELD_SCAN_CHARS, 0)?.toString() ?: ""
                 val fieldWords = fieldChars.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-                val fieldRemaining = findNewContent(fieldWords, finalWords)
+                val fieldRemaining = findNewContent(fieldWords, finalDisplayWords)
                 if (fieldRemaining.isNotEmpty()) {
                     Log.d(TAG, "[COMMIT_FINAL] field-based recovery: +${fieldRemaining.size} new words")
                     inputConnection.commitText(fieldRemaining.joinToString(" "), 1)
                 } else {
                     // Recovery layer 2: complete alignment failure.
                     // P5: try a longest-common-suffix overlap between the field tail and
-                    // finalWords before giving up.  If the field ends with a suffix that
+                    // finalDisplayWords before giving up.  If the field ends with a suffix that
                     // matches the beginning of the final text, append only the non-overlapping
                     // remainder so post-trim sentences are never silently dropped.
-                    // (Note: P1 must be applied first to make the field content rich enough
-                    // for this fallback to have meaningful overlap to work with.)
-                    val fieldTail = fieldWords.takeLast(minOf(fieldWords.size, finalWords.size))
+                    val fieldTail = fieldWords.takeLast(minOf(fieldWords.size, finalDisplayWords.size))
                     var suffixAppended = false
                     for (overlap in fieldTail.size downTo 1) {
-                        if (fieldTail.takeLast(overlap).zip(finalWords.take(overlap))
+                        if (fieldTail.takeLast(overlap).zip(finalDisplayWords.take(overlap))
                                 .all { (a, b) -> wordsMatch(a, b) }) {
-                            val toAppend = finalWords.drop(overlap).joinToString(" ")
+                            val toAppend = finalDisplayWords.drop(overlap).joinToString(" ")
                             if (toAppend.isNotBlank()) {
-                                Log.d(TAG, "[COMMIT_FINAL] suffix fallback: +${finalWords.size - overlap} word(s) beyond field tail")
+                                Log.d(TAG, "[COMMIT_FINAL] suffix fallback: +${finalDisplayWords.size - overlap} word(s) beyond field tail")
                                 inputConnection.commitText(toAppend, 1)
                             }
                             suffixAppended = true
@@ -566,7 +594,7 @@ class TextInjector(
             val safeCount = maxOf(0, composingWords.size - TRIM_COMPOSING_DROP_TAIL)
             if (safeCount > 0) {
                 // Commit the stable leading words (trailing space included) and erase the tail.
-                val safeText = composingWords.take(safeCount).joinToString(" ") + " "
+                val safeText = displayClean(composingWords.take(safeCount)) + " "
                 inputConnection.commitText(safeText, 1)
             } else {
                 // Fewer composing words than the drop count - nothing safe to keep.

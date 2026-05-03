@@ -297,11 +297,14 @@ class KeyboardViewModel(
                             }
 
                             is TranscriptResult.Final -> {
-                                Log.d(TAG, "Final transcript: \"${result.text}\"")
+                                Log.d(TAG, "Final transcript: \"${result.text}\"" +
+                                        if (result.isUtteranceBoundary) " [utterance boundary]" else "")
                                 textInjector?.commitFinal(result.text)
-                                _isContinuousMode.value = false
-                                _uiState.value = KeyboardUiState.Idle
-                                captureJob = null
+                                if (!result.isUtteranceBoundary) {
+                                    _isContinuousMode.value = false
+                                    _uiState.value = KeyboardUiState.Idle
+                                    captureJob = null
+                                }
                             }
 
                             is TranscriptResult.Failure -> {
