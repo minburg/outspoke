@@ -125,12 +125,15 @@ class GoldenPathTest {
         val sentence2 = "Und was ich wirklich nicht haben möchte, ist, dass hier Sätze verloren gehen."
 
         val responses = buildList {
-            // First 4 strides return only sentence1 → stable prefix builds up.
-            repeat(4) { add(TranscriptResult.Final(sentence1)) }
+            // First 4 strides return only sentence1 (without trailing period so that
+            // SENTENCE_FINAL does not fire and the stable-chunk trim can accumulate).
+            // Real model output rarely includes terminal punctuation mid-stream.
+            val s1raw = sentence1.trimEnd('.')
+            repeat(4) { add(TranscriptResult.Final(s1raw)) }
             // After trim, model sees only the tail context → now emits both sentences.
-            add(TranscriptResult.Final("$sentence1 $sentence2"))
-            add(TranscriptResult.Final("$sentence1 $sentence2"))
-            add(TranscriptResult.Final("$sentence1 $sentence2"))
+            add(TranscriptResult.Final("$s1raw $sentence2"))
+            add(TranscriptResult.Final("$s1raw $sentence2"))
+            add(TranscriptResult.Final("$s1raw $sentence2"))
         }
 
         val engine = FakeSpeechEngine(responses)

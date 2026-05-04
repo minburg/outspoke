@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dev.brgr.outspoke.audio.AudioCaptureManager
 import dev.brgr.outspoke.ime.EnterAction
 import dev.brgr.outspoke.ime.TextInjector
+import dev.brgr.outspoke.ime.WordSuggestionProvider
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
 import dev.brgr.outspoke.inference.PipelineDiagnostics
@@ -27,6 +28,7 @@ private const val TAG = "KeyboardViewModel"
 class KeyboardViewModel(
     private val audioCaptureManager: AudioCaptureManager,
     private val appPreferences: AppPreferences,
+    private val wordSuggestionProvider: WordSuggestionProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<KeyboardUiState>(
@@ -95,12 +97,128 @@ class KeyboardViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
-     * **Debug builds only.** When `true`, the pipeline writes WAV files so the engineer
-     * can listen to what the model hears. Collected eagerly so the value is always
-     * available as a snapshot when recording starts.
+     * `true` when the word-suggestion bar feature is enabled in preferences.
+     * When `false` the bar is never shown and no dictionary work is performed.
      */
-    val debugAudioDumpEnabled: StateFlow<Boolean> = appPreferences.debugAudioDumpEnabled
+    val suggestionBarFeatureEnabled: StateFlow<Boolean> = appPreferences.suggestionBarEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * The word currently under the text cursor, or `null` when the cursor is not inside
+     * a word.  Updated by [updateWordAtCursor] on every cursor movement and after each
+     * committed final transcript.  Consumed by the suggestion bar.
+     */
+    private val _wordAtCursor = MutableStateFlow<WordAtCursor?>(null)
+    val wordAtCursor: StateFlow<WordAtCursor?> = _wordAtCursor.asStateFlow()
+
+    /**
+     * Spelling suggestions for the word currently under the cursor, delivered
+     * asynchronously by Android's [WordSuggestionProvider] (SpellCheckerSession).
+     *
+     * Empty when the cursor is between words, the suggestion bar is dismissed, or the
+     * system spell-checker returns no alternatives (word is correctly spelled).
+     *
+     * Reset to empty at the start of each new recording session via [onRecordStart].
+     */
+    private val _wordSuggestions = MutableStateFlow<List<String>>(emptyList())
+    val wordSuggestions: StateFlow<List<String>> = _wordSuggestions.asStateFlow()
+
+    /**
+     * `true` after the user has tapped the dismiss (×) button in the suggestion bar.
+     * Suppresses further suggestions until the cursor moves to a new word.
+     * In-memory only — intentionally not persisted to DataStore.
+     */
+    private val _suggestionBarDismissed = MutableStateFlow(false)
+    val suggestionBarDismissed: StateFlow<Boolean> = _suggestionBarDismissed.asStateFlow()
+
+    init {
+        // Wire up the spell-checker callback.
+        // dismissed state is in-memory only — never read from DataStore.
+        wordSuggestionProvider.onSuggestions = { suggestions ->
+            // Ignore suggestions that arrive after the bar was dismissed, or while
+            // recording / transcription is active — showing them mid-session confuses
+            // users who see suggestions flash and disappear as new words come in.
+            if (!_suggestionBarDismissed.value && !isActiveSession()) {
+                _wordSuggestions.value = suggestions
+            }
+        }
+
+        // Propagate the user's active-language selection to the provider whenever it changes.
+        viewModelScope.launch {
+            appPreferences.suggestionBarLanguages.collect { tags ->
+                wordSuggestionProvider.setActiveLanguages(tags)
+            }
+        }
+    }
+
+    /**
+     * Reads the word at the current cursor position from [textInjector] and publishes it
+     * to [wordAtCursor].  When a word is found and the bar is not dismissed, also fires an
+     * asynchronous spell-checker query whose result updates [wordSuggestions].
+     *
+     * Safe to call from the main thread — [TextInjector.wordAtCursor] performs only
+     * lightweight [android.view.inputmethod.InputConnection] calls.
+     *
+     * Called on every [onUpdateSelection] and after each [TranscriptResult.Final] commit.
+     */
+    fun updateWordAtCursor() {
+        // Do nothing when the feature is disabled — avoids even reading the cursor word.
+        if (!suggestionBarFeatureEnabled.value) return
+        // Do nothing during an active recording or transcription session — suggestions
+        // would flash briefly and disappear as each new word commits, which is confusing.
+        if (isActiveSession()) return
+        val wac = textInjector?.wordAtCursor()
+        _wordAtCursor.value = wac
+        if (wac != null && !_suggestionBarDismissed.value) {
+            Log.d(TAG, "updateWordAtCursor → \"${wac.word}\" — querying corrector")
+            wordSuggestionProvider.getSuggestions(wac.word, wac.sentenceContext)
+        } else {
+            Log.d(TAG, "updateWordAtCursor → no cursor word (wac=$wac, dismissed=${_suggestionBarDismissed.value})")
+            _wordSuggestions.value = emptyList()
+        }
+    }
+
+    /**
+     * Returns true when the keyboard is actively recording or processing a transcription.
+     * The suggestion bar must not be shown in these states.
+     */
+    private fun isActiveSession(): Boolean {
+        val s = _uiState.value
+        return s is KeyboardUiState.Listening ||
+                s is KeyboardUiState.Processing ||
+                s is KeyboardUiState.Transcribing
+    }
+
+    /**
+     * Clears word suggestions so the bar vanishes, without setting a persistent dismissed
+     * state. Behaves identically to clicking at the end of the text field — the bar
+     * reappears the next time the user taps on a word.
+     */
+    fun dismissSuggestionBar() {
+        _wordSuggestions.value = emptyList()
+    }
+
+    /**
+     * Replaces the word currently under the text cursor with [word].
+     *
+     * Delegates to [TextInjector.replaceCursorWord] and then refreshes [wordAtCursor] so
+     * the suggestion bar reflects the new cursor state immediately.  Safe to call on the
+     * main thread.
+     *
+     * Called by the suggestion bar when the user taps a chip.
+     */
+    fun replaceWordAtCursor(word: String) {
+        textInjector?.replaceCursorWord(word)
+        updateWordAtCursor()
+    }
+
+    /**
+     * When `true` (default), number-word sequences in the transcript are converted to
+     * digit form by [dev.brgr.outspoke.inference.NumberNormaliser] as part of the
+     * post-processing pipeline.
+     */
+    val formatNumbersAsDigits: StateFlow<Boolean> = appPreferences.formatNumbersAsDigits
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /**
      * Persists [tag] to preferences and immediately forwards it to the loaded engine.
@@ -141,7 +259,10 @@ class KeyboardViewModel(
 
             EngineState.Ready -> {
                 // Clear any engine-driven blocking state so the user can start recording.
-                if (_uiState.value is KeyboardUiState.EngineLoading) {
+                if (_uiState.value is KeyboardUiState.EngineLoading ||
+                    (_uiState.value is KeyboardUiState.Error &&
+                            (_uiState.value as KeyboardUiState.Error).reason == KeyboardUiState.ErrorReason.EngineLoadFailed)
+                ) {
                     _uiState.value = KeyboardUiState.Idle
                 }
             }
@@ -199,6 +320,19 @@ class KeyboardViewModel(
         _isContinuousMode.value = true
     }
 
+    /**
+     * Called when the user taps "Retry" after a transient error (e.g. low-confidence failure).
+     *
+     * Starts a new recording session and immediately engages continuous mode so the stop
+     * button is shown. Without this, the button would appear magenta (active) in HOLD mode
+     * with no way to stop — the gesture handler is not tracking a held finger, so the user
+     * would have to tap the TalkButton which would re-start instead of stop recording.
+     */
+    fun onRetry() {
+        _isContinuousMode.value = true
+        onRecordStart()
+    }
+
     /** Delete the character immediately before the cursor. */
     fun deleteChar() {
         textInjector?.deleteChar()
@@ -243,6 +377,8 @@ class KeyboardViewModel(
         captureJob?.cancel()
         _uiState.value = KeyboardUiState.Listening
         _diagnostics.value = PipelineDiagnostics()
+        _wordSuggestions.value = emptyList()
+        // Dismissed flag is no longer set persistently — bar reappears on next word tap.
 
         captureJob = viewModelScope.launch {
             // Capture this coroutine's Job reference so the collect lambda can detect
@@ -260,7 +396,6 @@ class KeyboardViewModel(
                     Log.w(TAG, "No InferenceRepository - capturing audio without transcription")
                     audioCaptureManager.startCapture(
                         vadSensitivity = vadSensitivity.value * 0.4f,
-                        debugAudioDumpEnabled = debugAudioDumpEnabled.value,
                     ).collect { /* amplitude updated internally */ }
                     // Flow completed naturally (stopCapture called); no inference to wait for.
                     _uiState.value = KeyboardUiState.Idle
@@ -272,62 +407,66 @@ class KeyboardViewModel(
                 repo.transcribe(
                     audio = audioCaptureManager.startCapture(
                         vadSensitivity = vadSensitivity.value * 0.4f,
-                        debugAudioDumpEnabled = debugAudioDumpEnabled.value,
                     ),
                     postprocessingEnabled = postprocessingEnabled.value,
-                    debugAudioDumper = if (debugAudioDumpEnabled.value) audioCaptureManager.debugAudioDumper else null,
+                    formatNumbersAsDigits = formatNumbersAsDigits.value,
                 ).collect { result ->
-                        // Stale-session guard: if this job has been superseded (e.g. the field
-                        // was cleared and a new session started), discard this result entirely
-                        // so no old-session text is injected into the fresh TextInjector.
-                        if (captureJob != null && captureJob != myJob) return@collect
+                    // Stale-session guard: if this job has been superseded (e.g. the field
+                    // was cleared and a new session started), discard this result entirely
+                    // so no old-session text is injected into the fresh TextInjector.
+                    if (captureJob != null && captureJob != myJob) return@collect
 
-                        when (result) {
-                            is TranscriptResult.Partial -> {
-                                _uiState.value = KeyboardUiState.Processing(result.text)
-                                textInjector?.setPartial(result.text)
-                                // Update alignment recovery counter from the injector.
-                                val injector = textInjector
-                                if (injector != null) {
-                                    val d = _diagnostics.value
-                                    if (injector.alignmentRecoveryCount > d.alignmentRecoveries) {
-                                        _diagnostics.value = d.copy(alignmentRecoveries = injector.alignmentRecoveryCount)
-                                    }
+                    when (result) {
+                        is TranscriptResult.Partial -> {
+                            _uiState.value = KeyboardUiState.Processing(result.text)
+                            textInjector?.setPartial(result.text)
+                            // Update alignment recovery counter from the injector.
+                            val injector = textInjector
+                            if (injector != null) {
+                                val d = _diagnostics.value
+                                if (injector.alignmentRecoveryCount > d.alignmentRecoveries) {
+                                    _diagnostics.value = d.copy(alignmentRecoveries = injector.alignmentRecoveryCount)
                                 }
-                            }
-
-                            is TranscriptResult.Final -> {
-                                Log.d(TAG, "Final transcript: \"${result.text}\"" +
-                                        if (result.isUtteranceBoundary) " [utterance boundary]" else "")
-                                textInjector?.commitFinal(result.text)
-                                if (!result.isUtteranceBoundary) {
-                                    _isContinuousMode.value = false
-                                    _uiState.value = KeyboardUiState.Idle
-                                    captureJob = null
-                                }
-                            }
-
-                            is TranscriptResult.Failure -> {
-                                Log.e(TAG, "Transcription failure", result.cause)
-                                _isContinuousMode.value = false
-                                _uiState.value = KeyboardUiState.Error(
-                                    reason = KeyboardUiState.ErrorReason.TranscriptionFailed,
-                                    detail = result.cause.message,
-                                )
-                            }
-
-                            // The audio window was trimmed: shrink committedWords so the
-                            // next partial can re-anchor without losing middle sentences.
-                            is TranscriptResult.WindowTrimmed -> {
-                                Log.d(TAG, "WindowTrimmed - resetting TextInjector alignment" +
-                                        if (result.stableWords.isNotEmpty()) " (stableWords=${result.stableWords.size}w)" else "")
-                                textInjector?.resetAfterTrim(result.stableWords)
-                                _diagnostics.value = _diagnostics.value.copy(
-                                    windowTrims = _diagnostics.value.windowTrims + 1
-                                )
                             }
                         }
+
+                        is TranscriptResult.Final -> {
+                            Log.d(
+                                TAG, "Final transcript: \"${result.text}\"" +
+                                        if (result.isUtteranceBoundary) " [utterance boundary]" else ""
+                            )
+                            textInjector?.commitFinal(result.text)
+                            updateWordAtCursor()
+                            if (!result.isUtteranceBoundary) {
+                                _isContinuousMode.value = false
+                                _uiState.value = KeyboardUiState.Idle
+                                captureJob = null
+                            }
+                        }
+
+                        is TranscriptResult.Failure -> {
+                            Log.e(TAG, "Transcription failure", result.cause)
+                            _isContinuousMode.value = false
+                            _uiState.value = KeyboardUiState.Error(
+                                reason = KeyboardUiState.ErrorReason.TranscriptionFailed,
+                                detail = result.cause.message,
+                            )
+                        }
+
+                        // The audio window was trimmed: shrink committedWords so the
+                        // next partial can re-anchor without losing middle sentences.
+                        is TranscriptResult.WindowTrimmed -> {
+                            Log.d(
+                                TAG, "WindowTrimmed - resetting TextInjector alignment" +
+                                        if (result.stableWords.isNotEmpty()) " (stableWords=${result.stableWords.size}w)" else ""
+                            )
+                            textInjector?.resetAfterTrim(result.stableWords)
+                            _diagnostics.value = _diagnostics.value.copy(
+                                windowTrims = _diagnostics.value.windowTrims + 1
+                            )
+                        }
                     }
+                }
 
                 // The flow completed normally. If still in Transcribing (or Listening), it
                 // means VAD filtered out all audio (nothing was said) so InferenceRepository
@@ -413,6 +552,11 @@ class KeyboardViewModel(
         // failures and potential duplication on the very next partial injection.
         textInjector?.clear()
 
+        // Always clear suggestions — the field is empty so there is nothing to suggest or
+        // correct. This also ensures the IME window height is reset even when idle.
+        _wordSuggestions.value = emptyList()
+        _wordAtCursor.value = null
+
         val isActivelyRecording = _uiState.value is KeyboardUiState.Listening ||
                 _uiState.value is KeyboardUiState.Processing
         val hasInferenceRunning = _uiState.value is KeyboardUiState.Transcribing
@@ -479,9 +623,10 @@ class KeyboardViewModel(
     class Factory(
         private val audioCaptureManager: AudioCaptureManager,
         private val appPreferences: AppPreferences,
+        private val wordSuggestionProvider: WordSuggestionProvider,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            KeyboardViewModel(audioCaptureManager, appPreferences) as T
+            KeyboardViewModel(audioCaptureManager, appPreferences, wordSuggestionProvider) as T
     }
 }

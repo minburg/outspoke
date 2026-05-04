@@ -3,6 +3,7 @@ package dev.brgr.outspoke.inference
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import android.os.Debug
 import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import org.json.JSONObject
@@ -10,7 +11,6 @@ import java.io.File
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.nio.LongBuffer
-import android.os.Debug
 
 private const val TAG = "ParakeetEngine"
 private const val FALLBACK_BLANK_ID = 1024
@@ -65,6 +65,33 @@ class ParakeetEngine : SpeechEngine {
     @Volatile
     override var isLoaded: Boolean = false
         private set
+
+    /**
+     * BCP-47 language tag to use for post-processing (filler removal, number normalisation).
+     * `null` means auto-detect; the post-processing pipeline defaults to `"en"` in that case.
+     *
+     * **ONNX language conditioning note:**
+     * The current Parakeet TDT 0.6B-v3 ONNX export (nemo128 + encoder + decoder_joint) does
+     * NOT expose a language input tensor — the three verified input sets are:
+     *   • nemo128:         [waveforms (FLOAT), waveforms_lens (INT64)]
+     *   • encoder:         [audio_signal (FLOAT), length (INT64)]
+     *   • decoder_joint:   [encoder_outputs, targets, target_length, input_states_1, input_states_2]
+     * None of these carry a language token.  When a language-conditioned ONNX export becomes
+     * available, the correct place to inject it is `encode()` — pass the language ID as an
+     * additional INT64 tensor whose name matches the new export's input slot (e.g.
+     * "language_id"), mapping each BCP-47 tag to the model's integer language index.
+     * Until then, [forcedLanguage] is consumed only by the post-processing layer.
+     */
+    @Volatile
+    private var forcedLanguage: String? = null
+
+    /** Returns the active language tag for post-processing, defaulting to `"en"` for auto-detect. */
+    override val currentLanguage: String get() = forcedLanguage ?: "en"
+
+    /** Implements [SpeechEngine.setLanguage]; stores [tag] for post-processing use. */
+    override fun setLanguage(tag: String) {
+        forcedLanguage = if (tag == "auto") null else tag
+    }
 
 
     /**
@@ -389,6 +416,7 @@ class ParakeetEngine : SpeechEngine {
                         hypothesis.add(predictedToken)
                         prevToken = predictedToken
                         tokensAtFrame++
+
                         if (predictedDur > 0) {
                             t += predictedDur
                             tokensAtFrame = 0
@@ -410,20 +438,10 @@ class ParakeetEngine : SpeechEngine {
             }
         }
 
-        return detokenize(hypothesis)
+        val finalText = detokenize(hypothesis)
+        return finalText
     }
 
-    /**
-     * Converts token IDs to a string using [vocabulary].
-     * Handles SentencePiece word-boundary markers (U+2581 `▁`).
-     *
-     * Filtered entries:
-     *  - [blankId] - the blank/CTC token; should never reach here but guard anyway
-     *  - Purely numeric strings - NeMo SentencePiece exports label unused/special token
-     *    slots with their index (e.g. "8192", "1076", "▁7877"). Both bare and
-     *    `▁`-prefixed forms are filtered so that word-boundary variants such as
-     *    "▁8192" are caught before the space-insertion logic runs.
-     */
     /**
      * Converts token IDs to a string using [vocabulary].
      * Handles SentencePiece word-boundary markers (U+2581 `▁`).
@@ -542,6 +560,9 @@ class ParakeetEngine : SpeechEngine {
         Log.i(TAG, "ParakeetEngine memory: used=${usedMemMB}MB, max=${maxMemMB}MB")
         val debugMem = Debug.MemoryInfo()
         Debug.getMemoryInfo(debugMem)
-        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
+        Log.i(
+            TAG,
+            "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB"
+        )
     }
 }

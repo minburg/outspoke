@@ -79,7 +79,7 @@ class ModelDownloadManager(
 
         for (remoteFile in source.files) {
             val finalFile = File(modelDir, remoteFile.filename)
-            val tempFile  = File(modelDir, "${remoteFile.filename}.tmp")
+            val tempFile = File(modelDir, "${remoteFile.filename}.tmp")
 
             // Skip files that were fully downloaded in a previous attempt.
             if (finalFile.exists() && finalFile.length() > 0) {
@@ -103,23 +103,25 @@ class ModelDownloadManager(
             when (response.code) {
                 206 -> {
                     resuming = true
-                    offset   = existingOffset
+                    offset = existingOffset
                 }
+
                 200 -> {
                     resuming = false
-                    offset   = 0L
+                    offset = 0L
                     if (existingOffset > 0) {
                         tempFile.delete()
                         Log.d(TAG, "Server returned 200 for Range request - restarting ${remoteFile.filename}")
                     }
                 }
+
                 else -> throw RuntimeException(
                     "HTTP ${response.code} downloading ${remoteFile.filename}: ${response.message}"
                 )
             }
 
             try {
-                val body           = response.body
+                val body = response.body
                 val responseLength = body.contentLength()
                 // Total file size = bytes already on disk + bytes the server is sending now.
                 val totalBytes = if (resuming && offset > 0 && responseLength > 0)
@@ -219,23 +221,25 @@ class ModelDownloadManager(
         when (response.code) {
             206 -> {
                 resuming = true
-                offset   = existingOffset
+                offset = existingOffset
             }
+
             200 -> {
                 resuming = false
-                offset   = 0L
+                offset = 0L
                 if (existingOffset > 0) {
                     zipTemp.delete()
                     Log.d(TAG, "Server returned 200 for ZIP Range request - restarting")
                 }
             }
+
             else -> throw RuntimeException(
                 "HTTP ${response.code} downloading ZIP: ${response.message}"
             )
         }
 
         try {
-            val body           = response.body
+            val body = response.body
             val responseLength = body.contentLength()
             val totalBytes = if (resuming && offset > 0 && responseLength > 0)
                 offset + responseLength else responseLength

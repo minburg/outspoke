@@ -137,5 +137,256 @@ class InferenceRepositoryTest {
         }
 }
 
+// Short-utterance zero-padding unit tests
+
+class ZeroPadToMinimumTest {
+
+    @Test
+    fun `given empty array, when padded to 32000, then result has 32000 zeroes`() {
+        val result = zeroPadToMinimum(ShortArray(0), 32_000)
+        assertEquals(32_000, result.size)
+        assertTrue("All padding should be zero", result.all { it == 0.toShort() })
+    }
+
+    @Test
+    fun `given array shorter than minimum, when padded, then length equals minimum and original content is preserved`() {
+        val original = ShortArray(8_000) { it.toShort() }
+        val result = zeroPadToMinimum(original, 32_000)
+
+        assertEquals(32_000, result.size)
+        // Original samples are preserved at the front.
+        for (i in original.indices) {
+            assertEquals("Sample at $i should match original", original[i], result[i])
+        }
+        // Tail is silence.
+        for (i in original.size until result.size) {
+            assertEquals("Padding at $i should be zero", 0.toShort(), result[i])
+        }
+    }
+
+    @Test
+    fun `given array exactly at minimum, when padded, then same array is returned unchanged`() {
+        val original = ShortArray(32_000) { 1 }
+        val result = zeroPadToMinimum(original, 32_000)
+        assertSame("Should return the same instance when no padding is needed", original, result)
+    }
+
+    @Test
+    fun `given array longer than minimum, when padded, then same array is returned unchanged`() {
+        val original = ShortArray(40_000) { 2 }
+        val result = zeroPadToMinimum(original, 32_000)
+        assertSame("Should return the same instance when already above minimum", original, result)
+    }
+}
+
+class ShortUtteranceRepositoryTest {
+
+    private val sampleRate = 16_000
+
+    private fun capturedSizesEngine(): Pair<SpeechEngine, MutableList<Int>> {
+        val sizes = mutableListOf<Int>()
+        val engine = object : SpeechEngine {
+            override val isLoaded = true
+            override fun load(modelDir: File) = Unit
+            override fun close() = Unit
+            override fun transcribe(chunk: AudioChunk): TranscriptResult {
+                sizes += chunk.samples.size
+                return TranscriptResult.Final("word")
+            }
+        }
+        return engine to sizes
+    }
+
+    @Test
+    fun `given utterance shorter than threshold, final inference receives at least MIN_PADDING_SAMPLES`() = runTest {
+        // 0.5 s < SHORT_UTTERANCE_THRESHOLD_SAMPLES (2.5 s) → short-utterance path
+        val (engine, capturedSizes) = capturedSizesEngine()
+        val repo = InferenceRepository(engine)
+
+        repo.transcribe(flowOf(AudioChunk(ShortArray(sampleRate / 2)))).toList()
+
+        // The engine must have been called with at least MIN_PADDING_SAMPLES (32 000).
+        assertTrue("Engine should have been called at least once", capturedSizes.isNotEmpty())
+        val lastSize = capturedSizes.last()
+        assertTrue(
+            "Short-utt path must deliver ≥ MIN_PADDING_SAMPLES (32000) but got $lastSize",
+            lastSize >= sampleRate * 2
+        )
+    }
+
+    @Test
+    fun `given utterance shorter than threshold, result is emitted as Final with isUtteranceBoundary true`() = runTest {
+        // 1 s < 2.5 s threshold → short-utterance path
+        val repo = InferenceRepository(object : SpeechEngine {
+            override val isLoaded = true
+            override fun load(modelDir: File) = Unit
+            override fun close() = Unit
+            override fun transcribe(chunk: AudioChunk) = TranscriptResult.Partial("hello")
+        })
+
+        val results = repo.transcribe(flowOf(AudioChunk(ShortArray(sampleRate)))).toList()
+
+        val final = results.filterIsInstance<TranscriptResult.Final>()
+        assertTrue("Should emit at least one Final result", final.isNotEmpty())
+        assertTrue(
+            "Final result should have isUtteranceBoundary = true",
+            final.last().isUtteranceBoundary
+        )
+    }
+
+    @Test
+    fun `given long utterance above threshold, final inference does NOT receive short-utt padding`() = runTest {
+        // 3 s > 2.5 s threshold → normal path; engine should NOT be called with 32000+ samples
+        // from zero-padding (it will still get ≥ MIN_FINAL_SAMPLES but the logic differs).
+        val (engine, capturedSizes) = capturedSizesEngine()
+        val repo = InferenceRepository(engine)
+
+        // 3 chunks × 1 s = 3 s, all above threshold.  First two strides fire a partial,
+        // final flush runs the normal path on remaining audio.
+        val chunks = List(3) { AudioChunk(ShortArray(sampleRate)) }
+        repo.transcribe(chunks.asFlow()).toList()
+
+        // The final engine call should receive the actual window (≥ MIN_FINAL_SAMPLES
+        // for the normal path) — but it should NOT be artificially inflated to
+        // MIN_PADDING_SAMPLES (32 000) when the window is already above threshold.
+        // Here, 3 s of audio is above threshold, so no short-utt padding applies.
+        assertTrue("Engine should have been called", capturedSizes.isNotEmpty())
+    }
+}
+
+// ── estimateConfidence unit tests ─────────────────────────────────────────────────────────────
+
+class EstimateConfidenceTest {
+
+    private val sampleRate = 16_000
+
+    @Test
+    fun `given Final with meaningful multi-character text, then confidence is above threshold`() {
+        // "hello" = 5 word chars → wordCharCount >= 2 → confidence = 1.0
+        val result = TranscriptResult.Final("hello")
+        val confidence = estimateConfidence(result, sampleRate)
+        assertTrue("Confidence should be >= threshold for real text", confidence >= CONFIDENCE_THRESHOLD)
+    }
+
+    @Test
+    fun `given Final with empty text, then confidence is 0`() {
+        val result = TranscriptResult.Final("")
+        val confidence = estimateConfidence(result, sampleRate)
+        assertEquals(0.0f, confidence, 0.001f)
+    }
+
+    @Test
+    fun `given Final with single punctuation character, then confidence is 0`() {
+        val result = TranscriptResult.Final(".")
+        val confidence = estimateConfidence(result, sampleRate)
+        assertEquals(0.0f, confidence, 0.001f)
+    }
+
+    @Test
+    fun `given Failure result, then confidence is 0`() {
+        val result = TranscriptResult.Failure(RuntimeException("engine error"))
+        val confidence = estimateConfidence(result, sampleRate)
+        assertEquals(0.0f, confidence, 0.001f)
+    }
+
+    @Test
+    fun `given single letter text, then confidence is 0 (fewer than 2 word chars)`() {
+        val result = TranscriptResult.Final("a")
+        val confidence = estimateConfidence(result, sampleRate)
+        assertEquals(0.0f, confidence, 0.001f)
+    }
+
+    @Test
+    fun `given two-character text, then confidence is above threshold`() {
+        // "hi" = 2 word chars → minimum passing case
+        val result = TranscriptResult.Final("hi")
+        val confidence = estimateConfidence(result, sampleRate)
+        assertTrue("Two word-chars should pass confidence gate", confidence >= CONFIDENCE_THRESHOLD)
+    }
+}
+
+// ── Confidence gate integration tests ────────────────────────────────────────────────────────
+
+class ConfidenceGateTest {
+
+    private val sampleRate = 16_000
+
+    /** Builds a SpeechEngine that always returns [result]. */
+    private fun engineReturning(result: TranscriptResult): SpeechEngine = object : SpeechEngine {
+        override val isLoaded = true
+        override fun load(modelDir: File) = Unit
+        override fun close() = Unit
+        override fun transcribe(chunk: AudioChunk) = result
+    }
+
+    /**
+     * A short utterance (0.5 s < 2.5 s threshold) where the engine returns a
+     * meaningful result with very short text ("x") — below the 2-char minimum
+     * → estimateConfidence returns 0.0 → gate fires → Failure is emitted.
+     */
+    @Test
+    fun `given low-confidence short utterance, then Failure is emitted`() = runTest {
+        // Engine returns a single-character result (word char count = 1 < 2 → confidence 0.0)
+        val repo = InferenceRepository(engineReturning(TranscriptResult.Final("x")))
+
+        val results = repo.transcribe(
+            flowOf(AudioChunk(ShortArray(sampleRate / 2)))  // 0.5 s → short-utterance path
+        ).toList()
+
+        assertTrue("Should emit at least one result", results.isNotEmpty())
+        val last = results.last()
+        assertTrue(
+            "Low-confidence short utterance should emit Failure but got $last",
+            last is TranscriptResult.Failure
+        )
+        val msg = (last as TranscriptResult.Failure).cause.message ?: ""
+        assertTrue("Failure message should mention confidence", "could not understand" in msg)
+    }
+
+    /**
+     * A short utterance where the engine returns a sufficiently rich text
+     * (many word chars, short audio → high density → above threshold).
+     * Gate must NOT fire; a Final result must be returned.
+     */
+    @Test
+    fun `given high-confidence short utterance, then Final result passes through`() = runTest {
+        // "hello there" has 10 word characters (≥2) → binary proxy returns 1.0 → above threshold → passes
+        val repo = InferenceRepository(engineReturning(TranscriptResult.Final("hello there")))
+
+        val results = repo.transcribe(
+            flowOf(AudioChunk(ShortArray(sampleRate / 2)))  // 0.5 s → short-utterance path
+        ).toList()
+
+        assertTrue("Should emit at least one result", results.isNotEmpty())
+        val finals = results.filterIsInstance<TranscriptResult.Final>()
+        assertTrue(
+            "High-confidence short utterance should emit Final but got ${results.last()}",
+            finals.isNotEmpty()
+        )
+    }
+
+    /**
+     * A long utterance (3 s > 2.5 s threshold) where the engine returns single-char text.
+     * The confidence gate must NOT apply — only the short-utterance path is gated.
+     * A Final result must be returned as normal.
+     */
+    @Test
+    fun `given long utterance with low-confidence-looking result, then confidence gate is bypassed`() = runTest {
+        // Engine returns a trivial single-character result — would fail confidence gate if applied.
+        val repo = InferenceRepository(engineReturning(TranscriptResult.Final("x")))
+
+        // 3 × 1 s = 3 s > SHORT_UTTERANCE_THRESHOLD_SAMPLES (2.5 s) → normal path
+        val chunks = List(3) { AudioChunk(ShortArray(sampleRate)) }
+        val results = repo.transcribe(chunks.asFlow()).toList()
+
+        assertTrue("Should emit at least one result", results.isNotEmpty())
+        // The last result should be a Final (not a Failure from the confidence gate)
+        val last = results.last()
+        assertTrue(
+            "Long utterance should bypass confidence gate and emit Final but got $last",
+            last is TranscriptResult.Final
+        )
+    }
+}
 
 

@@ -18,7 +18,10 @@ sealed class TranscriptResult {
      * must NOT tear down capture state — only commit the text and continue listening.
      * When false (the default), this is a true session-ending Final.
      */
-    data class Final(val text: String, val isUtteranceBoundary: Boolean = false) : TranscriptResult()
+    data class Final(
+        val text: String,
+        val isUtteranceBoundary: Boolean = false,
+    ) : TranscriptResult()
 
     /** Inference failed. [cause] carries the underlying exception for logging/display. */
     data class Failure(val cause: Throwable) : TranscriptResult()

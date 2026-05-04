@@ -51,11 +51,11 @@ fun enterActionFrom(editorInfo: EditorInfo): EnterAction {
     val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
     return when (imeAction) {
         EditorInfo.IME_ACTION_SEARCH -> EnterAction.SEARCH
-        EditorInfo.IME_ACTION_GO     -> EnterAction.GO
-        EditorInfo.IME_ACTION_SEND   -> EnterAction.SEND
-        EditorInfo.IME_ACTION_NEXT   -> EnterAction.NEXT
-        EditorInfo.IME_ACTION_DONE   -> EnterAction.DONE
-        else                         -> EnterAction.DONE
+        EditorInfo.IME_ACTION_GO -> EnterAction.GO
+        EditorInfo.IME_ACTION_SEND -> EnterAction.SEND
+        EditorInfo.IME_ACTION_NEXT -> EnterAction.NEXT
+        EditorInfo.IME_ACTION_DONE -> EnterAction.DONE
+        else -> EnterAction.DONE
     }
 }
 

@@ -198,5 +198,22 @@ class SileroVadFilter(
 
         /** 20 frames × 30 ms = 600 ms of silence after hangover before emitting an utterance boundary. */
         internal const val SILENCE_BOUNDARY_FRAMES = 20
+
+        // ── Short-utterance VAD parameters ───────────────────────────────────────────
+        // These constants define tighter onset and lead-in values intended for the
+        // short-utterance path (< 2.5 s of VAD-active audio).  Reducing onset latency
+        // and lead-in avoids clipping the very first phoneme of a brief command.
+        //
+        // TODO: Wire these into the short-utterance path once the VAD parameter
+        //   injection API is in place.  The current architecture does not support
+        //   per-path VAD configuration — SileroVadFilter is constructed once and
+        //   shared for both short and long recordings — so these values are documented
+        //   here as named constants for A/B testing readiness but are NOT applied yet.
+
+        /** Target onset gate for the short-utterance path: 1 frame × 30 ms = 30 ms. */
+        internal const val SHORT_UTT_VAD_ONSET_MS = 30
+
+        /** Target lead-in for the short-utterance path: ~6-7 frames × 30 ms ≈ 200 ms. */
+        internal const val SHORT_UTT_VAD_LEAD_IN_MS = 200
     }
 }

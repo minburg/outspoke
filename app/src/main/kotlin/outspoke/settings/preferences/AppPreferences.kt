@@ -2,11 +2,7 @@ package dev.brgr.outspoke.settings.preferences
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import dev.brgr.outspoke.settings.model.ModelId
 import kotlinx.coroutines.flow.Flow
@@ -122,21 +118,104 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[keyKeyboardTutorialShown] = shown }
     }
 
-    private val keyDebugAudioDumpEnabled = booleanPreferencesKey("debug_audio_dump_enabled")
+    private val keyForcedLanguage = stringPreferencesKey("forced_language")
 
     /**
-     * **Debug builds only.** When `true`, the pipeline writes WAV files to the app's
-     * external files directory so the engineer can listen to what the model actually hears:
-     *  - `debug_vad_output.wav` — everything that passed VAD gating (Tap 1).
-     *  - `debug_stride_NNN.wav` — the exact window fed to `engine.transcribe()` per stride (Tap 2).
+     * BCP-47 language tag to force on the active speech engine, or `null` for automatic detection.
      *
-     * Defaults to `false`. The preference toggle is only shown in debug builds.
+     * Supported values for Parakeet TDT 0.6B-v3:
+     *   `null` (auto), `"en"`, `"de"`, `"fr"`, `"es"`, `"it"`, `"pt"`, `"nl"`, `"pl"`,
+     *   `"zh"`, `"ja"`, `"ko"`.
+     *
+     * When non-null, `InferenceService` passes this tag to `SpeechEngine.setLanguage()` after
+     * loading the engine.  The language is also used by the post-processing pipeline
+     * (filler-word removal, number normalisation) to select the correct locale rules.
+     *
+     * Defaults to `null` (auto-detect) so existing installs are unaffected.
      */
-    val debugAudioDumpEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[keyDebugAudioDumpEnabled] ?: false
+    val forcedLanguage: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[keyForcedLanguage]   // null when key absent → auto-detect
     }
 
-    suspend fun setDebugAudioDumpEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[keyDebugAudioDumpEnabled] = enabled }
+    suspend fun setForcedLanguage(tag: String?) {
+        context.dataStore.edit { prefs ->
+            if (tag == null) prefs.remove(keyForcedLanguage)
+            else prefs[keyForcedLanguage] = tag
+        }
+    }
+
+    private val keyFormatNumbersAsDigits = booleanPreferencesKey("format_numbers_as_digits")
+
+    /**
+     * When `true` (default), the post-processing pipeline converts number-word sequences
+     * such as "twelve", "two thousand and twenty five", or "zwölf" into their digit
+     * equivalents ("12", "2025", "12").
+     *
+     * Set to `false` to keep number words as spoken — useful when the user dictates
+     * text where the written form of numbers is preferred (e.g. legal or literary writing).
+     */
+    val formatNumbersAsDigits: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyFormatNumbersAsDigits] ?: true
+    }
+
+    suspend fun setFormatNumbersAsDigits(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyFormatNumbersAsDigits] = enabled }
+    }
+
+    private val keySuggestionBarEnabled = booleanPreferencesKey("suggestion_bar_enabled")
+
+    /**
+     * Master switch for the word-suggestion bar feature.
+     *
+     * When `false` (default) the suggestion bar is never shown, no dictionary is loaded,
+     * and no background work is done.  When `true`, the bar appears after each dictation
+     * commit and shows correction candidates from the languages selected in
+     * [suggestionBarLanguages].
+     */
+    val suggestionBarEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keySuggestionBarEnabled] ?: false
+    }
+
+    suspend fun setSuggestionBarEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keySuggestionBarEnabled] = enabled }
+    }
+
+    private val keySuggestionBarLanguages = stringPreferencesKey("suggestion_bar_languages")
+
+    /**
+     * Comma-separated set of BCP-47 language tags the word corrector should search.
+     * Only tags from [SuggestionLanguage.TAG_SET] are valid.
+     *
+     * Defaults to empty string → empty set → no language is active even if the feature
+     * is enabled (so users must explicitly choose at least one language on first use).
+     */
+    val suggestionBarLanguages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[keySuggestionBarLanguages] ?: ""
+        if (raw.isBlank()) emptySet() else raw.split(",").toSet()
+    }
+
+    suspend fun setSuggestionBarLanguages(tags: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[keySuggestionBarLanguages] = tags.joinToString(",")
+        }
+    }
+
+    private val keySuggestionBarDismissed = booleanPreferencesKey("suggestion_bar_dismissed")
+
+    /**
+     * `true` once the user has tapped the dismiss (×) button in the suggestion bar.
+     * The bar will not appear again until a new recording session starts.
+     *
+     * Reset to `false` automatically at the start of each new recording session so the
+     * bar can appear again if the user taps on a word in the new transcription.
+     *
+     * Defaults to `false` so the bar is shown on first use.
+     */
+    val suggestionBarDismissed: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keySuggestionBarDismissed] ?: false
+    }
+
+    suspend fun setSuggestionBarDismissed(dismissed: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keySuggestionBarDismissed] = dismissed }
     }
 }

@@ -1,12 +1,7 @@
 package dev.brgr.outspoke.ui.keyboard.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -23,8 +18,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
@@ -385,8 +380,10 @@ private fun TalkButtonContinuousPreview() {
 }
 
 /** Shows all three drag-progress states of [LockHint] side-by-side. */
-@Preview(showBackground = true, backgroundColor = 0xFF111111, name = "LockHint - all states",
-    widthDp = 200, heightDp = 120)
+@Preview(
+    showBackground = true, backgroundColor = 0xFF111111, name = "LockHint - all states",
+    widthDp = 200, heightDp = 120
+)
 @Composable
 private fun LockHintPreview() {
     OutspokeKeyboardTheme {

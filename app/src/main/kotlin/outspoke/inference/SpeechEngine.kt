@@ -31,6 +31,15 @@ interface SpeechEngine {
     fun transcribe(chunk: AudioChunk): TranscriptResult
 
     /**
+     * The active BCP-47 language tag used by post-processing (filler removal, number
+     * normalisation, script-hallucination detection).  Returns `"en"` when the engine is
+     * running in auto-detect mode or does not support language selection.
+     *
+     * Engines that support [setLanguage] should override this to return the stored tag.
+     */
+    val currentLanguage: String get() = "en"
+
+    /**
      * Sets the active language for inference.
      *
      * [tag] is a BCP-47 language tag (e.g. `"en"`, `"de"`, `"nl"`) or `"auto"` to let the

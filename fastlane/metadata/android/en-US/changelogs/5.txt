@@ -1,0 +1,7 @@
+New feature release (v0.2.0).
+
+Word correction bar: after dictation, a suggestion bar now appears above the keyboard showing up to 5 on-device correction candidates for the word under the cursor. Tap a suggestion to replace the word. Powered by a phonetic + edit-distance + bigram language model pipeline — no internet connection needed once the language files are downloaded.
+
+Supported languages: Dutch, English, French, German, Italian, Polish, Spanish. Language packs (~8 MB each) are downloaded on demand from the project's own GitHub repository (github.com/minburg/outspoke-data). No data leaves your device.
+
+The feature is opt-in and disabled by default. Enable it in Settings → Preferences and select one or more languages. Also further improved the accuracy of the transcriptions.

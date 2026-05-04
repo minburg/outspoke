@@ -1,5 +1,10 @@
 package dev.brgr.outspoke.ime
 
+import dev.brgr.outspoke.ime.TranscriptAligner.findNewContent
+import dev.brgr.outspoke.ime.TranscriptAligner.normalizeWord
+import dev.brgr.outspoke.ime.TranscriptAligner.wordsMatch
+
+
 /**
  * Pure-function alignment utilities extracted from [TextInjector].
  *
@@ -51,7 +56,7 @@ object TranscriptAligner {
             curr[0] = i
             for (j in 1..b.length) {
                 curr[j] = if (a[i - 1] == b[j - 1]) prev[j - 1]
-                          else 1 + minOf(prev[j], curr[j - 1], prev[j - 1])
+                else 1 + minOf(prev[j], curr[j - 1], prev[j - 1])
             }
             val tmp = prev; prev = curr; curr = tmp
         }
@@ -65,15 +70,15 @@ object TranscriptAligner {
      * where the model refines a word slightly across strides (e.g. "schreibt" vs "schreibe").
      *
      * Allowed edits by normalized length:
-     *  - 0-5 chars: exact match only (short words like "they"/"then", "form"/"from" are
-     *    semantically distinct; a single edit on a 4-letter word is a 25% alteration)
-     *  - 6+ chars: 1 edit
+     *  - 0-3 chars: exact match only (very short words like "I"/"a", "the"/"them" are
+     *    semantically distinct and have too few characters to distinguish signal from noise)
+     *  - 4+ chars: 1 edit (covers model refinements like "gute"/"guten", "schreibt"/"schreibe")
      */
     internal fun wordsMatch(a: String, b: String): Boolean {
         val na = a.normalizeWord()
         val nb = b.normalizeWord()
         if (na == nb) return true
-        val maxEdits = if (minOf(na.length, nb.length) >= 6) 1 else 0
+        val maxEdits = if (minOf(na.length, nb.length) >= 4) 1 else 0
         return maxEdits > 0 && levenshtein(na, nb) <= maxEdits
     }
 

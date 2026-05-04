@@ -145,16 +145,17 @@ class RMSVadFilter(sensitivity: Float = 0.5f) : VadFilter {
     companion object {
         /**
          * Number of consecutive above-threshold frames required before speech onset is
-         * confirmed. 1 frame × 30 ms = 30 ms - opens gate on first confirmed speech frame
-         * to avoid clipping onset phonemes.
+         * confirmed. 2 frames × 30 ms = 60 ms - suppresses single-frame plosive pops
+         * and finger taps while still opening fast enough to capture onset phonemes.
          */
-        private const val ONSET_FRAMES = 1
+        private const val ONSET_FRAMES = 2
 
         /**
          * Frames of audio prepended before confirmed speech onset (pre-roll buffer).
-         * 20 frames × 30 ms = 600 ms - gives model pre-speech silence as acoustic context.
+         * 15 frames × 30 ms = 450 ms - captures the first consonant/phoneme of the
+         * triggering word so it is not truncated.
          */
-        private const val LEAD_IN_FRAMES = 20
+        private const val LEAD_IN_FRAMES = 15
 
         /**
          * Frames of sub-threshold audio tolerated before declaring silence (hangover).

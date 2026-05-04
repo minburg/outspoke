@@ -56,8 +56,8 @@
                 android:exported="false">
             <!-- Android 14+ foreground service type justification -->
             <meta-data
-                android:name="android.app.foregroundServiceType.microphone.justification"
-                android:value="Required for real-time speech recognition and transcription." />
+                    android:name="android.app.foregroundServiceType.microphone.justification"
+                    android:value="Required for real-time speech recognition and transcription."/>
         </service>
 
         <!-- Foreground service that manages model file downloads in the background -->
@@ -68,7 +68,7 @@
             <!-- Android 14+ foreground service type justification -->
             <meta-data
                     android:name="android.app.foregroundServiceType.dataSync.justification"
-                    android:value="Required for downloading speech recognition model files in the background." />
+                    android:value="Required for downloading speech recognition model files in the background."/>
         </service>
 
     </application>

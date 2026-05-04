@@ -13,8 +13,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.brgr.outspoke.BuildConfig
 import dev.brgr.outspoke.R
+import dev.brgr.outspoke.ime.correction.SuggestionDownloadState
+import dev.brgr.outspoke.ime.correction.SuggestionLanguage
 import dev.brgr.outspoke.settings.preferences.PreferencesViewModel
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
 
@@ -31,19 +32,27 @@ fun PreferencesScreen(
     val vadSensitivity by viewModel.vadSensitivity.collectAsState()
     val postprocessingEnabled by viewModel.postprocessingEnabled.collectAsState()
     val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
-    val debugAudioDumpEnabled by viewModel.debugAudioDumpEnabled.collectAsState()
+    val suggestionBarEnabled by viewModel.suggestionBarEnabled.collectAsState()
+    val suggestionBarLanguages by viewModel.suggestionBarLanguages.collectAsState()
+    val downloadStates by viewModel.downloadStates.collectAsState()
 
     PreferencesContent(
         triggerMode = triggerMode,
         vadSensitivity = vadSensitivity,
         postprocessingEnabled = postprocessingEnabled,
         showPipelineDiagnostics = showPipelineDiagnostics,
-        debugAudioDumpEnabled = debugAudioDumpEnabled,
+        suggestionBarEnabled = suggestionBarEnabled,
+        suggestionBarLanguages = suggestionBarLanguages,
+        downloadStates = downloadStates,
         onTriggerModeChange = viewModel::setTriggerMode,
         onVadSensitivityChange = viewModel::setVadSensitivity,
         onPostprocessingChange = viewModel::setPostprocessingEnabled,
         onShowPipelineDiagnosticsChange = viewModel::setShowPipelineDiagnostics,
-        onDebugAudioDumpChange = viewModel::setDebugAudioDumpEnabled,
+        onSuggestionBarEnabledChange = viewModel::setSuggestionBarEnabled,
+        onSuggestionBarLanguagesChange = viewModel::setSuggestionBarLanguages,
+        onDownloadLanguage = viewModel::downloadLanguage,
+        onCancelDownload = viewModel::cancelDownload,
+        onDeleteLanguage = viewModel::deleteLanguage,
         onResetTutorial = viewModel::resetTutorial,
     )
 }
@@ -55,12 +64,18 @@ private fun PreferencesContent(
     vadSensitivity: Float,
     postprocessingEnabled: Boolean,
     showPipelineDiagnostics: Boolean,
-    debugAudioDumpEnabled: Boolean = false,
+    suggestionBarEnabled: Boolean = false,
+    suggestionBarLanguages: Set<String> = emptySet(),
+    downloadStates: Map<String, SuggestionDownloadState> = emptyMap(),
     onTriggerModeChange: (String) -> Unit,
     onVadSensitivityChange: (Float) -> Unit,
     onPostprocessingChange: (Boolean) -> Unit,
     onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
-    onDebugAudioDumpChange: (Boolean) -> Unit = {},
+    onSuggestionBarEnabledChange: (Boolean) -> Unit = {},
+    onSuggestionBarLanguagesChange: (Set<String>) -> Unit = {},
+    onDownloadLanguage: (String) -> Unit = {},
+    onCancelDownload: (String) -> Unit = {},
+    onDeleteLanguage: (String) -> Unit = {},
     onResetTutorial: () -> Unit = {},
 ) {
     Column(
@@ -101,10 +116,6 @@ private fun PreferencesContent(
 
         HorizontalDivider()
 
-        // Voice Activity Detection toggle.
-        // Uses SileroVAD to filter out non-speech audio before transcription.
-        // The underlying preference is stored as a float (0 = off, >0 = on) for
-        // backwards compatibility; the toggle writes 0f (off) or 1f (on).
         val vadEnabled = vadSensitivity > 0f
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -135,7 +146,6 @@ private fun PreferencesContent(
 
         HorizontalDivider()
 
-        // Post-processing toggle - lets users bypass filler/repetition cleaning for debugging.
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = stringResource(R.string.pref_postprocessing_title),
@@ -165,7 +175,105 @@ private fun PreferencesContent(
 
         HorizontalDivider()
 
-        // Pipeline diagnostics toggle - shows a live summary badge on the keyboard.
+
+        // Word Suggestion Bar — master toggle + per-language download controls.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.pref_suggestion_bar_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.pref_suggestion_bar_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (suggestionBarEnabled) stringResource(R.string.pref_suggestion_bar_enabled)
+                    else stringResource(R.string.pref_suggestion_bar_disabled),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(
+                    checked = suggestionBarEnabled,
+                    onCheckedChange = onSuggestionBarEnabledChange,
+                )
+            }
+
+            if (suggestionBarEnabled) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.pref_suggestion_bar_languages_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = stringResource(R.string.pref_suggestion_bar_languages_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // One row per supported language with download state + enable toggle.
+                SuggestionLanguage.entries.forEach { lang ->
+                    val dlState = downloadStates[lang.tag] ?: SuggestionDownloadState.NotDownloaded
+                    val isReady = dlState is SuggestionDownloadState.Ready
+                    val isSelected = lang.tag in suggestionBarLanguages
+
+                    SuggestionLanguageRow(
+                        language = lang,
+                        downloadState = dlState,
+                        isSelected = isSelected,
+                        onToggleSelected = { checked ->
+                            if (isReady) {
+                                val updated = if (checked) suggestionBarLanguages + lang.tag
+                                else suggestionBarLanguages - lang.tag
+                                onSuggestionBarLanguagesChange(updated)
+                            }
+                        },
+                        onDownload = { onDownloadLanguage(lang.tag) },
+                        onCancelDownload = { onCancelDownload(lang.tag) },
+                        onDelete = { onDeleteLanguage(lang.tag) },
+                    )
+                }
+
+                val anyReady = SuggestionLanguage.entries.any {
+                    downloadStates[it.tag] is SuggestionDownloadState.Ready && it.tag in suggestionBarLanguages
+                }
+                if (!anyReady) {
+                    Text(
+                        text = stringResource(R.string.pref_suggestion_bar_no_language),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.pref_tutorial_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.pref_tutorial_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = onResetTutorial,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.pref_tutorial_reset))
+            }
+        }
+
+        HorizontalDivider()
+
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = stringResource(R.string.pref_diagnostics_title),
@@ -192,59 +300,103 @@ private fun PreferencesContent(
                 )
             }
         }
+    }
+}
 
-        HorizontalDivider()
+/**
+ * Single row for a suggestion language: shows the language name, its download state,
+ * and appropriate action controls.
+ *
+ * States:
+ * - [SuggestionDownloadState.NotDownloaded] → Download button
+ * - [SuggestionDownloadState.Downloading]   → Progress bar + Cancel button
+ * - [SuggestionDownloadState.Ready]         → Checkmark icon + enable Checkbox + Delete button
+ * - [SuggestionDownloadState.Failed]        → Error text + Retry button
+ */
+@Composable
+private fun SuggestionLanguageRow(
+    language: SuggestionLanguage,
+    downloadState: SuggestionDownloadState,
+    isSelected: Boolean,
+    onToggleSelected: (Boolean) -> Unit,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = language.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
 
-        // Tutorial reset - lets the user (or developer) replay the keyboard walk-through.
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(R.string.pref_tutorial_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.pref_tutorial_subtitle),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(
-                onClick = onResetTutorial,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.pref_tutorial_reset))
+            when (downloadState) {
+                is SuggestionDownloadState.NotDownloaded -> {
+                    TextButton(onClick = onDownload) {
+                        Text(stringResource(R.string.suggestion_lang_download))
+                    }
+                }
+
+                is SuggestionDownloadState.Downloading -> {
+                    TextButton(onClick = onCancelDownload) {
+                        Text(stringResource(R.string.suggestion_lang_cancel))
+                    }
+                }
+
+                is SuggestionDownloadState.Ready -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = onToggleSelected,
+                        )
+                        TextButton(onClick = onDelete) {
+                            Text(
+                                text = stringResource(R.string.suggestion_lang_delete),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+
+                is SuggestionDownloadState.Failed -> {
+                    TextButton(onClick = onDownload) {
+                        Text(
+                            text = stringResource(R.string.suggestion_lang_retry),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
         }
 
-        // Debug: Audio Tap - only visible in debug builds so it never ships to end users.
-        if (BuildConfig.DEBUG) {
-            HorizontalDivider()
+        // Progress bar shown while downloading.
+        if (downloadState is SuggestionDownloadState.Downloading) {
+            LinearProgressIndicator(
+                progress = { downloadState.progress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.pref_debug_audio_dump_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                Text(
-                    text = stringResource(R.string.pref_debug_audio_dump_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = if (debugAudioDumpEnabled) stringResource(R.string.pref_debug_audio_dump_enabled)
-                        else stringResource(R.string.pref_debug_audio_dump_disabled),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Switch(
-                        checked = debugAudioDumpEnabled,
-                        onCheckedChange = onDebugAudioDumpChange,
-                    )
-                }
-            }
+        // Error message when download failed.
+        if (downloadState is SuggestionDownloadState.Failed) {
+            Text(
+                text = downloadState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -276,6 +428,34 @@ private fun PreferencesTapToggleVadOnPreview() {
             vadSensitivity = 1f,
             postprocessingEnabled = false,
             showPipelineDiagnostics = true,
+            onTriggerModeChange = {},
+            onVadSensitivityChange = {},
+            onPostprocessingChange = {},
+            onShowPipelineDiagnosticsChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Preferences · Suggestion Bar Enabled")
+@Composable
+private fun PreferencesSuggestionBarPreview() {
+    OutspokeTheme {
+        PreferencesContent(
+            triggerMode = "HOLD",
+            vadSensitivity = 0f,
+            postprocessingEnabled = true,
+            showPipelineDiagnostics = false,
+            suggestionBarEnabled = true,
+            suggestionBarLanguages = setOf("en"),
+            downloadStates = mapOf(
+                "nl" to SuggestionDownloadState.NotDownloaded,
+                "en" to SuggestionDownloadState.Ready,
+                "fr" to SuggestionDownloadState.Downloading(0.45f),
+                "de" to SuggestionDownloadState.Failed("Network error"),
+                "it" to SuggestionDownloadState.NotDownloaded,
+                "pl" to SuggestionDownloadState.NotDownloaded,
+                "es" to SuggestionDownloadState.NotDownloaded,
+            ),
             onTriggerModeChange = {},
             onVadSensitivityChange = {},
             onPostprocessingChange = {},
