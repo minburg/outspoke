@@ -48,11 +48,11 @@ class KeyboardViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, "HOLD")
 
     /**
-     * VAD sensitivity in [0.0, 1.0]. Collected eagerly so the value is always available
-     * as a snapshot when recording starts - no suspend context required.
+     * Whether VAD (voice activity detection) is enabled. Collected eagerly so the value is
+     * always available as a snapshot when recording starts - no suspend context required.
      */
-    val vadSensitivity: StateFlow<Float> = appPreferences.vadSensitivity
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+    val vadSensitivity: StateFlow<Boolean> = appPreferences.vadSensitivity
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /**
      * `true` when the currently selected model is a Whisper variant.
@@ -395,7 +395,7 @@ class KeyboardViewModel(
                     // Inference repo not yet bound - capture for amplitude feedback only.
                     Log.w(TAG, "No InferenceRepository - capturing audio without transcription")
                     audioCaptureManager.startCapture(
-                        vadSensitivity = vadSensitivity.value * 0.4f,
+                        vadEnabled = vadSensitivity.value,
                     ).collect { /* amplitude updated internally */ }
                     // Flow completed naturally (stopCapture called); no inference to wait for.
                     _uiState.value = KeyboardUiState.Idle
@@ -406,7 +406,7 @@ class KeyboardViewModel(
                 // TranscriptResult emissions drive both the UI and text injection.
                 repo.transcribe(
                     audio = audioCaptureManager.startCapture(
-                        vadSensitivity = vadSensitivity.value * 0.4f,
+                        vadEnabled = vadSensitivity.value,
                     ),
                     postprocessingEnabled = postprocessingEnabled.value,
                     formatNumbersAsDigits = formatNumbersAsDigits.value,

@@ -1,0 +1,3 @@
+Fourth patch (v0.2.1).
+
+Fixed VAD to be a boolean value and ON by default.

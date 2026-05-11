@@ -453,7 +453,7 @@ InferenceService watches <filesDir>/models/ for CLOSE_WRITE / MOVED_TO events. W
 ## 13. Build Configuration and ABI Splits
 
 - compileSdk 36, minSdk 30 (Android 11+), targetSdk 36
-- versionCode 5, versionName 0.2.0
+- versionCode 6, versionName 0.2.1
 - Kotlin 2.3.20, AGP 8.13.2, JVM target 11
 - buildFeatures: compose = true, buildConfig = true
 - Release: isMinifyEnabled = true, isShrinkResources = true, ProGuard enabled

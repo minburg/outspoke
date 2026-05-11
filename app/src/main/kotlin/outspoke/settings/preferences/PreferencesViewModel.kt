@@ -26,14 +26,14 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { prefs.setTriggerMode(mode) }
     }
 
-    val vadSensitivity: StateFlow<Float> = prefs.vadSensitivity.stateIn(
+    val vadSensitivity: StateFlow<Boolean> = prefs.vadSensitivity.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = 0.15f,
+        initialValue = true,
     )
 
-    fun setVadSensitivity(value: Float) {
-        viewModelScope.launch { prefs.setVadSensitivity(value) }
+    fun setVadSensitivity(enabled: Boolean) {
+        viewModelScope.launch { prefs.setVadSensitivity(enabled) }
     }
 
     val postprocessingEnabled: StateFlow<Boolean> = prefs.postprocessingEnabled.stateIn(

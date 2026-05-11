@@ -30,15 +30,15 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[keyTriggerMode] = mode }
     }
 
-    private val keyVadSensitivity = floatPreferencesKey("vad_sensitivity")
+    private val keyVadEnabled = booleanPreferencesKey("vad_enabled")
 
-    /** VAD aggressiveness in [0.0, 1.0]. Defaults to 0.0 (disabled). */
-    val vadSensitivity: Flow<Float> = context.dataStore.data.map { prefs ->
-        prefs[keyVadSensitivity] ?: 0f
+    /** Whether VAD (voice activity detection) is active. Defaults to `true`. */
+    val vadSensitivity: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[keyVadEnabled] ?: true
     }
 
-    suspend fun setVadSensitivity(value: Float) {
-        context.dataStore.edit { prefs -> prefs[keyVadSensitivity] = value }
+    suspend fun setVadSensitivity(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[keyVadEnabled] = enabled }
     }
 
     private val keySelectedModelId = stringPreferencesKey("selected_model_id")

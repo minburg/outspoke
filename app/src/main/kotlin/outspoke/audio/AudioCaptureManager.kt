@@ -110,7 +110,7 @@ class AudioCaptureManager(private val context: Context) {
      */
     // Permission is checked manually via PermissionHelper before AudioRecord is created.
     @SuppressLint("MissingPermission")
-    fun startCapture(vadSensitivity: Float = 0f): Flow<AudioChunk> =
+    fun startCapture(vadEnabled: Boolean = true): Flow<AudioChunk> =
         channelFlow {
             if (!PermissionHelper.hasRecordPermission(context)) {
                 throw SecurityException(
@@ -121,16 +121,16 @@ class AudioCaptureManager(private val context: Context) {
 
             stopRequested = false   // reset for this capture session
 
-            // Only create a filter when sensitivity > 0; null means pass-through (VAD disabled).
-            val vad: VadFilter? = if (vadSensitivity > 0f) {
+            // Only create a filter when VAD is enabled; null means pass-through (VAD disabled).
+            val vad: VadFilter? = if (vadEnabled) {
                 try {
                     val sileroBytes = context.resources.openRawResource(R.raw.silero_vad_v4).readBytes()
                     SileroVadFilter(modelBytes = sileroBytes, threshold = 0.3f)
                 } catch (e: Exception) {
                     Log.w(TAG, "Silero VAD model not found in raw resources. Falling back to Energy VAD.", e)
-                    RMSVadFilter(vadSensitivity)
+                    RMSVadFilter(0.4f)
                 }
-            } else null.also { Log.d(TAG, "VAD disabled due to vadSensitivity being $vadSensitivity") }
+            } else null.also { Log.d(TAG, "VAD disabled") }
 
             val minBufferBytes = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,

@@ -61,14 +61,14 @@ fun PreferencesScreen(
 @Composable
 private fun PreferencesContent(
     triggerMode: String,
-    vadSensitivity: Float,
+    vadSensitivity: Boolean,
     postprocessingEnabled: Boolean,
     showPipelineDiagnostics: Boolean,
     suggestionBarEnabled: Boolean = false,
     suggestionBarLanguages: Set<String> = emptySet(),
     downloadStates: Map<String, SuggestionDownloadState> = emptyMap(),
     onTriggerModeChange: (String) -> Unit,
-    onVadSensitivityChange: (Float) -> Unit,
+    onVadSensitivityChange: (Boolean) -> Unit,
     onPostprocessingChange: (Boolean) -> Unit,
     onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
     onSuggestionBarEnabledChange: (Boolean) -> Unit = {},
@@ -116,7 +116,6 @@ private fun PreferencesContent(
 
         HorizontalDivider()
 
-        val vadEnabled = vadSensitivity > 0f
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = stringResource(R.string.pref_vad_title),
@@ -133,13 +132,13 @@ private fun PreferencesContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = if (vadEnabled) stringResource(R.string.state_enabled)
+                    text = if (vadSensitivity) stringResource(R.string.state_enabled)
                     else stringResource(R.string.state_disabled),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Switch(
-                    checked = vadEnabled,
-                    onCheckedChange = { enabled -> onVadSensitivityChange(if (enabled) 1f else 0f) },
+                    checked = vadSensitivity,
+                    onCheckedChange = onVadSensitivityChange,
                 )
             }
         }
@@ -408,7 +407,7 @@ private fun PreferencesHoldVadOffPreview() {
     OutspokeTheme {
         PreferencesContent(
             triggerMode = "HOLD",
-            vadSensitivity = 0f,
+            vadSensitivity = false,
             postprocessingEnabled = true,
             showPipelineDiagnostics = false,
             onTriggerModeChange = {},
@@ -425,7 +424,7 @@ private fun PreferencesTapToggleVadOnPreview() {
     OutspokeTheme {
         PreferencesContent(
             triggerMode = "TAP_TOGGLE",
-            vadSensitivity = 1f,
+            vadSensitivity = true,
             postprocessingEnabled = false,
             showPipelineDiagnostics = true,
             onTriggerModeChange = {},
@@ -442,7 +441,7 @@ private fun PreferencesSuggestionBarPreview() {
     OutspokeTheme {
         PreferencesContent(
             triggerMode = "HOLD",
-            vadSensitivity = 0f,
+            vadSensitivity = false,
             postprocessingEnabled = true,
             showPipelineDiagnostics = false,
             suggestionBarEnabled = true,
