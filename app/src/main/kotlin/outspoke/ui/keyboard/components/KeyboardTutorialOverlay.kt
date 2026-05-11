@@ -12,8 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
@@ -67,12 +70,16 @@ private data class TutorialStep(
 )
 
 private val TUTORIAL_STEPS = listOf(
-    TutorialStep(TutorialButtonId.TALK,            R.string.tutorial_talk_button_title,    R.string.tutorial_talk_button_desc),
-    TutorialStep(TutorialButtonId.SWITCH_KEYBOARD, R.string.tutorial_switch_keyboard_title, R.string.tutorial_switch_keyboard_desc),
-    TutorialStep(TutorialButtonId.DELETE_ALL,      R.string.tutorial_delete_all_title,     R.string.tutorial_delete_all_desc),
-    TutorialStep(TutorialButtonId.DELETE_WORD,     R.string.tutorial_delete_word_title,    R.string.tutorial_delete_word_desc),
-    TutorialStep(TutorialButtonId.DELETE_CHAR,     R.string.tutorial_delete_char_title,    R.string.tutorial_delete_char_desc),
-    TutorialStep(TutorialButtonId.ENTER,           R.string.tutorial_enter_title,          R.string.tutorial_enter_desc),
+    TutorialStep(TutorialButtonId.TALK, R.string.tutorial_talk_button_title, R.string.tutorial_talk_button_desc),
+    TutorialStep(
+        TutorialButtonId.SWITCH_KEYBOARD,
+        R.string.tutorial_switch_keyboard_title,
+        R.string.tutorial_switch_keyboard_desc
+    ),
+    TutorialStep(TutorialButtonId.DELETE_ALL, R.string.tutorial_delete_all_title, R.string.tutorial_delete_all_desc),
+    TutorialStep(TutorialButtonId.DELETE_WORD, R.string.tutorial_delete_word_title, R.string.tutorial_delete_word_desc),
+    TutorialStep(TutorialButtonId.DELETE_CHAR, R.string.tutorial_delete_char_title, R.string.tutorial_delete_char_desc),
+    TutorialStep(TutorialButtonId.ENTER, R.string.tutorial_enter_title, R.string.tutorial_enter_desc),
 )
 
 /**
@@ -180,8 +187,8 @@ fun KeyboardTutorialOverlay(
 
         // Resolve shared labels here so StepContent stays free of stringResource()
         // calls and the previews can supply plain hardcoded strings instead.
-        val skipLabel    = stringResource(R.string.tutorial_skip)
-        val nextLabel    = stringResource(R.string.tutorial_next)
+        val skipLabel = stringResource(R.string.tutorial_skip)
+        val nextLabel = stringResource(R.string.tutorial_next)
         val dismissLabel = stringResource(R.string.tutorial_dismiss)
 
         Crossfade(
@@ -192,15 +199,15 @@ fun KeyboardTutorialOverlay(
         ) { idx ->
             val s = TUTORIAL_STEPS[idx]
             StepContent(
-                title        = stringResource(s.titleRes),
-                description  = stringResource(s.descRes),
-                skipLabel    = skipLabel,
-                nextLabel    = if (idx == totalSteps - 1) dismissLabel else nextLabel,
-                stepIndex    = idx,
-                totalSteps   = totalSteps,
+                title = stringResource(s.titleRes),
+                description = stringResource(s.descRes),
+                skipLabel = skipLabel,
+                nextLabel = if (idx == totalSteps - 1) dismissLabel else nextLabel,
+                stepIndex = idx,
+                totalSteps = totalSteps,
                 cardAtBottom = cardAtBottom,
-                onSkip       = onDismiss,
-                onNext       = {
+                onSkip = onDismiss,
+                onNext = {
                     if (currentStep < totalSteps - 1) currentStep++ else onDismiss()
                 },
             )
@@ -236,7 +243,12 @@ private fun StepContent(
                     .padding(horizontal = 16.dp)
                     .padding(top = 8.dp),
             ) {
-                ExplanationCardContent(title = title, description = description, stepIndex = stepIndex, totalSteps = totalSteps)
+                ExplanationCardContent(
+                    title = title,
+                    description = description,
+                    stepIndex = stepIndex,
+                    totalSteps = totalSteps
+                )
             }
         }
 
@@ -260,7 +272,12 @@ private fun StepContent(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    ExplanationCardContent(title = title, description = description, stepIndex = stepIndex, totalSteps = totalSteps)
+                    ExplanationCardContent(
+                        title = title,
+                        description = description,
+                        stepIndex = stepIndex,
+                        totalSteps = totalSteps
+                    )
                 }
             }
 
@@ -331,7 +348,13 @@ private fun ExplanationCardContent(
 }
 
 /** Card at the top - spotlight is in the lower half (e.g. TALK button). */
-@Preview(showBackground = true, backgroundColor = 0xFF111111, widthDp = 360, heightDp = 280, name = "Tutorial - card top")
+@Preview(
+    showBackground = true,
+    backgroundColor = 0xFF111111,
+    widthDp = 360,
+    heightDp = 280,
+    name = "Tutorial - card top"
+)
 @Composable
 private fun StepContentTopPreview() {
     OutspokeKeyboardTheme {
@@ -350,7 +373,13 @@ private fun StepContentTopPreview() {
 }
 
 /** Card at the bottom - spotlight is in the upper area (e.g. SWITCH_KEYBOARD button). */
-@Preview(showBackground = true, backgroundColor = 0xFF111111, widthDp = 360, heightDp = 280, name = "Tutorial - card bottom")
+@Preview(
+    showBackground = true,
+    backgroundColor = 0xFF111111,
+    widthDp = 360,
+    heightDp = 280,
+    name = "Tutorial - card bottom"
+)
 @Composable
 private fun StepContentBottomPreview() {
     OutspokeKeyboardTheme {

@@ -1,0 +1,23 @@
+{
+  "agent": {
+    "architect": {
+      "mode": "subagent",
+      "model": "anthropic/claude-4-7-opus",
+      "prompt": "You are the Lead Architect. Mandatory context: 'pro-analysis-update.md'. Your role is to diff the coder's changes against 'architecture.md'. If a change violates the architecture, reject it and provide specific feedback for the Coder.",
+      "permission": {
+        "edit": "deny",
+        "read": "allow"
+      }
+    },
+    "coder": {
+      "mode": "primary",
+      "model": "anthropic/claude-4-6-sonnet",
+      "prompt": "You are a Senior Android Kotlin dev. Follow instructions from the Architect. Implementation workflow: 1. Edit code. 2. Run './gradlew test'. 3. If build fails, fix until pass. 4. Git commit local changes only (NO PUSH). 5. Hand over to @architect for verification.",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "git": "allow"
+      }
+    }
+  }
+}

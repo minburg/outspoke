@@ -5,11 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
-import android.os.Binder
-import android.os.Build
-import android.os.Debug
-import android.os.FileObserver
-import android.os.IBinder
+import android.os.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -48,6 +44,9 @@ private const val NOTIFICATION_ID = 1001
  *  - Cleanly close the engine on [onDestroy]
  */
 class InferenceService : LifecycleService() {
+
+    /** Currently active grammar corrector. Tied to the service lifecycle. */
+    private val grammarCorrector: GrammarCorrector = NoOpGrammarCorrector
 
     /** The currently loaded engine, or `null` while loading / unloaded. */
     @Volatile
@@ -100,8 +99,14 @@ class InferenceService : LifecycleService() {
         // Log device and memory info at service startup
         val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
         val memInfo = ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
-        Log.i(TAG, "Service created on device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
-        Log.i(TAG, "Total RAM: ${memInfo.totalMem / (1024 * 1024)} MB, Avail: ${memInfo.availMem / (1024 * 1024)} MB, LowMem: ${memInfo.lowMemory}")
+        Log.i(
+            TAG,
+            "Service created on device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})"
+        )
+        Log.i(
+            TAG,
+            "Total RAM: ${memInfo.totalMem / (1024 * 1024)} MB, Avail: ${memInfo.availMem / (1024 * 1024)} MB, LowMem: ${memInfo.lowMemory}"
+        )
 
         Log.d(TAG, "Service created - observing selected model preference")
 
@@ -124,6 +129,7 @@ class InferenceService : LifecycleService() {
         currentEngine?.close()
         currentEngine = null
         currentRepository = null
+        grammarCorrector.close()
         logMemoryUsage()
         Log.d(TAG, "Service destroyed - engine closed")
     }
@@ -157,7 +163,10 @@ class InferenceService : LifecycleService() {
             Log.i(TAG, "Preparing to load model $modelId, modelDir=${modelDir.path}, size=${modelSizeMB}MB")
             Log.i(TAG, "Available RAM: ${memInfo.availMem / (1024 * 1024)} MB, LowMem: ${memInfo.lowMemory}")
             if (modelSizeMB > 500 && memInfo.availMem < modelSizeMB * 2 * 1024 * 1024) {
-                Log.w(TAG, "Device RAM may be insufficient for large model $modelId (model: ${modelSizeMB}MB, avail: ${memInfo.availMem / (1024 * 1024)}MB)")
+                Log.w(
+                    TAG,
+                    "Device RAM may be insufficient for large model $modelId (model: ${modelSizeMB}MB, avail: ${memInfo.availMem / (1024 * 1024)}MB)"
+                )
             }
 
             _engineState.value = EngineState.Loading
@@ -167,8 +176,18 @@ class InferenceService : LifecycleService() {
             try {
                 val engine = SpeechEngineFactory.create(modelId)
                 engine.load(modelDir)
+
+                // Apply forced-language preference so post-processing uses the correct locale.
+                // For Parakeet TDT, this does not affect ONNX inference (no language tensor in
+                // the current export) but controls filler removal and number normalisation.
+                val lang = AppPreferences(applicationContext).forcedLanguage.first()
+                if (lang != null) {
+                    engine.setLanguage(lang)
+                    Log.d(TAG, "Forced language '$lang' applied to engine for $modelId")
+                }
+
                 currentEngine = engine
-                currentRepository = InferenceRepository(engine)
+                currentRepository = InferenceRepository(engine, grammarCorrector)
                 _engineState.value = EngineState.Ready
                 updateNotification(getString(R.string.notif_engine_ready, ModelRegistry[modelId].displayName))
                 val elapsed = System.currentTimeMillis() - startTime
@@ -280,6 +299,9 @@ class InferenceService : LifecycleService() {
         Log.i(TAG, "App memory usage: used=${usedMemMB}MB, max=${maxMemMB}MB")
         val debugMem = Debug.MemoryInfo()
         Debug.getMemoryInfo(debugMem)
-        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
+        Log.i(
+            TAG,
+            "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB"
+        )
     }
 }

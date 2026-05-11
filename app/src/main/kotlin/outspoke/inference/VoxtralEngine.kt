@@ -956,6 +956,9 @@ class VoxtralEngine : SpeechEngine {
         Log.i(TAG, "VoxtralEngine memory: used=${usedMemMB}MB, max=${maxMemMB}MB")
         val debugMem = Debug.MemoryInfo()
         Debug.getMemoryInfo(debugMem)
-        Log.i(TAG, "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB")
+        Log.i(
+            TAG,
+            "Debug memory: dalvik=${debugMem.dalvikPrivateDirty}KB, native=${debugMem.nativePrivateDirty}KB, totalPss=${debugMem.totalPss}KB"
+        )
     }
 }

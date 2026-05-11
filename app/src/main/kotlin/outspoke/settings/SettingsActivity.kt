@@ -18,9 +18,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
+import dev.brgr.outspoke.R
 import dev.brgr.outspoke.audio.PermissionHelper
 import dev.brgr.outspoke.inference.InferenceService
-import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.model.ModelStorageManager
 import dev.brgr.outspoke.settings.screens.HomeScreen
 import dev.brgr.outspoke.settings.screens.ModelScreen

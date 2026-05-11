@@ -2,11 +2,7 @@ package dev.brgr.outspoke.ime
 
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.inputmethod.CompletionInfo
-import android.view.inputmethod.CorrectionInfo
-import android.view.inputmethod.ExtractedText
-import android.view.inputmethod.ExtractedTextRequest
-import android.view.inputmethod.InputConnection
+import android.view.inputmethod.*
 
 /**
  * In-memory fake [InputConnection] for unit-testing [TextInjector].
@@ -37,6 +33,23 @@ class FakeInputConnection : InputConnection {
     /** Buffer offset at which the composing span begins, or -1 when no span is active. */
     private var composingStart: Int = -1
 
+    /**
+     * Cursor position within [buffer] (not including composing text).
+     * Defaults to end-of-buffer (cursor always at end unless [setSelection] is called).
+     */
+    private var cursorPos: Int = 0
+
+    /**
+     * Start of the active selection (inclusive), or -1 when there is no selection.
+     * When a selection is active, [commitText] replaces the selected range.
+     */
+    private var selStart: Int = -1
+
+    /**
+     * End of the active selection (exclusive), or -1 when there is no selection.
+     */
+    private var selEnd: Int = -1
+
     /** Full text visible in the field (committed portion + active composing span). */
     val fieldText: String get() = buffer.toString() + composing
 
@@ -44,17 +57,32 @@ class FakeInputConnection : InputConnection {
     val committedText: String get() = buffer.toString()
 
     /**
-     * Commits [text] into the field, replacing the current composing span if one is active.
+     * Commits [text] into the field.
      *
-     * In Android semantics, [commitText] always clears the composing region first, then
-     * appends the supplied text.  In this fake the composing content is not part of
-     * [buffer], so clearing it is just a matter of resetting the composing tracking fields
-     * before appending.
+     * If an active selection exists ([selStart] != -1), the selected range is replaced
+     * with [text] and the cursor is placed after the inserted text.
+     *
+     * Otherwise, the current composing span is replaced by [text] (matching Android's
+     * [commitText] semantics where the composing region is cleared first).
      */
     override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
+        // Replace active selection if one exists.
+        if (selStart >= 0 && selEnd >= selStart) {
+            val s = selStart.coerceIn(0, buffer.length)
+            val e = selEnd.coerceIn(s, buffer.length)
+            buffer.replace(s, e, text.toString())
+            cursorPos = s + text.length
+            selStart = -1
+            selEnd = -1
+            composing = ""
+            composingStart = -1
+            return true
+        }
+        // No selection: clear composing span and append.
         composing = ""
         composingStart = -1
         buffer.append(text)
+        cursorPos = buffer.length
         return true
     }
 
@@ -81,23 +109,43 @@ class FakeInputConnection : InputConnection {
         }
         composing = ""
         composingStart = -1
+        cursorPos = buffer.length
         return true
     }
 
     /**
-     * Returns the last [n] characters of [fieldText] (committed + composing), matching
-     * the Android contract where the cursor is always considered to be at the end.
+     * Returns the last [n] characters before the cursor within [fieldText].
+     * When a selection is active the cursor is treated as being at [selStart].
      */
     override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence {
         val full = fieldText
-        return full.takeLast(minOf(n, full.length))
+        val cursor = if (selStart >= 0) selStart else full.length
+        val from = maxOf(0, cursor - n)
+        return full.substring(from, cursor)
     }
 
-    /** Cursor is always at the end in this fake, so there is never any text after it. */
-    override fun getTextAfterCursor(n: Int, flags: Int): CharSequence = ""
+    /**
+     * Returns up to [n] characters after the cursor within [fieldText].
+     * When a selection is active the text after [selEnd] is returned.
+     */
+    override fun getTextAfterCursor(n: Int, flags: Int): CharSequence {
+        val full = fieldText
+        val cursor = if (selEnd >= 0) selEnd else full.length
+        return full.substring(cursor, minOf(full.length, cursor + n))
+    }
 
     /** No selection is ever active in this fake. */
     override fun getSelectedText(flags: Int): CharSequence? = null
+
+    /**
+     * Sets the selection range.  When [start] == [end] this positions the cursor
+     * without a visual selection.
+     */
+    override fun setSelection(start: Int, end: Int): Boolean {
+        selStart = start
+        selEnd = end
+        return true
+    }
 
     /**
      * Deletes [beforeLength] characters immediately before the cursor.
@@ -112,6 +160,7 @@ class FakeInputConnection : InputConnection {
         if (deleteCount > 0) {
             buffer.delete(buffer.length - deleteCount, buffer.length)
         }
+        cursorPos = buffer.length
         return true
     }
 
@@ -121,7 +170,6 @@ class FakeInputConnection : InputConnection {
     override fun setComposingRegion(start: Int, end: Int): Boolean = false
     override fun commitCompletion(text: CompletionInfo?): Boolean = false
     override fun commitCorrection(correctionInfo: CorrectionInfo?): Boolean = false
-    override fun setSelection(start: Int, end: Int): Boolean = false
     override fun performEditorAction(editorAction: Int): Boolean = false
     override fun performContextMenuAction(id: Int): Boolean = false
     override fun beginBatchEdit(): Boolean = true
@@ -134,7 +182,7 @@ class FakeInputConnection : InputConnection {
     override fun getHandler(): android.os.Handler? = null
     override fun closeConnection() = Unit
     override fun commitContent(
-        inputContentInfo: android.view.inputmethod.InputContentInfo,
+        inputContentInfo: InputContentInfo,
         flags: Int,
         opts: Bundle?,
     ): Boolean = false

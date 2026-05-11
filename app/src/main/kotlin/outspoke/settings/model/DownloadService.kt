@@ -11,6 +11,9 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import dev.brgr.outspoke.R
+import dev.brgr.outspoke.settings.model.DownloadService.Companion.ACTION_CANCEL_DOWNLOAD
+import dev.brgr.outspoke.settings.model.DownloadService.Companion.ACTION_START_DOWNLOAD
+import dev.brgr.outspoke.settings.model.DownloadService.Companion.downloadStates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +65,7 @@ class DownloadService : LifecycleService() {
                 val modelId = ModelId.fromName(intent.getStringExtra(EXTRA_MODEL_ID) ?: "")
                 startDownload(modelId)
             }
+
             ACTION_CANCEL_DOWNLOAD -> {
                 val modelId = ModelId.fromName(intent.getStringExtra(EXTRA_MODEL_ID) ?: "")
                 cancelDownload(modelId)
@@ -155,11 +159,11 @@ class DownloadService : LifecycleService() {
     }
 
     companion object {
-        const val ACTION_START_DOWNLOAD  = "dev.brgr.outspoke.action.START_DOWNLOAD"
+        const val ACTION_START_DOWNLOAD = "dev.brgr.outspoke.action.START_DOWNLOAD"
         const val ACTION_CANCEL_DOWNLOAD = "dev.brgr.outspoke.action.CANCEL_DOWNLOAD"
-        const val EXTRA_MODEL_ID         = "extra_model_id"
+        const val EXTRA_MODEL_ID = "extra_model_id"
 
-        private const val CHANNEL_ID      = "outspoke_download"
+        private const val CHANNEL_ID = "outspoke_download"
         private const val NOTIFICATION_ID = 2001
 
         private val _downloadStates = MutableStateFlow<Map<ModelId, ModelState>>(emptyMap())

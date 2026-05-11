@@ -133,7 +133,7 @@ class TextInjectorTest {
         injector.setPartial("nicht haben möchte, ist, dass hier Sätze verloren gehen.")
         injector.commitFinal(
             "Ich bin relativ sicher, dass es jetzt besser ist. Und was ich wirklich nicht" +
-                " haben möchte, ist, dass hier Sätze verloren gehen."
+                    " haben möchte, ist, dass hier Sätze verloren gehen."
         )
 
         assertThat(ic.fieldText).contains("verloren gehen")

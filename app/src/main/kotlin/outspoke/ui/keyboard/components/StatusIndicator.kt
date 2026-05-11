@@ -39,8 +39,14 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * - [KeyboardUiState.Listening]     → pulsing filled circle (accent colour)
  * - [KeyboardUiState.Processing]    → spinner + partial transcript text
  * - [KeyboardUiState.Transcribing]  → spinner + "Transcribing…" label (mic off, engine busy)
- * - [KeyboardUiState.Error]         → warning icon + error message + "Open Outspoke" action
+ * - [KeyboardUiState.Error]         → warning icon + error message + recovery action(s)
  * - [KeyboardUiState.EngineLoading] → spinner + loading message + "Open Outspoke" action
+ *
+ * For transient errors ([KeyboardUiState.ErrorReason.TranscriptionFailed],
+ * [KeyboardUiState.ErrorReason.AudioCaptureFailed], [KeyboardUiState.ErrorReason.MicInitFailed])
+ * a "Try again" button is shown alongside the error so the user can retry immediately without
+ * leaving the keyboard. For errors that require external action (permission denied, engine load
+ * failed) the "Open Outspoke" button is shown instead.
  *
  * @param diagnostics Pipeline counters from the most recent recording session. When non-clean
  *                    a compact summary (e.g. "2T · 1R") is shown next to the idle mic icon,
@@ -48,6 +54,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  *                    fired - without opening logcat.
  * @param onOpenCompanionApp Called when the user taps the "Open Outspoke" action button shown
  *                           in [KeyboardUiState.Error] and [KeyboardUiState.EngineLoading] states.
+ * @param onRetry Called when the user taps "Try again" for transient errors. Should trigger
+ *                a new recording attempt and transition the UI back to [KeyboardUiState.Listening].
  */
 @Composable
 fun StatusIndicator(
@@ -55,6 +63,7 @@ fun StatusIndicator(
     modifier: Modifier = Modifier,
     diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     onOpenCompanionApp: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
 ) {
     AnimatedContent(
         targetState = uiState,
@@ -68,10 +77,18 @@ fun StatusIndicator(
             is KeyboardUiState.Listening -> ListeningIndicator()
             is KeyboardUiState.Processing -> ProcessingIndicator(partial = state.partial)
             is KeyboardUiState.Transcribing -> TranscribingIndicator()
-            is KeyboardUiState.Error -> ErrorIndicator(
-                message = localizedErrorMessage(state),
-                onOpenCompanionApp = onOpenCompanionApp,
-            )
+            is KeyboardUiState.Error -> {
+                val isTransient = state.reason in setOf(
+                    KeyboardUiState.ErrorReason.TranscriptionFailed,
+                    KeyboardUiState.ErrorReason.AudioCaptureFailed,
+                    KeyboardUiState.ErrorReason.MicInitFailed,
+                )
+                ErrorIndicator(
+                    message = localizedErrorMessage(state),
+                    onOpenCompanionApp = if (isTransient) null else onOpenCompanionApp,
+                    onRetry = if (isTransient) onRetry else null,
+                )
+            }
 
             is KeyboardUiState.EngineLoading -> EngineLoadingIndicator(
                 message = localizedLoadingMessage(state),
@@ -184,6 +201,7 @@ private fun TranscribingIndicator() {
 private fun ErrorIndicator(
     message: String,
     onOpenCompanionApp: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,11 +219,23 @@ private fun ErrorIndicator(
                 maxLines = 2,
             )
         }
-        if (onOpenCompanionApp != null) {
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.height(2.dp))
+            TextButton(
+                onClick = onRetry,
+                modifier = Modifier.height(36.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.action_retry),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else if (onOpenCompanionApp != null) {
             Spacer(modifier = Modifier.height(2.dp))
             TextButton(
                 onClick = onOpenCompanionApp,
-                modifier = Modifier.height(28.dp),
+                modifier = Modifier.height(36.dp),
             ) {
                 Text(
                     text = stringResource(R.string.action_open_outspoke),
@@ -222,7 +252,7 @@ private fun EngineLoadingIndicator(
     message: String,
     onOpenCompanionApp: (() -> Unit)? = null,
 ) {
-    Column(horizontalAlignment = Alignment.Start) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GradientArcSpinner(modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))
@@ -237,7 +267,7 @@ private fun EngineLoadingIndicator(
             Spacer(modifier = Modifier.height(2.dp))
             TextButton(
                 onClick = onOpenCompanionApp,
-                modifier = Modifier.height(28.dp),
+                modifier = Modifier.height(36.dp),
             ) {
                 Text(
                     text = stringResource(R.string.action_open_outspoke),
@@ -329,6 +359,17 @@ private fun StatusTranscribingPreview() {
 private fun StatusErrorPreview() {
     OutspokeKeyboardTheme {
         StatusIndicator(uiState = KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied))
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF111111)
+@Composable
+private fun StatusErrorTransientPreview() {
+    OutspokeKeyboardTheme {
+        StatusIndicator(
+            uiState = KeyboardUiState.Error(KeyboardUiState.ErrorReason.TranscriptionFailed, detail = "ONNX error"),
+            onRetry = {},
+        )
     }
 }
 
