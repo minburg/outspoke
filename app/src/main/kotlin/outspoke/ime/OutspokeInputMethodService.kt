@@ -387,6 +387,7 @@ class OutspokeInputMethodService :
                         },
                         onSuggestionBarHeightChanged = { barPx -> updateImeHeight(barPx) },
                         keyboardContentHeightPx = keyboardHeightPx,
+                        navBarHeightPx = navBarHeightPx,
                     )
                 }
             }

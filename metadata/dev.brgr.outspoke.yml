@@ -34,8 +34,8 @@ AntiFeatures:
 Repo: https://github.com/minburg/outspoke/releases
 RepoType: git
 
-CurrentVersion: '0.2.1'
-CurrentVersionCode: 6
+CurrentVersion: '0.2.2'
+CurrentVersionCode: 7
 
 # SHA-256 fingerprint of the APK signing certificate - no colons, lowercase.
 # Retrieve it with: apksigner verify --print-certs app-release.apk | grep SHA-256
@@ -84,6 +84,13 @@ Builds:
   - versionName: '0.2.1'
     versionCode: 6
     commit: v0.2.1
+    subdir: app
+    gradle:
+      - release
+
+  - versionName: '0.2.2'
+    versionCode: 7
+    commit: v0.2.2
     subdir: app
     gradle:
       - release

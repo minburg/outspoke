@@ -304,6 +304,12 @@ fun KeyboardScreen(
  * Used by [dev.brgr.outspoke.ime.OutspokeInputMethodService] to set up the content.
  *
  * Shows the [KeyboardTutorialOverlay] on first launch until the user dismisses it.
+ *
+ * @param navBarHeightPx Navigation bar height in pixels from [WindowManager.currentWindowMetrics].
+ *                       Passed directly to [KeyboardTutorialOverlay] so its Skip/Next buttons
+ *                       are always positioned above the system navigation bar, regardless of
+ *                       whether insets are correctly dispatched into the IME window's Compose
+ *                       tree on the current device.
  */
 @Composable
 fun KeyboardScreen(
@@ -312,6 +318,7 @@ fun KeyboardScreen(
     onOpenCompanionApp: () -> Unit,
     onSuggestionBarHeightChanged: (Int) -> Unit = {},
     keyboardContentHeightPx: Int = 0,
+    navBarHeightPx: Int = 0,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val amplitude by viewModel.amplitude.collectAsState()
@@ -374,6 +381,7 @@ fun KeyboardScreen(
                 positions = tutorialPositions,
                 onDismiss = viewModel::dismissTutorial,
                 modifier = Modifier.matchParentSize(),
+                navBarHeightPx = navBarHeightPx,
             )
         }
     }

@@ -19,8 +19,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
@@ -92,15 +94,24 @@ private val TUTORIAL_STEPS = listOf(
  * "Skip" dismisses immediately; "Next" advances through all six steps; on the
  * final step the button reads "Got it!" and dismisses the tutorial permanently.
  *
- * @param positions  Shared [TutorialPositions] populated by [KeyboardScreen]'s buttons.
- * @param onDismiss  Called when the user finishes or skips all steps.
+ * @param positions      Shared [TutorialPositions] populated by [KeyboardScreen]'s buttons.
+ * @param onDismiss      Called when the user finishes or skips all steps.
+ * @param navBarHeightPx Navigation bar height in pixels as reported by [WindowManager]
+ *                       at the service level. This is the authoritative value and is used
+ *                       directly for bottom padding instead of relying on
+ *                       [Modifier.navigationBarsPadding], which may return 0 inside an
+ *                       IME window on some OEM ROMs even when button navigation is active.
  */
 @Composable
 fun KeyboardTutorialOverlay(
     positions: TutorialPositions,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    navBarHeightPx: Int = 0,
 ) {
+    // Convert the service-level pixel value to Dp once. When gesture navigation is active
+    // navBarHeightPx is 0; on button-nav devices it is the real nav bar height.
+    val navBarPaddingDp: Dp = with(LocalDensity.current) { navBarHeightPx.toDp() }
     var currentStep by remember { mutableIntStateOf(0) }
     val totalSteps = TUTORIAL_STEPS.size
     val step = TUTORIAL_STEPS[currentStep]
@@ -206,6 +217,7 @@ fun KeyboardTutorialOverlay(
                 stepIndex = idx,
                 totalSteps = totalSteps,
                 cardAtBottom = cardAtBottom,
+                navBarPaddingDp = navBarPaddingDp,
                 onSkip = onDismiss,
                 onNext = {
                     if (currentStep < totalSteps - 1) currentStep++ else onDismiss()
@@ -224,6 +236,7 @@ private fun StepContent(
     cardAtBottom: Boolean,
     skipLabel: String,
     nextLabel: String,
+    navBarPaddingDp: Dp = 0.dp,
     onSkip: () -> Unit,
     onNext: () -> Unit,
 ) {
@@ -253,14 +266,17 @@ private fun StepContent(
         }
 
         // Bottom section: nav row stacked below the card when cardAtBottom.
-        // Using a Column removes the need for a hardcoded gap between card and nav.
+        // navBarPaddingDp is the authoritative nav bar height from WindowManager (service
+        // level). It is used directly instead of Modifier.navigationBarsPadding() because
+        // inset dispatch inside an IME window is unreliable on some OEM ROMs — if insets
+        // are never delivered the modifier is a silent no-op and the buttons would be drawn
+        // behind the system navigation bar.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp)
-                .padding(bottom = 4.dp),
+                .padding(bottom = navBarPaddingDp + 4.dp)
+                .padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (cardAtBottom) {

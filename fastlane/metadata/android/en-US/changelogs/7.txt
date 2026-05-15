@@ -1,0 +1,3 @@
+Fifth patch (v0.2.2).
+
+Fixed tutorial overlay Skip and Next buttons being drawn behind the system navigation bar on devices that use button-based navigation (3-button or 2-button nav bar). The buttons are now always positioned above the nav bar using the authoritative navigation bar height from the system, rather than relying on inset dispatch inside the IME window, which is unreliable on some devices.
