@@ -126,7 +126,21 @@ fun SuggestionBar(
                     .height(SUGGESTION_BAR_HEIGHT_DP.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Scrollable chip list — grows to fill available width left of dismiss icon.
+                // Dismiss button — leading edge so it is visually separated from the
+                // switch-keyboard icon that lives in the keyboard row directly below.
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = MyIcons.Close,
+                        contentDescription = dismissContentDescription,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+
+                // Scrollable chip list — fills remaining width after the dismiss icon.
                 LazyRow(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 4.dp),
@@ -148,19 +162,6 @@ fun SuggestionBar(
                             elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 1.dp),
                         )
                     }
-                }
-
-                // Dismiss button — compact icon button on the trailing edge.
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        imageVector = MyIcons.Close,
-                        contentDescription = dismissContentDescription,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
                 }
             }
             // Hairline divider — visually separates suggestion area from keyboard buttons.
@@ -188,6 +189,14 @@ private fun SuggestionBarContent(suggestions: List<String>) {
                 .height(SUGGESTION_BAR_HEIGHT_DP.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = MyIcons.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
             LazyRow(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 4.dp),
@@ -209,14 +218,6 @@ private fun SuggestionBarContent(suggestions: List<String>) {
                         elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 1.dp),
                     )
                 }
-            }
-            IconButton(onClick = {}, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = MyIcons.Close,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
             }
         }
         HorizontalDivider(

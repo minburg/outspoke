@@ -13,6 +13,10 @@ import org.junit.Test
  *  4. Mixed 25% non-Latin → fails (above 20% threshold)
  *  5. Empty string → passes (returns false)
  *
+ * The check is script-consistency based, not language-setting based:
+ * coherent Cyrillic and Greek text passes (it is a real transcript from a
+ * Parakeet-supported language), while CJK, Arabic, and symbol noise fails.
+ *
  * Additional edge-case tests validate punctuation neutrality, digits, German umlauts,
  * and the exact boundary behaviour around the 20% threshold.
  */
@@ -78,15 +82,15 @@ class ScriptHallucinationTest {
     }
 
     @Test
-    fun `Cyrillic text fails`() {
+    fun `Cyrillic text passes - it is a real Parakeet-supported script`() {
         val text = "Привет мир"
-        assertThat(isScriptHallucination(text)).isTrue()
+        assertThat(isScriptHallucination(text)).isFalse()
     }
 
     @Test
-    fun `Greek text fails`() {
+    fun `Greek text passes - it is a real Parakeet-supported script`() {
         val text = "Γεια σου κόσμε"
-        assertThat(isScriptHallucination(text)).isTrue()
+        assertThat(isScriptHallucination(text)).isFalse()
     }
 
     @Test

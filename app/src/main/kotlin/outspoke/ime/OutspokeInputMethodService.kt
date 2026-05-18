@@ -3,6 +3,7 @@ package dev.brgr.outspoke.ime
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.Resources
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.IBinder
@@ -221,17 +222,60 @@ class OutspokeInputMethodService :
 
     /**
      * Height of the navigation bar in pixels, or 0 when gesture navigation is active.
-     * Computed lazily using [WindowManager.currentWindowMetrics] (API 30+).
+     *
+     * Two independent sources are consulted to guard against OEM ROMs (e.g. Realme UI)
+     * that return 0 from [WindowManager.currentWindowMetrics] at the service-context level
+     * even when button navigation is active:
+     *
+     *  1. [WindowManager.currentWindowMetrics] (public API, API 30+) — primary source,
+     *     correct on stock AOSP and most devices.
+     *
+     *  2. The `navigation_bar_height` system dimension resource — a private-but-stable
+     *     internal resource present on all known Android versions and OEM ROMs. Used only
+     *     as a fallback when source 1 returns 0, and only when we can confirm button
+     *     navigation is actually active (i.e. the resource itself is > 0 AND the system
+     *     navigation mode is not gesture-only). This avoids adding spurious bottom padding
+     *     on gesture-nav devices where both sources should be 0.
+     *
+     * On gesture navigation both sources return 0, so the result is correctly 0.
+     * On button navigation, if source 1 is broken by the OEM, source 2 saves us.
      */
     private val navBarHeightPx: Int by lazy {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        wm.currentWindowMetrics.windowInsets
+
+        // Source 1: public API
+        val fromWindowMetrics = wm.currentWindowMetrics.windowInsets
             .getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+
+        // Source 2: internal system resource — only consulted when source 1 returns 0,
+        // because on gesture-nav devices the resource may still report the physical bar
+        // height even though no space is reserved. We only trust it when source 1 is 0.
+        if (fromWindowMetrics > 0) {
+            fromWindowMetrics
+        } else {
+            try {
+                val resId = Resources.getSystem()
+                    .getIdentifier("navigation_bar_height", "dimen", "android")
+                if (resId != 0) Resources.getSystem().getDimensionPixelSize(resId) else 0
+            } catch (_: Exception) {
+                0
+            }
+        }
     }
 
     /**
-     * Total height of the keyboard panel in pixels (visible content only — excludes
-     * the suggestion bar slot). = 20% of the usable screen height (above nav bar) + nav bar.
+     * Total height of the IME window for the keyboard panel (excludes the suggestion bar
+     * slot). This equals 20 % of the usable screen height (above the nav bar) PLUS the
+     * nav bar height.
+     *
+     * Why include [navBarHeightPx]:
+     * The Android IME window is anchored to the very bottom of the screen — it is NOT
+     * automatically placed above the navigation bar. The window therefore must be tall
+     * enough to span the nav bar area so that its top edge reaches the desired keyboard
+     * height above the nav bar. Content inside the Compose tree is then pushed above the
+     * nav bar via explicit [navBarHeightPx] bottom padding (passed down to [KeyboardScreen]
+     * and [KeyboardTutorialOverlay]), which is more reliable than [Modifier.navigationBarsPadding]
+     * because inset dispatch inside IME windows is broken on some OEM ROMs.
      */
     private val keyboardHeightPx: Int by lazy {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager

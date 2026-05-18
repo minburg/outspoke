@@ -77,6 +77,19 @@ private const val HALLUCINATION_SCRIPT_THRESHOLD = 0.20f
 private val LATIN_RANGE = '\u0000'..'\u024F'
 
 /**
+ * Allowed Unicode range for Cyrillic-script languages (Basic Cyrillic + Cyrillic Supplement).
+ * Covers Russian, Ukrainian, Bulgarian and other Slavic languages written in Cyrillic.
+ */
+private val CYRILLIC_RANGE = '\u0400'..'\u052F'
+
+/**
+ * Allowed Unicode range for Greek script.
+ * Covers modern Greek (U+0370–U+03FF) plus Greek Extended (U+1F00–U+1FFF) for polytonic.
+ */
+private val GREEK_RANGE_1 = '\u0370'..'\u03FF'
+private val GREEK_RANGE_2 = '\u1F00'..'\u1FFF'
+
+/**
  * Standard punctuation characters that are always allowed regardless of language.
  * Includes common ASCII punctuation plus a handful of non-ASCII typographic characters
  * used in Latin-script writing (€, „, ", «, »).
@@ -118,7 +131,7 @@ private val LEADING_PUNCT_RE = Regex("""^[,;]+\s*""")
  * Only matches letters (not digits) so that decimals like "3.14" are unaffected.
  * Covers basic Latin, German umlauts, and common extended Latin characters.
  */
-private val MISSING_SENTENCE_SPACE_RE = Regex("""([.!?])([A-Za-zÀ-ÖØ-öø-ÿ])""")
+private val MISSING_SENTENCE_SPACE_RE = Regex("""([.!?])(\p{L})""")
 
 /**
  * Strips all leading/trailing non-alphanumeric characters from a single word token
@@ -846,40 +859,54 @@ internal fun estimateConfidence(result: TranscriptResult, audioSamples: Int): Fl
 }
 
 /**
- * Returns `true` when [text] contains more than [HALLUCINATION_SCRIPT_THRESHOLD] (20%) of
- * characters that are outside the script range expected for [language].
+ * Returns `true` when [text] is likely a model hallucination based on Unicode script
+ * consistency — regardless of the user-configured [language].
  *
- * **Algorithm (O(N) scan):**
- * 1. Iterate every character in [text].
- * 2. Skip whitespace and punctuation (these are always neutral and never counted).
- * 3. For each remaining character, check whether it falls in the allowed Unicode range.
- * 4. If `outOfRange / total > HALLUCINATION_SCRIPT_THRESHOLD`, return `true`.
+ * **Why script-consistency rather than language-gating:**
+ * Parakeet's ONNX export has no language input tensor; [language] reflects only the
+ * user's UI setting, not what Parakeet actually decoded.  A user dictating Russian with
+ * the UI set to "en" (or "auto") would be wrongly blocked if the check were tied to the
+ * language setting.  Instead we check whether the text is *internally consistent*: real
+ * transcripts are almost entirely one script (Latin, Cyrillic, or Greek), while Parakeet
+ * hallucinations on silence or noise tend to be random punctuation, symbols, CJK
+ * characters, or mixed-script gibberish.
  *
- * For `"en"`, `"de"` and all currently unsupported languages the allowed range is
- * [LATIN_RANGE] (U+0000–U+024F) which covers every Latin-script language.
+ * **Algorithm:**
+ * 1. Classify every non-whitespace, non-punctuation character into one of four buckets:
+ *    Latin (U+0000–U+024F), Cyrillic (U+0400–U+052F), Greek (U+0370–U+03FF / U+1F00–U+1FFF),
+ *    or Other (everything else — CJK, symbols, emoji, etc.).
+ * 2. If the "Other" bucket exceeds [HALLUCINATION_SCRIPT_THRESHOLD] (20%) of all
+ *    letter/digit characters, classify the text as a hallucination.
+ * 3. Texts that are coherently Latin, Cyrillic, or Greek are never flagged — the
+ *    dominant-script check is intentionally NOT performed.
+ *
+ * The [language] parameter is retained for API compatibility and future use (e.g. once
+ * a language-conditioned ONNX export becomes available), but is not used by this check.
  *
  * An empty or whitespace-only string is never a hallucination (returns `false`).
  */
 internal fun isScriptHallucination(text: String, language: String = "en"): Boolean {
-    // Allowed code-point range for the given language — extend this when adding non-Latin langs.
-    @Suppress("UNUSED_PARAMETER")
-    val allowedRange = LATIN_RANGE  // same for all currently supported languages
-
     var total = 0
-    var outOfRange = 0
+    var other = 0
 
     for (ch in text) {
-        // Whitespace is neutral — skip.
         if (ch.isWhitespace()) continue
-        // Common punctuation is always allowed — skip.
         if (ch in ALLOWED_PUNCTUATION) continue
+        if (!ch.isLetterOrDigit()) {
+            // Non-letter, non-digit, non-whitespace, non-punctuation (e.g. emoji, symbols)
+            total++
+            other++
+            continue
+        }
 
         total++
-        if (ch !in allowedRange) outOfRange++
+        val known = ch in LATIN_RANGE || ch in CYRILLIC_RANGE ||
+                ch in GREEK_RANGE_1 || ch in GREEK_RANGE_2
+        if (!known) other++
     }
 
     if (total == 0) return false
-    return (outOfRange.toFloat() / total) > HALLUCINATION_SCRIPT_THRESHOLD
+    return (other.toFloat() / total) > HALLUCINATION_SCRIPT_THRESHOLD
 }
 
 /**
@@ -1035,18 +1062,14 @@ class InferenceRepository(
                         else -> result
                     }
                     Log.d(TAG, "[BOUNDARY] Final = ${cleaned.logLabel()}")
-                    val cleanedText = when (cleaned) {
-                        is TranscriptResult.Final -> cleaned.text
-                        is TranscriptResult.Partial -> cleaned.text
-                        else -> null
-                    }
+                    val cleanedText = (cleaned as? TranscriptResult.Final)?.text
                     val toSend = if (cleanedText != null && isScriptHallucination(
                             cleanedText,
                             language = engine.currentLanguage
                         )
                     ) {
-                        Log.w(TAG, "[HALLUCINATION] Non-Latin script detected in boundary final — suppressing")
-                        TranscriptResult.Failure(RuntimeException("Non-Latin script detected — likely hallucination"))
+                        Log.w(TAG, "[HALLUCINATION] Unexpected script detected in boundary final — suppressing")
+                        TranscriptResult.Failure(RuntimeException("Unexpected script detected — likely hallucination"))
                     } else {
                         applyGrammarCorrection(cleaned, engine.currentLanguage)
                     }
@@ -1180,8 +1203,8 @@ class InferenceRepository(
                     isContinuationAfterTrim = false
 
                     if (isScriptHallucination(cleaned.text, language = engine.currentLanguage)) {
-                        Log.w(TAG, "[HALLUCINATION] Non-Latin script detected in partial — suppressing")
-                        send(TranscriptResult.Failure(RuntimeException("Non-Latin script detected — likely hallucination")))
+                        Log.w(TAG, "[HALLUCINATION] Unexpected script detected in partial — suppressing")
+                        send(TranscriptResult.Failure(RuntimeException("Unexpected script detected — likely hallucination")))
                     } else {
                         send(cleaned)
                     }
@@ -1404,7 +1427,7 @@ class InferenceRepository(
             // Long-utterance results are never gated — gating partials in continuous
             // dictation would cause unacceptable silent drops in the middle of sentences.
             // Engine failures (Failure, WindowTrimmed) are passed through unchanged.
-            if (isShortUtterance && (cleaned is TranscriptResult.Final || cleaned is TranscriptResult.Partial)) {
+            if (isShortUtterance && (cleaned is TranscriptResult.Final)) {
                 val confidence = estimateConfidence(cleaned, rawChunk.samples.size)
                 Log.d(TAG, "[FINAL] SHORT-UTT confidence=%.2f threshold=%.2f".format(confidence, CONFIDENCE_THRESHOLD))
                 if (confidence < CONFIDENCE_THRESHOLD) {
@@ -1417,11 +1440,7 @@ class InferenceRepository(
                 }
             }
 
-            val finalText = when (cleaned) {
-                is TranscriptResult.Final -> cleaned.text
-                is TranscriptResult.Partial -> cleaned.text
-                else -> null
-            }
+            val finalText = (cleaned as? TranscriptResult.Final)?.text
             val finalToSend =
                 if (finalText != null && isScriptHallucination(finalText, language = engine.currentLanguage)) {
                     Log.w(TAG, "[HALLUCINATION] Non-Latin script detected in final — suppressing")

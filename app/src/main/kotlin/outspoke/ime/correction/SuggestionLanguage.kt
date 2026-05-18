@@ -10,13 +10,31 @@ package dev.brgr.outspoke.ime.correction
  * Entries are listed in alphabetical order by display name, as required by the settings UI.
  */
 enum class SuggestionLanguage(val tag: String, val displayName: String) {
+    BULGARIAN("bg", "Bulgarian"),
+    CROATIAN("hr", "Croatian"),
+    CZECH("cs", "Czech"),
+    DANISH("da", "Danish"),
     DUTCH("nl", "Dutch"),
     ENGLISH("en", "English"),
+    ESTONIAN("et", "Estonian"),
+    FINNISH("fi", "Finnish"),
     FRENCH("fr", "French"),
     GERMAN("de", "German"),
+    GREEK("el", "Greek"),
+    HUNGARIAN("hu", "Hungarian"),
     ITALIAN("it", "Italian"),
+    LATVIAN("lv", "Latvian"),
+    LITHUANIAN("lt", "Lithuanian"),
+    MALTESE("mt", "Maltese"),
     POLISH("pl", "Polish"),
+    PORTUGUESE("pt", "Portuguese"),
+    ROMANIAN("ro", "Romanian"),
+    RUSSIAN("ru", "Russian"),
+    SLOVAK("sk", "Slovak"),
+    SLOVENIAN("sl", "Slovenian"),
     SPANISH("es", "Spanish"),
+    SWEDISH("sv", "Swedish"),
+    UKRAINIAN("uk", "Ukrainian"),
     ;
 
     companion object {

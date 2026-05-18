@@ -100,12 +100,29 @@ fun KeyboardScreen(
      */
     keyboardContentHeightPx: Int = 0,
     tutorialPositions: TutorialPositions? = null,
+    /**
+     * Navigation bar height in pixels from [WindowManager.currentWindowMetrics] at the
+     * service level. Applied as explicit bottom padding on the keyboard content column so
+     * that buttons are never drawn behind the system navigation bar.
+     *
+     * This mirrors the same pattern used by [KeyboardTutorialOverlay]: we do NOT use
+     * [Modifier.navigationBarsPadding] here because inset dispatch inside an IME window
+     * is unreliable on some OEM ROMs — if insets are never delivered the modifier is a
+     * silent no-op and the buttons draw behind the nav bar. The service-level value is
+     * authoritative and always correct.
+     *
+     * 0 on gesture-navigation devices (no bar to avoid), real height on button-nav devices.
+     */
+    navBarHeightPx: Int = 0,
 ) {
     val density = LocalDensity.current
-    // Convert the service-provided pixel height to Dp once; stays constant per session.
+    // Convert the service-provided pixel heights to Dp once; stay constant per session.
     val mainContentHeight = if (keyboardContentHeightPx > 0) {
         with(density) { keyboardContentHeightPx.toDp() }
     } else null
+    // Explicit nav bar bottom padding — authoritative service-level value, same pattern
+    // as KeyboardTutorialOverlay. 0 on gesture nav, real height on button-nav devices.
+    val navBarPaddingDp = with(density) { navBarHeightPx.toDp() }
 
     // The IME window is a fixed size (keyboard + suggestion bar slot). The bar clips its
     // own content internally as it animates. The keyboard Column is pinned to the bottom
@@ -132,8 +149,11 @@ fun KeyboardScreen(
         )
 
         // Main keyboard content — always pinned to the bottom with a fixed height.
-        // Window size is constant, so this Column never moves regardless of bar state.
-        Column(
+        // Uses a Box so the button row is anchored to the bottom edge and the top section
+        // (status + waveform) is vertically centred in the remaining space above. This
+        // prevents the large empty gap that appears on tablets/high-res screens when a
+        // Column with SpaceBetween distributes all leftover space as dead whitespace.
+        Box(
             modifier = if (mainContentHeight != null) {
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -145,14 +165,19 @@ fun KeyboardScreen(
                     .fillMaxWidth()
                     .wrapContentHeight()
             }
-                .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = navBarPaddingDp + 8.dp),
         ) {
-
-            //  Top section: status + (optional) language selector + waveform
+            // Top section: status row + (optional) language selector + waveform.
+            // Centred vertically in the space above the button row so that on tall
+            // keyboard windows (tablets) the waveform sits in the middle rather than
+            // being pushed hard against the top edge.
             Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    // Keep it above the button row so they never overlap.
+                    // The TalkButton is 72 dp tall; 80 dp gives a safe margin.
+                    .padding(bottom = 80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -201,13 +226,13 @@ fun KeyboardScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             //  Bottom row: 5 buttons with TalkButton centred
             // Left and right groups each have weight(1f) so the centre button stays
             // exactly in the middle regardless of screen width.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Left group: [Delete All]  [Delete Word]
@@ -295,7 +320,7 @@ fun KeyboardScreen(
 
                 }
             }
-        } // end main content Column
+        } // end main content Box
     } // end outer Box
 }
 
@@ -373,6 +398,7 @@ fun KeyboardScreen(
             onSuggestionBarHeightChanged = onSuggestionBarHeightChanged,
             keyboardContentHeightPx = keyboardContentHeightPx,
             tutorialPositions = tutorialPositions,
+            navBarHeightPx = navBarHeightPx,
         )
 
         // Tutorial overlay covers the keyboard on first launch.

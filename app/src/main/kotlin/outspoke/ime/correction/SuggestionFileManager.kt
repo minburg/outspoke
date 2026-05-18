@@ -22,7 +22,7 @@ object SuggestionFileManager {
      * broken by future data updates. Bump this constant (and the release tag
      * in outspoke-data) whenever the file format or content changes materially.
      */
-    const val BASE_URL = "https://github.com/minburg/outspoke-data/releases/download/v1"
+    const val BASE_URL = "https://github.com/minburg/outspoke-data/releases/download/v2"
 
     fun getLanguageDir(context: Context, tag: String): File =
         File(context.filesDir, "$ROOT/$tag")
