@@ -51,7 +51,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 **Word-suggestion / correction feature (new in v0.2.0):**
 - `SuggestionBar` (keyboard UI) appears after a dictation commit and shows up to 5 correction candidates for the word under the cursor.
 - Language packs (dictionary + ARPA language model) are downloaded on demand from `https://github.com/minburg/outspoke-data` — the only external URL used at runtime beyond the one-time ASR model download from Hugging Face. Files are pinned to a specific release tag to prevent silent breakage.
-- Supported languages: Dutch, English, French, German, Italian, Polish, Spanish (`SuggestionLanguage` enum).
+- Supported languages: Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Russian, Slovak, Slovenian, Spanish, Swedish, Ukrainian (`SuggestionLanguage` enum).
 - `SuggestionFileManager` stores packs in `<filesDir>/suggestion_files/<tag>/`; `SuggestionFileDownloader` handles resumable HTTP downloads with SHA-256 verification.
 - `WordCorrector` orchestrates the pipeline: `CandidateGenerator` (phonetic index via Kölner Phonetik for DE, Double Metaphone for all others + Damerau-Levenshtein edit distance) → `ArpaLanguageModel` (bigram ARPA LM) → combined frequency + LM score.
 - `WordSuggestionProvider` is the public façade used by the IME; it loads only languages selected by the user and delivers results on the main thread.
@@ -78,3 +78,110 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 - `dependenciesInfo` is disabled in the APK for F-Droid / IzzyOnDroid reproducibility.
 - Do not add analytics, crash reporters, or any SDK that phones home.
 - External file downloads (suggestion packs) come **only** from `github.com/minburg/outspoke-data`. Do not add other external hosts.
+
+## Release Process
+
+Complete checklist for publishing a new version to GitHub Releases and IzzyOnDroid.
+
+### 1. Bump the version
+
+Edit `app/build.gradle.kts`:
+
+```kotlin
+versionCode = <previous + 1>      // integer; IzzyOnDroid uses this to detect updates
+versionName = "0.x.y"             // shown to users; must match the git tag (without "v")
+```
+
+The ABI-split `versionCode` formula is `defaultVersionCode * 10 + abiOffset` (handled automatically by the build script — only edit `defaultVersionCode` here).
+
+Also update `how-to-release.txt` — change the tag command to use the new version:
+
+```
+git tag v0.x.y && git push origin v0.x.y
+```
+
+Also update `metadata/dev.brgr.outspoke.yml`:
+
+- Set `CurrentVersion` to the new `versionName`.
+- Set `CurrentVersionCode` to the new `versionCode`.
+- Append a new entry to the `Builds:` list:
+
+```yaml
+  - versionName: '0.x.y'
+    versionCode: <N>
+    commit: v0.x.y
+    subdir: app
+    gradle:
+      - release
+```
+
+### 2. Write the fastlane changelog
+
+Create `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
+
+- File name is the plain integer `versionCode` (e.g. `8.txt` for versionCode 8).
+- First line: `Nth patch (vX.Y.Z).` — keep phrasing consistent with previous entries.
+- Blank line, then a plain-English description of what changed. Focus on user-visible changes; skip internal refactors unless they fix something the user would notice.
+- Keep it under ~500 characters — IzzyOnDroid truncates long changelogs.
+
+### 3. Update documentation
+
+Review and update these files so they reflect the new state of the codebase:
+
+- **`AGENTS.md`** — package table, architecture notes, supported language lists.
+- **`README.md`** — features list, requirements, permissions table, privacy section.
+- **`docs/architecture.md`** — package table, AppPreferences schema, version line in §13, any new subsystems.
+
+Only update what actually changed; do not rewrite sections that are still accurate.
+
+### 4. Commit everything
+
+Stage and commit all changed files together in one commit:
+
+```bash
+git add app/build.gradle.kts \
+        how-to-release.txt \
+        metadata/dev.brgr.outspoke.yml \
+        fastlane/metadata/android/en-US/changelogs/<versionCode>.txt \
+        AGENTS.md README.md docs/architecture.md \
+        # …any other changed source files
+git commit -m "release v0.x.y"
+git push
+```
+
+### 5. Tag the release
+
+The tag must match `versionName` from `app/build.gradle.kts` with a `v` prefix:
+
+```bash
+git tag v0.x.y
+git push origin v0.x.y
+```
+
+### 6. Create the GitHub Release
+
+1. Go to **Releases → Draft a new release** on GitHub.
+2. Select the tag you just pushed (`v0.x.y`).
+3. Set the release title to `v0.x.y`.
+4. Paste the changelog text (from the `.txt` file above) into the description.
+5. Build the release APKs locally:
+   ```bash
+   ./gradlew assembleRelease
+   # APKs appear in app/build/outputs/apk/release/
+   ```
+6. Attach all three APK files: `arm64-v8a`, `armeabi-v7a`, and `universal`.
+7. Publish the release.
+
+### 7. IzzyOnDroid picks it up automatically
+
+IzzyOnDroid polls GitHub Releases for new tags. Once the release is published, it will appear in the IzzyOnDroid repo on the next scan (usually within 24 hours). No manual submission is needed.
+
+### Version numbering conventions
+
+| Segment | Rule |
+|---|---|
+| `versionCode` | Increment by 1 for every release, no exceptions. Never reuse or skip. |
+| `versionName` | `0.MAJOR.PATCH` — bump PATCH for fixes and small features, bump MAJOR for large feature additions. |
+| Git tag | Always `v` + `versionName` (e.g. `v0.2.3`). Must match exactly. |
+| Fastlane file | Always plain `versionCode` integer (e.g. `8.txt`). |
+

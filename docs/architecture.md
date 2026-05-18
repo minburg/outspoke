@@ -453,7 +453,7 @@ InferenceService watches <filesDir>/models/ for CLOSE_WRITE / MOVED_TO events. W
 ## 13. Build Configuration and ABI Splits
 
 - compileSdk 36, minSdk 30 (Android 11+), targetSdk 36
-- versionCode 6, versionName 0.2.1
+- versionCode 8, versionName 0.2.3
 - Kotlin 2.3.20, AGP 8.13.2, JVM target 11
 - buildFeatures: compose = true, buildConfig = true
 - Release: isMinifyEnabled = true, isShrinkResources = true, ProGuard enabled
@@ -489,19 +489,37 @@ Each supported language requires two files, stored in `<filesDir>/suggestion_fil
 | `dict_<tag>.txt` | ~2 MB | Frequency-sorted word list (`word\tlog10_freq` per line) |
 | `lm_<tag>.arpa` | ~6 MB | Bigram ARPA language model for re-ranking |
 
-Files are downloaded on demand from `https://github.com/minburg/outspoke-data/releases/download/v1` — **the only external URL used at runtime besides the Hugging Face model download**. The URL is pinned to a specific release tag in `SuggestionFileManager.BASE_URL`; bump the tag there (and in the `outspoke-data` repository) whenever file format or content changes.
+Files are downloaded on demand from `https://github.com/minburg/outspoke-data/releases/download/v2` — **the only external URL used at runtime besides the Hugging Face model download**. The URL is pinned to a specific release tag in `SuggestionFileManager.BASE_URL`; bump the tag there (and in the `outspoke-data` repository) whenever file format or content changes.
 
 Supported languages (`SuggestionLanguage` enum):
 
 | Tag | Language |
 |---|---|
+| `bg` | Bulgarian |
+| `hr` | Croatian |
+| `cs` | Czech |
+| `da` | Danish |
 | `nl` | Dutch |
 | `en` | English |
+| `et` | Estonian |
+| `fi` | Finnish |
 | `fr` | French |
 | `de` | German |
+| `el` | Greek |
+| `hu` | Hungarian |
 | `it` | Italian |
+| `lv` | Latvian |
+| `lt` | Lithuanian |
+| `mt` | Maltese |
 | `pl` | Polish |
+| `pt` | Portuguese |
+| `ro` | Romanian |
+| `ru` | Russian |
+| `sk` | Slovak |
+| `sl` | Slovenian |
 | `es` | Spanish |
+| `sv` | Swedish |
+| `uk` | Ukrainian |
 
 ### Correction Pipeline
 

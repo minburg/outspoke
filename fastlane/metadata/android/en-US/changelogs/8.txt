@@ -1,0 +1,9 @@
+Sixth patch (v0.2.3).
+
+Extended language support: word correction now covers 22 languages, adding Bulgarian, Croatian, Czech, Danish, Estonian, Finnish, Greek, Hungarian, Latvian, Lithuanian, Maltese, Portuguese, Romanian, Russian, Slovak, Slovenian, Swedish, and Ukrainian alongside the existing Dutch, English, French, German, Italian, Polish, and Spanish.
+
+Cyrillic and Greek scripts are now recognised by the transcription pipeline. Previously, text in Russian, Ukrainian, Bulgarian, Greek, and other non-Latin scripts was incorrectly filtered as a hallucination. All three major European scripts — Latin, Cyrillic, and Greek — are now accepted as valid output.
+
+Fixed keyboard layout on tablets and unusual aspect ratios: the mic button and action buttons are now always positioned correctly at the bottom of the keyboard, with the status and waveform section centred in the remaining space above rather than being spread out with large empty gaps.
+
+Fixed the dismiss button in the word suggestion bar, which is now placed on the leading edge (left side) to avoid visual confusion with the switch-keyboard icon directly below it.
