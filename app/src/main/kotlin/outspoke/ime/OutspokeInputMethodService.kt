@@ -199,6 +199,12 @@ class OutspokeInputMethodService :
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // Mark the already-bound foreground service as started so it survives IME recreation.
+        try {
+            startService(inferenceServiceIntent())
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Unable to retain inference service; keeping the existing binding", e)
+        }
         val targetHeight = keyboardHeightPx + (if (barVisible) barSlotHeightPx else 0)
         Log.d(
             TAG,
