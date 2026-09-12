@@ -95,6 +95,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **SileroVadFilter** (primary)
 
+- Runtime neural VAD failures switch to energy detection for the rest of the recording, retaining onset and hangover state. Input tensors are closed even when inference throws.
 - Silero VAD v4 ONNX. RNN state tensors h/c shape [2,1,64] carried across chunks.
 - Speech probability threshold: 0.3.
 - Three layers: onset gate (2 frames/60 ms), pre-roll buffer (15 frames/450 ms lead-in), hangover.
