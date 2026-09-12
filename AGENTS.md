@@ -32,7 +32,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 
 ## Architecture — What Isn't Obvious from Single Files
 
-**`InferenceService` is a foreground `LifecycleService`** that the IME binds to. The engine stays alive across keyboard hide/show cycles. Unbinding does not stop the service — it shuts down only when explicitly stopped.
+**`InferenceService` is a foreground `LifecycleService`** that the IME binds to. The engine stays alive across keyboard hide/show cycles. Unbinding does not stop the service — it shuts down only when explicitly stopped. Repository sessions serialize engine use and teardown; memory-pressure cleanup skips active recording and final decoding.
 
 **`SpeechEngine` is the only seam for adding a new model.** Implement `load`, `transcribe`, `close`, `setLanguage`, `setLanguageFilter`, register a `ModelId` enum value and a `ModelInfo` in `ModelRegistry`, add a branch in `SpeechEngineFactory`. Nothing in the IME or repository layer needs to change.
 
