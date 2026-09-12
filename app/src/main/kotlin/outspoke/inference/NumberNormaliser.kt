@@ -204,6 +204,13 @@ internal object NumberNormaliser {
         return result
     }
 
+    /** Numeric repetition can be intentional, for example digits in a code. */
+    fun isNumberToken(word: String): Boolean {
+        val bare = stripPunctuation(word).lowercase()
+        return bare.isNotEmpty() && (bare.all { it.isDigit() } ||
+            isNumberWord(bare, isGerman = false) || isNumberWord(bare, isGerman = true))
+    }
+
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /**

@@ -21,6 +21,13 @@ class NumberNormaliserTest {
     }
 
     @Test
+    fun `repeated digits survive transcript cleanup`() {
+        assertEquals("1 1 1 2 2 2", "one one one two two two".cleanTranscript())
+        assertEquals("1 2 1 2", "one two one two".cleanTranscript())
+        assertEquals("5 5", "5 5".cleanTranscript())
+    }
+
+    @Test
     fun `separate numbers retain their boundaries`() {
         val cases = mapOf(
             "one two three four five" to "1 2 3 4 5",
