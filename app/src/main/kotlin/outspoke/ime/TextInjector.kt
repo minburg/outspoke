@@ -878,6 +878,12 @@ class TextInjector(
         inputConnection.commitText(" ", 1)
     }
 
+    /** Called once after a successful recording, never for an intermediate chunk. */
+    fun finishTranscription(addSpace: Boolean) {
+        inputConnection.finishComposingText()
+        if (addSpace && supportsComposing) ensureSeparatorSpace()
+    }
+
     fun sendNewline() {
         lastPartial = ""
         inputConnection.commitText("\n", 1)

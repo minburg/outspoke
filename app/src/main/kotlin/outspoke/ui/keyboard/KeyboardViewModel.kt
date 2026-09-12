@@ -40,6 +40,9 @@ class KeyboardViewModel(
     /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
+    val trailingSpace = appPreferences.trailingSpace
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun insertSpace() { textInjector?.insertSpace() }
 
     /**
@@ -470,6 +473,9 @@ class KeyboardViewModel(
             // job see captureJob != myJob and return immediately - preventing stale
             // partial results from bleeding into the fresh TextInjector state.
             val myJob = coroutineContext[Job]
+            var hasTranscript = false
+            var failed = false
+            val addTrailingSpace = trailingSpace.value
 
             try {
                 // Repo was verified non-null above; re-read defensively in case the binder
@@ -520,6 +526,7 @@ class KeyboardViewModel(
                                 TAG, "Final transcript: \"${result.text}\"" +
                                         if (result.isUtteranceBoundary) " [utterance boundary]" else ""
                             )
+                            hasTranscript = hasTranscript || result.text.isNotBlank()
                             textInjector?.commitFinal(result.text)
                             updateWordAtCursor()
                             if (!result.isUtteranceBoundary) {
@@ -530,6 +537,7 @@ class KeyboardViewModel(
                         }
 
                         is TranscriptResult.Failure -> {
+                            failed = true
                             Log.e(TAG, "Transcription failure", result.cause)
                             _isContinuousMode.value = false
                             _uiState.value = KeyboardUiState.Error(
@@ -570,9 +578,8 @@ class KeyboardViewModel(
                     }
                 }
 
-                // The flow completed normally. If still in Transcribing (or Listening), it
-                // means VAD filtered out all audio (nothing was said) so InferenceRepository
-                // emitted no Final result. Reset to Idle so the button becomes usable again.
+                if (hasTranscript && !failed) textInjector?.finishTranscription(addTrailingSpace)
+                // Completion, including an empty final utterance, releases the recording UI.
                 if (_uiState.value == KeyboardUiState.Transcribing ||
                     _uiState.value == KeyboardUiState.Listening
                 ) {
