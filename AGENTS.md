@@ -32,7 +32,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 
 ## Architecture — What Isn't Obvious from Single Files
 
-**`InferenceService` is a foreground `LifecycleService`** that the IME binds to. The engine stays alive across keyboard hide/show cycles. Unbinding does not stop the service — it shuts down only when explicitly stopped.
+**`InferenceService` is a foreground `LifecycleService`** that the IME binds to. The engine stays alive across keyboard hide/show cycles. Unbinding does not stop the service — it shuts down only when explicitly stopped. Repository sessions serialize engine use and teardown; memory-pressure cleanup skips active recording and final decoding.
 
 **`SpeechEngine` is the only seam for adding a new model.** Implement `load`, `transcribe`, `close`, `setLanguage`, `setLanguageFilter`, register a `ModelId` enum value and a `ModelInfo` in `ModelRegistry`, add a branch in `SpeechEngineFactory`. Nothing in the IME or repository layer needs to change.
 
@@ -47,6 +47,8 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 **`InferenceRepository` sliding window:** partials fire every ~1 s once ≥ 2 s of audio is buffered; hard ceiling 30 s. Stable-prefix trims, silence-trims (2 blank strides), and force-trims (window > 12 s, no stable prefix) all emit `WindowTrimmed`. Every raw transcript passes an 8-step post-processing pipeline (filler removal → stutter collapse → phrase dedup → spurious-period removal → leading-dot strip → leading-punct strip → multi-dot normalisation → missing sentence-space repair → sentence-boundary capitalisation) before emission. **Short utterances** (< 2.5 s) use a decode-context retry at final flush: the TDT decoder is extremely context-sensitive on short clips, so the primary attempt re-decodes from frame 0 with 600 ms of lead silence prepended, and a low-confidence/blank result retries once without the lead; the best non-empty attempt wins, and a "Low confidence" failure is emitted only when a non-blank result fails the 0.55 gate in every context.
 
 **Parakeet uses the chunked-TDT streaming path (active since v0.3.0):** audio is buffered and decoded in 2 s chunks with the TDT decoder's LSTM state carried across chunks (`ChunkStreamingEngine` — the capability interface `ParakeetEngine` implements; non-Parakeet engines fall back to the legacy sliding-window path above). Every chunk re-runs the post-processing pipeline over the entire accumulated utterance, so the per-chunk cost must stay bounded: `collapseRepeatedPhrases` (phrase dedup) caps candidate phrase length at 8 words to keep the scan near-linear (v0.3.1) — an unbounded scan grows cubic in utterance length and breaks the streaming path's real-time budget within a few minutes of dictation.
+
+**Recording completion:** The IME observes `KeyboardViewModel.isRecording` for `FLAG_KEEP_SCREEN_ON`, independently of transcript UI state.
 
 **VAD is dual-layer:** `SileroVadFilter` (Silero v4 ONNX) is primary; `RMSVadFilter` (energy threshold) is the automatic fallback if the ONNX VAD model fails to load.
 

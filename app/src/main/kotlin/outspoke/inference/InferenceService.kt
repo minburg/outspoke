@@ -18,6 +18,8 @@ import dev.brgr.outspoke.settings.model.ModelId
 import dev.brgr.outspoke.settings.model.ModelRegistry
 import dev.brgr.outspoke.settings.model.ModelStorageManager
 import dev.brgr.outspoke.settings.preferences.AppPreferences
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -219,7 +221,10 @@ class InferenceService : LifecycleService() {
         lifecycleScope.launch(Dispatchers.Default) {
             engineLoadMutex.withLock {
                 if (currentEngine == null) return@withLock
-                currentEngine?.close()
+                if (currentRepository?.closeEngine(onlyIfIdle = true) == false) {
+                    Log.i(TAG, "Keeping model loaded until the active recording finishes")
+                    return@withLock
+                }
                 currentEngine = null
                 currentRepository = null
                 memoryUnloaded = true
@@ -237,12 +242,15 @@ class InferenceService : LifecycleService() {
         memoryCallback?.let { applicationContext.unregisterComponentCallbacks(it) }
         memoryCallback = null
         super.onDestroy()
-        currentEngine?.close()
-        currentEngine = null
-        currentRepository = null
-        grammarCorrector.close()
-        logMemoryUsage()
-        Log.d(TAG, "Service destroyed - engine closed")
+        CoroutineScope(Dispatchers.Default).launch {
+            engineLoadMutex.withLock {
+                currentRepository?.closeEngine()
+                currentEngine = null
+                currentRepository = null
+                grammarCorrector.close()
+                Log.d(TAG, "Service destroyed - engine closed")
+            }
+        }
     }
 
     /**
@@ -256,10 +264,8 @@ class InferenceService : LifecycleService() {
             memoryUnloaded = false
 
             // Close the current engine before replacing it.
-            currentEngine?.let { engine ->
-                engine.close()
-                Log.d(TAG, "Previous engine closed before reload")
-            }
+            _engineState.value = EngineState.Loading
+            currentRepository?.closeEngine()
             currentEngine = null
             currentRepository = null
 
@@ -288,8 +294,10 @@ class InferenceService : LifecycleService() {
             updateNotification(getString(R.string.notif_engine_loading))
 
             val startTime = System.currentTimeMillis()
+            var loadingEngine: SpeechEngine? = null
             try {
                 val engine = SpeechEngineFactory.create(modelId)
+                loadingEngine = engine
                 engine.load(modelDir)
 
                 // Apply forced-language preference so post-processing uses the correct locale.
@@ -303,17 +311,22 @@ class InferenceService : LifecycleService() {
 
                 currentEngine = engine
                 currentRepository = InferenceRepository(engine, grammarCorrector)
+                loadingEngine = null
                 _engineState.value = EngineState.Ready
                 updateNotification(getString(R.string.notif_engine_ready, ModelRegistry[modelId].displayName))
                 val elapsed = System.currentTimeMillis() - startTime
                 Log.i(TAG, "Engine loaded successfully for $modelId in ${elapsed}ms")
                 logMemoryUsage()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val msg = e.localizedMessage ?: "Unknown error"
                 Log.e(TAG, "Engine load failed for $modelId: $msg", e)
                 _engineState.value = EngineState.Error(msg)
                 updateNotification(getString(R.string.notif_engine_failed, msg))
                 logMemoryUsage()
+            } finally {
+                loadingEngine?.close()
             }
         }
     }
