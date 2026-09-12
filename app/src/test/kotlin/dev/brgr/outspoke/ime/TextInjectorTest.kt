@@ -35,6 +35,16 @@ class TextInjectorTest {
     private lateinit var ic: FakeInputConnection
     private lateinit var injector: TextInjector
 
+    @Test
+    fun `manual space preserves composing text and subsequent transcription`() {
+        injector.setPartial("hello world")
+        injector.insertSpace()
+        assertThat(ic.fieldText).isEqualTo("hello world ")
+        injector.setPartial("hello world again")
+        injector.commitFinal("hello world again")
+        assertThat(ic.fieldText.trim()).isEqualTo("hello world again")
+    }
+
     @Before
     fun setup() {
         ic = FakeInputConnection()
