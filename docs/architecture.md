@@ -139,7 +139,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 - LifecycleService running as an Android foreground service.
 - Notification channel: outspoke_inference, notification ID 1001.
 - Owns the SpeechEngine instance; reloads on selectedModelId preference change.
-- Uses a Mutex to protect engine swaps.
+- Uses a Mutex to protect engine swaps. The repository serializes recording sessions and engine teardown, including the final decode; memory-pressure unload skips an active session.
 - Exposes StateFlow<EngineState> to bound clients.
 - FileObserver on models/ directory detects newly downloaded models.
 - Stays alive independently of IME bind/unbind; shuts down only when explicitly stopped.

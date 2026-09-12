@@ -5,6 +5,10 @@ import android.util.Log
 import dev.brgr.outspoke.audio.AudioChunk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
@@ -1330,6 +1334,27 @@ class InferenceRepository(
             else -> result
         }
 
+    private val sessionMutex = Mutex()
+    private var closed = false
+
+    /** Model teardown must not race a recording or its final decode. */
+    suspend fun closeEngine(onlyIfIdle: Boolean = false): Boolean {
+        if (onlyIfIdle) {
+            if (!sessionMutex.tryLock()) return false
+        } else {
+            sessionMutex.lock()
+        }
+        try {
+            if (!closed) {
+                closed = true
+                engine.close()
+            }
+            return true
+        } finally {
+            sessionMutex.unlock()
+        }
+    }
+
     /**
      * @param postprocessingEnabled When `false` all transcript-cleaning steps (filler removal,
      *   stutter collapse, repetition deduplication, capitalisation) are skipped and the raw
@@ -1337,6 +1362,17 @@ class InferenceRepository(
      *   Defaults to `true` (post-processing active).
      */
     fun transcribe(
+        audio: Flow<AudioChunk>,
+        postprocessingEnabled: Boolean = true,
+        formatNumbersAsDigits: Boolean = true,
+    ): Flow<TranscriptResult> = flow {
+        sessionMutex.withLock {
+            check(!closed) { "Speech model is no longer available. Open the keyboard again to reload it." }
+            emitAll(transcribeSession(audio, postprocessingEnabled, formatNumbersAsDigits))
+        }
+    }
+
+    private fun transcribeSession(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
         formatNumbersAsDigits: Boolean = true,
@@ -1874,6 +1910,7 @@ class InferenceRepository(
         } else if (totalSamples > 0) {
             Log.d(TAG, "[FINAL] end-of-stream flush ${totalSamples.toSec()}")
             flushAsFinal(isUtteranceBoundary = false)
+            streamFailure?.let { send(TranscriptResult.Failure(it)) }
         }
     }.flowOn(Dispatchers.Default)
 
