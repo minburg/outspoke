@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,6 +68,7 @@ class InferenceService : LifecycleService() {
      */
     @Volatile
     private var currentModelId: ModelId? = null
+    private var loadedModelId: ModelId? = null
 
     /**
      * `true` after the engine was proactively closed under memory pressure (see
@@ -113,6 +115,26 @@ class InferenceService : LifecycleService() {
         return binder
     }
 
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        try {
+            ServiceCompat.startForeground(
+                this, NOTIFICATION_ID,
+                buildNotification(if (_engineState.value == EngineState.Ready)
+                    getString(R.string.notif_engine_ready, ModelRegistry[currentModelId ?: ModelId.DEFAULT].displayName)
+                else getString(R.string.notif_engine_loading)),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Foreground promotion unavailable; retaining bound service", e)
+            stopSelf(startId)
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Foreground promotion unavailable; retaining bound service", e)
+            stopSelf(startId)
+        }
+        return START_NOT_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -130,6 +152,8 @@ class InferenceService : LifecycleService() {
             // no persistent notification, but the engine loads and the keyboard stays functional.
             // The notification will appear the next time the user opens the companion Activity.
             Log.w(TAG, "startForeground rejected - running as bound service without notification", e)
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Foreground start unavailable - running as bound service", e)
         }
 
         // Log device and memory info at service startup
@@ -148,7 +172,7 @@ class InferenceService : LifecycleService() {
 
         // Observe the selected model preference and reload the engine whenever it changes.
         lifecycleScope.launch(Dispatchers.Default) {
-            AppPreferences(applicationContext).selectedModelId.collect { modelId ->
+            AppPreferences(applicationContext).selectedModelId.distinctUntilChanged().collect { modelId ->
                 currentModelId = modelId
                 memoryUnloaded = false  // a model change supersedes any memory-pressure unload
                 reloadForModel(modelId)
@@ -259,6 +283,8 @@ class InferenceService : LifecycleService() {
      */
     private suspend fun reloadForModel(modelId: ModelId) {
         engineLoadMutex.withLock {
+            if (currentEngine != null && loadedModelId == modelId &&
+                ModelStorageManager.isModelReady(applicationContext, modelId)) return@withLock
             // We are (re)loading on purpose, so any prior memory-pressure unload no
             // longer applies — clear the flag so reloadIfNeeded() does not re-trigger.
             memoryUnloaded = false
@@ -309,6 +335,7 @@ class InferenceService : LifecycleService() {
                     Log.d(TAG, "Forced language '$lang' applied to engine for $modelId")
                 }
 
+                loadedModelId = modelId
                 currentEngine = engine
                 currentRepository = InferenceRepository(engine, grammarCorrector)
                 loadingEngine = null

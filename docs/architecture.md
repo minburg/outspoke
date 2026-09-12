@@ -140,6 +140,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 - Notification channel: outspoke_inference, notification ID 1001.
 - Owns the SpeechEngine instance; reloads on selectedModelId preference change.
 - Uses a Mutex to protect engine swaps. The repository serializes recording sessions and engine teardown, including the final decode; memory-pressure unload skips an active session.
+- Observes distinct selected model IDs so unrelated preference changes do not reload the model.
 - Exposes StateFlow<EngineState> to bound clients.
 - FileObserver on models/ directory detects newly downloaded models.
 - Stays alive independently of IME bind/unbind; shuts down only when explicitly stopped.
@@ -152,7 +153,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 - Extends InputMethodService; implements LifecycleOwner and SavedStateRegistryOwner to host Compose.
 - Hosts the keyboard UI via ImeComposeView.
-- Binds to InferenceService on keyboard show; starts an unload timer (30 s) after keyboard hidden.
+- Binds to InferenceService for the IME lifetime and starts it when shown so it can survive IME recreation.
 - Forwards InputConnection changes to TextInjector and KeyboardViewModel.
 
 **TextInjector**
