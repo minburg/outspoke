@@ -30,6 +30,7 @@ class SileroVadFilter(
 
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
+    private var neuralFailed = false
 
     // Silero RNN states: [2, 1, 64] float tensors
     private val hState: FloatArray = FloatArray(2 * 1 * 64)
@@ -46,17 +47,17 @@ class SileroVadFilter(
     init {
         try {
             env = OrtEnvironment.getEnvironment()
-            val opts = OrtSession.SessionOptions().apply {
-                setIntraOpNumThreads(1)
-                setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
-                setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT)
+            OrtSession.SessionOptions().use { opts ->
+                opts.setIntraOpNumThreads(1)
+                opts.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+                opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT)
+                session = env?.createSession(modelBytes, opts)
             }
-            session = env?.createSession(modelBytes, opts)
             Log.d(TAG, "Silero VAD loaded successfully from RAW resource")
-            opts.close()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Silero VAD model from bytes", e)
             session = null
+            throw e
         }
     }
 
@@ -65,44 +66,29 @@ class SileroVadFilter(
         val s = session
         var speechProb = 0f
 
-        if (e != null && s != null && chunk.samples.size == REQUIRED_SAMPLES) {
+        if (!neuralFailed && e != null && s != null && chunk.samples.size == REQUIRED_SAMPLES) {
             try {
                 // Silero requires float32 samples in range [-1.0, 1.0].
                 val floatSamples = FloatArray(REQUIRED_SAMPLES) { i -> chunk.samples[i] / 32_768f }
 
-                val inputTensor = OnnxTensor.createTensor(
-                    e,
-                    FloatBuffer.wrap(floatSamples),
-                    longArrayOf(1, REQUIRED_SAMPLES.toLong())
-                )
-                val srTensor =
-                    OnnxTensor.createTensor(e, LongBuffer.wrap(longArrayOf(SAMPLE_RATE.toLong())), longArrayOf(1))
-                val hTensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(hState), longArrayOf(2, 1, 64))
-                val cTensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(cState), longArrayOf(2, 1, 64))
-
-                val inputs = mapOf(
-                    "input" to inputTensor,
-                    "sr" to srTensor,
-                    "h" to hTensor,
-                    "c" to cTensor
-                )
-
-                s.run(inputs).use { result ->
-                    val outputTensor = result.get("output").get() as OnnxTensor
-                    speechProb = outputTensor.floatBuffer[0]
-
-                    val hnTensor = result.get("hn").get() as OnnxTensor
-                    hnTensor.floatBuffer.get(hState)
-                    val cnTensor = result.get("cn").get() as OnnxTensor
-                    cnTensor.floatBuffer.get(cState)
+                OnnxTensor.createTensor(e, FloatBuffer.wrap(floatSamples), longArrayOf(1, REQUIRED_SAMPLES.toLong())).use { input ->
+                    OnnxTensor.createTensor(e, LongBuffer.wrap(longArrayOf(SAMPLE_RATE.toLong())), longArrayOf(1)).use { rate ->
+                        OnnxTensor.createTensor(e, FloatBuffer.wrap(hState), longArrayOf(2, 1, 64)).use { h ->
+                            OnnxTensor.createTensor(e, FloatBuffer.wrap(cState), longArrayOf(2, 1, 64)).use { c ->
+                                s.run(mapOf("input" to input, "sr" to rate, "h" to h, "c" to c)).use { result ->
+                                    speechProb = (result.get("output").get() as OnnxTensor).floatBuffer[0]
+                                    check(speechProb.isFinite()) { "VAD returned an invalid probability" }
+                                    (result.get("hn").get() as OnnxTensor).floatBuffer.get(hState)
+                                    (result.get("cn").get() as OnnxTensor).floatBuffer.get(cState)
+                                }
+                            }
+                        }
+                    }
                 }
-
-                inputTensor.close()
-                srTensor.close()
-                hTensor.close()
-                cTensor.close()
             } catch (ex: Exception) {
-                Log.e(TAG, "Silero VAD inference failed", ex)
+                Log.e(TAG, "Silero VAD failed; using energy detection for this recording", ex)
+                neuralFailed = true
+                speechProb = if (rms > 0.01f) 1.0f else 0.0f
             }
         } else {
             // Unaligned chunk size or missing session: Fallback purely on RMS gating just to avoid crashing pipeline.
