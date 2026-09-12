@@ -35,6 +35,39 @@ class TextInjectorTest {
     private lateinit var ic: FakeInputConnection
     private lateinit var injector: TextInjector
 
+    @Test
+    fun `manual space preserves composing text and subsequent transcription`() {
+        injector.setPartial("hello world")
+        injector.insertSpace()
+        assertThat(ic.fieldText).isEqualTo("hello world ")
+        injector.setPartial("hello world again")
+        injector.commitFinal("hello world again")
+        assertThat(ic.fieldText.trim()).isEqualTo("hello world again")
+    }
+
+    @Test
+    fun `trailing space is added once after the complete recording`() {
+        injector.commitFinal("first utterance")
+        assertThat(ic.fieldText).isEqualTo("first utterance")
+        injector.commitFinal("second utterance")
+        injector.finishTranscription(true)
+        injector.finishTranscription(true)
+        assertThat(ic.fieldText).isEqualTo("first utterance second utterance ")
+    }
+
+    @Test
+    fun `disabled trailing space leaves final text unchanged`() {
+        injector.commitFinal("hello")
+        injector.finishTranscription(false)
+        assertThat(ic.fieldText).isEqualTo("hello")
+    }
+
+    @Test
+    fun `empty transcription does not insert a space`() {
+        injector.finishTranscription(true)
+        assertThat(ic.fieldText).isEmpty()
+    }
+
     @Before
     fun setup() {
         ic = FakeInputConnection()
