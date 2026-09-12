@@ -45,6 +45,29 @@ class TextInjectorTest {
         assertThat(ic.fieldText.trim()).isEqualTo("hello world again")
     }
 
+    @Test
+    fun `trailing space is added once after the complete recording`() {
+        injector.commitFinal("first utterance")
+        assertThat(ic.fieldText).isEqualTo("first utterance")
+        injector.commitFinal("second utterance")
+        injector.finishTranscription(true)
+        injector.finishTranscription(true)
+        assertThat(ic.fieldText).isEqualTo("first utterance second utterance ")
+    }
+
+    @Test
+    fun `disabled trailing space leaves final text unchanged`() {
+        injector.commitFinal("hello")
+        injector.finishTranscription(false)
+        assertThat(ic.fieldText).isEqualTo("hello")
+    }
+
+    @Test
+    fun `empty transcription does not insert a space`() {
+        injector.finishTranscription(true)
+        assertThat(ic.fieldText).isEmpty()
+    }
+
     @Before
     fun setup() {
         ic = FakeInputConnection()
