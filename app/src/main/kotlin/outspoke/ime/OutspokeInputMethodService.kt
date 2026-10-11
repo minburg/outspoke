@@ -218,6 +218,10 @@ class OutspokeInputMethodService :
         // closed the engine and went Unloaded), reload it now so it is ready by the time
         // the user presses the talk button.
         inferenceBinder?.reloadIfNeeded()
+        // The keyboard window is now visible, so the app is while-in-use eligible for the
+        // microphone FGS type. Upgrade from specialUse if the service fell back to it when
+        // started in the background (issue #37). No-op when already microphone.
+        inferenceBinder?.promoteToFgsMicrophone()
         applyWindowHeight(targetHeight, force = true)
     }
 

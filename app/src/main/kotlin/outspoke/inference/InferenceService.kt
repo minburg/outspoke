@@ -1,11 +1,11 @@
 package dev.brgr.outspoke.inference
 
 import android.app.ActivityManager
+import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentCallbacks2
-import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.os.*
 import android.util.Log
@@ -76,6 +76,34 @@ class InferenceService : LifecycleService() {
     /** Mutex preventing concurrent [reloadForModel] calls from racing. */
     private val engineLoadMutex = Mutex()
 
+    /**
+     * The latest FGS notification text. Kept in sync by [updateNotification] so that a re-call of
+     * [android.app.Service.startForeground] (e.g. the specialUse → microphone upgrade) passes the
+     * current notification rather than a stale one.
+     */
+    private var currentNotifText: String = ""
+
+    /**
+     * Foreground-service promotion strategy. Guarantees [android.app.Service.startForeground] is
+     * always called — `microphone`, falling back to `specialUse` — so the 5 s
+     * [android.content.Context.startForegroundService] deadline is met and the process is never
+     * ANR'd (issue #37).
+     */
+    private val fgsPromoter = FgsPromoter(
+        startForeground = { type ->
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification(currentNotifText),
+                type,
+            )
+        },
+        onAllTypesRejected = {
+            Log.e(TAG, "startForeground rejected for every FGS type - stopping service to avoid ANR")
+            stopSelf()
+        },
+    )
+
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Loading)
 
     /** Observable loading / runtime state observed by the IME. */
@@ -102,6 +130,15 @@ class InferenceService : LifecycleService() {
                 reloadForModel(modelId)
             }
         }
+
+        /**
+         * Upgrade the FGS type to `microphone` now that the IME window is shown (the app is
+         * while-in-use eligible). Called by the IME on onWindowShown. No-op when already
+         * microphone (see FgsPromoter.promoteMicrophone).
+         */
+        fun promoteToFgsMicrophone() {
+            fgsPromoter.promoteMicrophone()
+        }
     }
 
     private val binder = InferenceBinder()
@@ -115,20 +152,13 @@ class InferenceService : LifecycleService() {
         super.onCreate()
 
         createNotificationChannel()
-        try {
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                buildNotification(getString(R.string.notif_engine_loading)),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-            )
-        } catch (e: SecurityException) {
-            // startForeground() is rejected when the service is started via the IME binding
-            // (no Activity in the foreground).  We continue running as a plain bound service -
-            // no persistent notification, but the engine loads and the keyboard stays functional.
-            // The notification will appear the next time the user opens the companion Activity.
-            Log.w(TAG, "startForeground rejected - running as bound service without notification", e)
-        }
+        // No foreground promotion here on purpose: onCreate also runs for a pure bindService()
+        // create by the IME, which arms no startForegroundService() deadline - promoting there
+        // would show a permanent notification for a merely-bound service. Every start command
+        // additionally reaches onStartCommand, which is where the deadline is met (issue #37).
+        // A bind-only service is brought to the foreground later, when the keyboard window is
+        // shown or an activity resumes (promoteMicrophone below).
+        currentNotifText = getString(R.string.notif_engine_loading)
 
         // Log device and memory info at service startup
         val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
@@ -162,6 +192,20 @@ class InferenceService : LifecycleService() {
 
         // Watch the models/root directory to detect external changes (e.g. download complete).
         startModelWatcher()
+
+        // Upgrade the FGS type to microphone as soon as the app regains while-in-use
+        // eligibility. A visible activity is such a state, so watch the settings activity's
+        // lifecycle. The IME window is handled via InferenceBinder.promoteToFgsMicrophone().
+        registerActivityLifecycleCallback()
+    }
+
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        // A start command may arrive while the service is already running (e.g. bound by the
+        // IME) but not yet promoted to the foreground. Ensure startForeground() has been called
+        // so the 5 s startForegroundService() deadline is always satisfied. No-op when already
+        // foreground (see FgsPromoter.promote).
+        fgsPromoter.promote()
+        return START_NOT_STICKY
     }
 
     /**
@@ -208,6 +252,32 @@ class InferenceService : LifecycleService() {
     }
 
     /**
+     * Registered in [onCreate]; upgrades the FGS type to `microphone` when an activity
+     * resumes (the app is then while-in-use eligible). Unregistered in [onDestroy].
+     */
+    private var activityLifecycleCallback: Application.ActivityLifecycleCallbacks? = null
+
+    private fun registerActivityLifecycleCallback() {
+        val cb = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: android.app.Activity) {
+                // A visible activity means the app is while-in-use eligible for the microphone
+                // FGS type. Upgrade from specialUse if we fell back to it. No-op when already
+                // microphone (see FgsPromoter.promoteMicrophone).
+                fgsPromoter.promoteMicrophone()
+            }
+
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityStarted(activity: android.app.Activity) = Unit
+            override fun onActivityPaused(activity: android.app.Activity) = Unit
+            override fun onActivityStopped(activity: android.app.Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: android.app.Activity) = Unit
+        }
+        activityLifecycleCallback = cb
+        (applicationContext as? Application)?.registerActivityLifecycleCallbacks(cb)
+    }
+
+    /**
      * Closes the currently loaded engine cooperatively under memory pressure and marks the
      * engine as memory-unloaded so [InferenceBinder.reloadIfNeeded] reloads it on next use.
      * No-op if the engine is not currently loaded / ready (e.g. still loading or already
@@ -236,6 +306,8 @@ class InferenceService : LifecycleService() {
         currentWatchDir = null
         memoryCallback?.let { applicationContext.unregisterComponentCallbacks(it) }
         memoryCallback = null
+        activityLifecycleCallback?.let { (applicationContext as? Application)?.unregisterActivityLifecycleCallbacks(it) }
+        activityLifecycleCallback = null
         super.onDestroy()
         currentEngine?.close()
         currentEngine = null
@@ -403,6 +475,7 @@ class InferenceService : LifecycleService() {
             .build()
 
     private fun updateNotification(text: String) {
+        currentNotifText = text
         val nm = getSystemService(NotificationManager::class.java) ?: return
         nm.notify(NOTIFICATION_ID, buildNotification(text))
     }

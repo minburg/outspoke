@@ -137,6 +137,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 **InferenceService**
 
 - LifecycleService running as an Android foreground service.
+- FGS promotion goes through `FgsPromoter`: every start command reaches `onStartCommand`, which must `startForeground` within the 5 s deadline or the process is ANR'd (issue #37) — `microphone` type, falling back to `specialUse` while the app is backgrounded, `stopSelf()` if both are rejected. A pure IME bind arms no deadline and stays notification-silent until the keyboard window shows or an activity resumes, which upgrades the type back to `microphone`.
 - Notification channel: outspoke_inference, notification ID 1001.
 - Owns the SpeechEngine instance; reloads on selectedModelId preference change.
 - Uses a Mutex to protect engine swaps.
