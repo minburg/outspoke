@@ -1,8 +1,5 @@
 package dev.brgr.outspoke.inference
 
-import dev.brgr.outspoke.inference.NumberNormaliser.DE_ONES
-
-
 /**
  * Converts number-word sequences in a word list to their digit representations.
  *
@@ -14,7 +11,7 @@ import dev.brgr.outspoke.inference.NumberNormaliser.DE_ONES
  * **Algorithm (greedy left-to-right):**
  * 1. Scan the word list left to right.
  * 2. On encountering a number word, begin accumulating a "run".
- * 3. Continue while the next word is also a number word or a connector ("and"/"und").
+ * 3. Extend only while the words form one number phrase; punctuation ends a phrase.
  * 4. When the run ends, drop trailing connectors, parse the tokens into a [Long] and
  *    replace the run with its digit string.
  * 5. Return the modified word list.
@@ -150,8 +147,12 @@ internal object NumberNormaliser {
                 i++
 
                 while (i < words.size) {
-                    val nextBare = stripPunctuation(words[i]).lowercase()
-                    if (isNumberWord(nextBare, isGerman) || isConnector(nextBare, isGerman)) {
+                    val (nextWord, leadingPunctuation, _) = splitPunctuation(words[i])
+                    val nextBare = nextWord.lowercase()
+                    if (splitPunctuation(runOrig.last()).third.isNotEmpty() || leadingPunctuation.isNotEmpty()) break
+                    if (detectOrdinal(runBare, isGerman).first) break
+                    if ((isNumberWord(nextBare, isGerman) || isConnector(nextBare, isGerman)) &&
+                        isNumberPhrasePrefix(runBare + nextBare, isGerman)) {
                         runOrig.add(words[i])
                         runBare.add(nextBare)
                         i++
@@ -203,6 +204,13 @@ internal object NumberNormaliser {
         return result
     }
 
+    /** Numeric repetition can be intentional, for example digits in a code. */
+    fun isNumberToken(word: String): Boolean {
+        val bare = stripPunctuation(word).lowercase()
+        return bare.isNotEmpty() && (bare.all { it.isDigit() } ||
+            isNumberWord(bare, isGerman = false) || isNumberWord(bare, isGerman = true))
+    }
+
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /**
@@ -238,6 +246,48 @@ internal object NumberNormaliser {
 
     private fun isConnector(lower: String, isGerman: Boolean): Boolean =
         if (isGerman) lower in DE_CONNECTORS else lower in EN_CONNECTORS
+
+    /** A phrase may end at a connector while waiting for the next streaming word. */
+    private fun isNumberPhrasePrefix(words: List<String>, isGerman: Boolean): Boolean {
+        val tokens = detectOrdinal(words, isGerman).third
+        val values = tokens.map { token ->
+            if (isConnector(token, isGerman)) null else parseNumberWords(listOf(token), isGerman)
+        }
+        for (i in tokens.indices) {
+            if (!isConnector(tokens[i], isGerman)) continue
+            // An article or a list conjunction must not disappear into a number.
+            if (tokens[i] != if (isGerman) "und" else "and") return false
+            val previous = values.getOrNull(i - 1) ?: return false
+            val next = values.getOrNull(i + 1)
+            val afterScale = previous >= 100 && (next == null || next < previous)
+            val germanTens = isGerman && previous in 1..9 &&
+                (next == null || next in 20..90 && next % 10 == 0L)
+            if (!afterScale && !germanTens) return false
+            if (i < tokens.lastIndex && next == null) return false
+        }
+        return validCardinalParts(values, isGerman)
+    }
+
+    /** Validate the grammar before the arithmetic parser is allowed to combine words. */
+    private fun validCardinalParts(parts: List<Long?>, isGerman: Boolean): Boolean {
+        val numbers = parts.filterNotNull()
+        if (numbers.size <= 1) return true
+        val scale = numbers.maxOrNull() ?: return false
+        if (scale >= 100) {
+            val index = parts.indexOf(scale)
+            if (parts.lastIndexOf(scale) != index) return false
+            return validCardinalParts(parts.take(index), isGerman) &&
+                validCardinalParts(parts.drop(index + 1), isGerman)
+        }
+        if (numbers.size != 2) return false
+        val (first, second) = numbers
+        return if (isGerman) {
+            parts.dropWhile { it == null }.dropLastWhile { it == null } == listOf(first, null, second) &&
+                first in 1..9 && second in 20..90 && second % 10 == 0L
+        } else {
+            first in 20..90 && first % 10 == 0L && second in 1..9
+        }
+    }
 
     /** Returns true when [lower] looks like a German ordinal (base + suffix). */
     private fun isGermanOrdinal(lower: String): Boolean {
@@ -298,7 +348,12 @@ internal object NumberNormaliser {
             return tokens[0].removePrefix("__ordinal_").toLongOrNull() ?: 0L
         }
 
-        val filtered = tokens.filter { !isConnector(it, isGerman) }
+        val filtered = tokens.filter { !isConnector(it, isGerman) }.map { token ->
+            val ordinalValue = token.removePrefix("__ordinal_").toLongOrNull()
+            if (!isGerman && token.startsWith("__ordinal_") && ordinalValue != null) {
+                EN_SCALES.entries.firstOrNull { it.value == ordinalValue }?.key ?: token
+            } else token
+        }
         return parseChunk(filtered, isGerman)
     }
 
