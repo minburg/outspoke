@@ -1092,13 +1092,22 @@ class TextInjector(
      * inserted at the cursor position via [InputConnection.commitText].
      *
      * When a word **is** found the implementation:
-     * 1. Selects from `cursor - leftFragment.length` to `cursor + rightFragment.length`
-     *    using [InputConnection.setSelection].
-     * 2. Commits [replacement] via [InputConnection.commitText], which replaces the selection.
+     * 1. Deletes `[cursor - leftFragment, cursor + rightFragment)` via
+     *    [InputConnection.deleteSurroundingText] - cursor-RELATIVE, so it is exact
+     *    regardless of how much text precedes the cursor.
+     * 2. Commits [replacement] via [InputConnection.commitText], which lands at the word
+     *    start where the cursor now sits.
+     *
+     * Do NOT compute an absolute selection range from the probe results: `getTextBeforeCursor`
+     * is window-capped, so `textBefore.length` is only the cursor position while the field
+     * prefix fits the window.  An older version did exactly that and corrupted text ~200
+     * characters early in any longer field (the tapped word was replaced at a position one
+     * or two words before it, spaces and all).
      *
      * This method is safe to call on the main thread — it only issues lightweight
-     * [InputConnection] calls (getTextBeforeCursor, getTextAfterCursor, setSelection,
-     * commitText).  Any active composing span is implicitly cleared by [commitText].
+     * [InputConnection] calls (getTextBeforeCursor, getTextAfterCursor,
+     * deleteSurroundingText, commitText).  Any active composing span is implicitly cleared
+     * by [commitText].
      *
      * [committedWords] and composing state are reset after the replacement so the next
      * recording session starts from a clean alignment baseline.
@@ -1130,11 +1139,10 @@ class TextInjector(
             // No word under cursor - insert at cursor position.
             inputConnection.commitText(replacement, 1)
         } else {
-            // Calculate absolute selection range: cursor position within the full field text.
-            val cursorPos = textBefore.length
-            val selStart = cursorPos - leftFragment.length
-            val selEnd = cursorPos + rightFragment.length
-            inputConnection.setSelection(selStart, selEnd)
+            // Cursor-relative deletion: exact no matter how much text precedes the cursor.
+            // Absolute offsets derived from the capped probe window would drift in long
+            // fields (see method docs) - never use setSelection here.
+            inputConnection.deleteSurroundingText(leftFragment.length, rightFragment.length)
             inputConnection.commitText(replacement, 1)
         }
 

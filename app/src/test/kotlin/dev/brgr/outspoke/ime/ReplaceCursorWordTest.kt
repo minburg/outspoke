@@ -95,4 +95,46 @@ class ReplaceCursorWordTest {
 
         assertThat(ic.fieldText).isEqualTo("hello")
     }
+
+    /**
+     * Regression (suggestion-bar corruption): the field holds far more than the 200-char
+     * getTextBeforeCursor probe window before the cursor - the case of correcting a word in
+     * a long text.  The old absolute-offset math used the PROBE LENGTH as the cursor
+     * position, so the selection landed ~200 chars early and the replacement corrupted text
+     * one or two words before the tapped word (spaces eaten, words merged).
+     *
+     * Cursor sits inside "performance"; the replacement must hit exactly that word.
+     */
+    @Test
+    fun `replaceCursorWord targets the tapped word even when over 200 chars precede it`() {
+        val ic = FakeInputConnection()
+        val injector = TextInjector(ic, textEditorInfo())
+
+        val preamble = "alpha ".repeat(40) // 240 chars - beyond the 200-char probe window
+        val sentence = "I'm sure the performance is very good."
+        ic.commitText(preamble + sentence, 1)
+        val cursor = (preamble + "I'm sure the perform").length // mid-word in "performance"
+        ic.setSelection(cursor, cursor)
+
+        injector.replaceCursorWord("preservation")
+
+        assertThat(ic.fieldText).isEqualTo(preamble + "I'm sure the preservation is very good.")
+    }
+
+    /**
+     * Cursor sits mid-word ("bro|wn"), so BOTH fragments must be removed before the
+     * replacement is inserted - the right fragment cannot be left behind.
+     */
+    @Test
+    fun `replaceCursorWord removes the right fragment when the cursor sits mid-word`() {
+        val ic = FakeInputConnection()
+        val injector = TextInjector(ic, textEditorInfo())
+
+        ic.commitText("The brown fox", 1)
+        ic.setSelection("The bro".length, "The bro".length)
+
+        injector.replaceCursorWord("red")
+
+        assertThat(ic.fieldText).isEqualTo("The red fox")
+    }
 }

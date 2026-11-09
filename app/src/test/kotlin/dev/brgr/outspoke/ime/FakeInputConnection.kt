@@ -78,11 +78,12 @@ class FakeInputConnection : InputConnection {
             composingStart = -1
             return true
         }
-        // No selection: clear composing span and append.
+        // No selection: clear composing span and insert at the cursor.
         composing = ""
         composingStart = -1
-        buffer.append(text)
-        cursorPos = buffer.length
+        val pos = cursorPos.coerceIn(0, buffer.length)
+        buffer.insert(pos, text)
+        cursorPos = pos + text.length
         return true
     }
 
@@ -117,9 +118,12 @@ class FakeInputConnection : InputConnection {
      * Returns the last [n] characters before the cursor within [fieldText].
      * When a selection is active the cursor is treated as being at [selStart].
      */
+    /** Cursor position honored by the text probes (selection start wins when set). */
+    private fun effectiveCursor(): Int = if (selStart >= 0) selStart else cursorPos
+
     override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence {
         val full = fieldText
-        val cursor = if (selStart >= 0) selStart else full.length
+        val cursor = effectiveCursor()
         val from = maxOf(0, cursor - n)
         return full.substring(from, cursor)
     }
@@ -130,7 +134,7 @@ class FakeInputConnection : InputConnection {
      */
     override fun getTextAfterCursor(n: Int, flags: Int): CharSequence {
         val full = fieldText
-        val cursor = if (selEnd >= 0) selEnd else full.length
+        val cursor = if (selEnd >= 0) selEnd else effectiveCursor()
         return full.substring(cursor, minOf(full.length, cursor + n))
     }
 
@@ -144,6 +148,7 @@ class FakeInputConnection : InputConnection {
     override fun setSelection(start: Int, end: Int): Boolean {
         selStart = start
         selEnd = end
+        cursorPos = start
         return true
     }
 
@@ -156,11 +161,13 @@ class FakeInputConnection : InputConnection {
      */
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
         finishComposingText()
-        val deleteCount = minOf(beforeLength, buffer.length)
-        if (deleteCount > 0) {
-            buffer.delete(buffer.length - deleteCount, buffer.length)
-        }
-        cursorPos = buffer.length
+        val cursor = (if (selStart >= 0) selStart else cursorPos).coerceIn(0, buffer.length)
+        val b = beforeLength.coerceIn(0, cursor)
+        val a = afterLength.coerceIn(0, buffer.length - cursor)
+        buffer.delete(cursor - b, cursor + a)
+        cursorPos = cursor - b
+        selStart = -1
+        selEnd = -1
         return true
     }
 
