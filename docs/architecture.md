@@ -153,7 +153,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 - Extends InputMethodService; implements LifecycleOwner and SavedStateRegistryOwner to host Compose.
 - Hosts the keyboard UI via ImeComposeView.
-- Binds to InferenceService on keyboard show; starts an unload timer (30 s) after keyboard hidden.
+- Binds to InferenceService on keyboard show. The engine is never unloaded on hide or keyboard switch — only under memory pressure, a model change, or model-file deletion; `reloadIfNeeded()` restores it after such an unload.
 - Forwards InputConnection changes to TextInjector and KeyboardViewModel.
 
 **TextInjector**
