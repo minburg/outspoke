@@ -179,6 +179,8 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 | Value | storageDirName | Status |
 |---|---|---|
 | PARAKEET_V3 | parakeet-v3 | Active |
+| PARAKEET_ULTRA | parakeet-ultra | Active |
+| ORUKEET | orukeet | Active |
 | VOXTRAL_MINI | voxtral-mini-4b | Disabled (resource limits) |
 | WHISPER_SMALL | whisper-small-int8 | Disabled (resource limits) |
 
@@ -346,6 +348,18 @@ If all three layers fail, the entire partial is returned as new content (alignme
         decoder_joint-model.int8.onnx
         config.json
         vocab.txt
+      parakeet-ultra/
+        nemo128.onnx
+        encoder-model.int8.onnx
+        decoder_joint-model.int8.onnx
+        config.json
+        vocab.txt
+      orukeet/
+        nemo128.onnx
+        encoder-model.int8.onnx
+        decoder_joint-model.int8.onnx
+        config.json
+        vocab.txt
       voxtral-mini-4b/    (placeholder - disabled)
       whisper-small-int8/ (placeholder - disabled)
 
@@ -384,6 +398,7 @@ NVIDIA Parakeet-TDT 0.6B v3, INT8 quantized, ~700 MB on disk.
 
 - Tokenizer: SentencePiece-like vocabulary from vocab.json (1024 tokens + blank).
 - Decoding: greedy TDT (Token-and-Duration Transducer). LSTM state is carried across strides.
+- Decoder result reads are name-based, never positional: third-party exports disagree on output order (orukeet: prednet_lengths first) and append extra outputs (Olicorne ultra: topk/duration heads). load() resolves the logits/state output names against the session and fails fast if absent (issue #39).
 - Logit tensor: first 1025 entries = token probabilities (vocab 1024 + blank); remainder = duration predictions. Only the greedy argmax is currently consumed.
 
 ### WhisperEngine (disabled - resource limits)

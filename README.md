@@ -10,7 +10,7 @@
 
 A privacy-focused speech-to-text keyboard(IME) for Android. Speech recognition runs entirely on-device - no internet needed after the initial model download, no account, no data leaving your phone.
 
-It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference. Voice activity detection uses [Silero VAD v4](https://github.com/snakers4/silero-vad) (also ONNX, also fully on-device) to suppress silence before it ever reaches the ASR model.
+It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) automatic speech recognition model, quantized to INT8 and run via [ONNX Runtime](https://onnxruntime.ai/) for efficient on-device inference. As a second selectable model it offers [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra) - moondream's post-trained version of the same architecture, more accurate in background noise and on long dictations, same download size. Voice activity detection uses [Silero VAD v4](https://github.com/snakers4/silero-vad) (also ONNX, also fully on-device) to suppress silence before it ever reaches the ASR model.
 
 
 ## Screenshots
@@ -26,6 +26,8 @@ It uses NVIDIA's [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.
 - **Real-time transcription** - progressive partial results while you speak
 - **Works in any app** - injects text via Android's standard `InputConnection` API
 - **Parakeet-TDT 0.6B v3** - INT8 quantized, ~700 MB, runs on mid-range hardware
+- **Parakeet Ultra** - optional drop-in replacement: same architecture, size and speed, better accuracy (moondream post-train of Parakeet-TDT v3)
+- **Orukeet** - community fine-tune of Parakeet-TDT v3: ~30 % faster CPU decoding, similar accuracy
 - **Voice Activity Detection** - Silero VAD v4 neural network (ONNX) filters silence before it reaches the ASR model; falls back to energy-threshold VAD if the model can't load
 - **Configurable trigger modes** - hold-to-talk or tap-to-toggle
 - **Word correction bar** - optional suggestion bar that appears after dictation, offering up to 5 on-device correction candidates for the word under the cursor. Uses downloadable language packs (dictionary + ARPA trigram language model) covering 25 languages. Language packs are fetched on demand from [minburg/outspoke-data](https://github.com/minburg/outspoke-data) — the only external source used at runtime besides the one-time ASR model download. All correction runs entirely on-device once files are downloaded; the feature is opt-in and off by default.
@@ -212,3 +214,5 @@ Bug reports and pull requests are welcome. Please open an issue first for signif
 This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
 
 The Parakeet-TDT model weights are distributed separately under [CC-BY-4.0](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by NVIDIA.
+The Parakeet Ultra weights are moondream's [CC-BY-4.0](https://huggingface.co/moondream/parakeet-ultra) post-train of the same model; the ONNX conversion is by [Olicorne](https://huggingface.co/Olicorne/parakeet-tdt-0.6b-v3-ultra-onnx).
+The Orukeet weights are [CC-BY-SA-4.0](https://huggingface.co/oruk/orukeet) by Oruk (derived from NVIDIA's Parakeet-TDT v3); the decoder+joiner graph merge is MIT-licensed work by Derek Zeng, distributed with [NOTICE.md](https://huggingface.co/ysdede/orukeet-0.6b-onnx/blob/main/NOTICE.md) attribution via [ysdede/orukeet-0.6b-onnx](https://huggingface.co/ysdede/orukeet-0.6b-onnx).

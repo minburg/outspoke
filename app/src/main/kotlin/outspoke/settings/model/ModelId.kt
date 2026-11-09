@@ -11,6 +11,8 @@ import dev.brgr.outspoke.settings.model.ModelId.Companion.DEFAULT
  */
 enum class ModelId(val storageDirName: String) {
     PARAKEET_V3("parakeet-v3"),
+    PARAKEET_ULTRA("parakeet-ultra"),
+    ORUKEET("orukeet"),
     VOXTRAL_MINI("voxtral-mini-4b"),
     WHISPER_SMALL("whisper-small-int8"),
     ;

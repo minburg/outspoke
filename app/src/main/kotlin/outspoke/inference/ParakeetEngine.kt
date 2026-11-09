@@ -128,11 +128,73 @@ private object Names {
     const val DEC_IN_TARGET_LEN = "target_length"     // INT32 [-1]
     const val DEC_IN_STATES_1 = "input_states_1"    // FLOAT [2, -1, 640]
     const val DEC_IN_STATES_2 = "input_states_2"    // FLOAT [2, -1, 640]
-    // Outputs accessed by index:
-    //   0 → "outputs"         FLOAT [-1,-1,-1, 8198]  (B, T_enc, T_tgt, vocab+dur)
-    //   1 → "prednet_lengths" INT32 [-1]
-    //   2 → "output_states_1" FLOAT [2,-1, 640]
-    //   3 → "output_states_2" FLOAT [2,-1, 640]
+    // Outputs must be read by NAME, never by position (issue #39): the orukeet export
+    // lists `prednet_lengths` first and the logits last, and the Olicorne ultra export
+    // appends extra rank-4 outputs (`topk_logits`, `duration_logits`) after the standard
+    // four. The names below are stable across all known NeMo TDT exports; load() still
+    // resolves them against the actual session (see resolveDecoderOutputs).
+    const val DEC_OUT_LOGITS = "outputs"          // FLOAT [-1,-1,-1, 8198]  (B, T_enc, T_tgt, vocab+dur)
+    const val DEC_OUT_STATES_1 = "output_states_1"  // FLOAT [2, -1, 640]
+    const val DEC_OUT_STATES_2 = "output_states_2"  // FLOAT [2, -1, 640]
+}
+
+/**
+ * The decoder_joint output names the engine reads, resolved once per [ParakeetEngine.load]
+ * from the actual session (see [resolveDecoderOutputs]).
+ */
+internal data class ResolvedDecoderOutputs(
+    val logits: String,
+    val states1: String,
+    val states2: String,
+)
+
+/**
+ * Resolves the decoder_joint logits / LSTM-state output names from a session's outputs.
+ *
+ * Exports differ in output ORDER (issue #39: istupakov's and Olicorne's v3/ultra exports
+ * list `outputs` first, the orukeet export lists `prednet_lengths` first), and newer
+ * exports append extra outputs after the standard four (ultra adds rank-4 `topk_logits`
+ * and `duration_logits` plus rank-3 `lse_*` tensors). Reading outputs by position
+ * therefore silently misreads a length tensor as the logits - resolution by name with a
+ * shape fallback is the only robust option.
+ *
+ * Resolution order:
+ *  - logits: the output named [Names.DEC_OUT_LOGITS] with rank 4; otherwise the rank-4
+ *    output with the LARGEST last dimension (a top-K head has far fewer columns than the
+ *    full vocab), which must exceed `blankId + 1` to count as logits.
+ *  - states: the outputs named [Names.DEC_OUT_STATES_1] / [Names.DEC_OUT_STATES_2];
+ *    otherwise, per slot, the remaining rank-3 `[2, *, 640]` tensors in graph order.
+ *
+ * @param outputs the session's tensor outputs as (name, shape) pairs, in graph order.
+ * @throws IllegalStateException when the logits or either state output cannot be resolved.
+ */
+internal fun resolveDecoderOutputs(
+    outputs: List<Pair<String, LongArray>>,
+    blankId: Int,
+): ResolvedDecoderOutputs {
+    val logits = outputs.firstOrNull { it.first == Names.DEC_OUT_LOGITS && it.second.size == 4 }
+        ?: outputs.filter { it.second.size == 4 }
+            .maxByOrNull { it.second.last() }
+            ?.takeIf { it.second.last() > blankId + 1 }
+        ?: throw IllegalStateException(
+            "decoder_joint has no rank-4 logits output (vocab $blankId + durations); " +
+                    "outputs: ${outputs.map { it.first }}"
+        )
+
+    fun isStateShape(o: Pair<String, LongArray>) =
+        o.second.size == 3 && o.second[0] == 2L && o.second.last() == 640L && o.first != logits.first
+    val stateLike = outputs.filter(::isStateShape)
+
+    val states1 = outputs.firstOrNull { it.first == Names.DEC_OUT_STATES_1 } ?: stateLike.firstOrNull()
+    val states2 = outputs.firstOrNull { it.first == Names.DEC_OUT_STATES_2 }
+        ?: stateLike.lastOrNull { it.first != states1?.first }
+    if (states1 == null || states2 == null || states1.first == states2.first) {
+        throw IllegalStateException(
+            "decoder_joint LSTM state outputs (two [2, *, 640] tensors) not found; " +
+                    "outputs: ${outputs.map { it.first }}"
+        )
+    }
+    return ResolvedDecoderOutputs(logits.first, states1.first, states2.first)
 }
 
 /**
@@ -239,6 +301,12 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
     private var blankId: Int = FALLBACK_BLANK_ID
     private var numDurations: Int = 0   // derived at load: outputDim - (blankId + 1)
 
+    /**
+     * Decoder output names resolved against the actual session in [load] - all decoder
+     * result reads go through this, never through output positions (issue #39).
+     */
+    private var decOut: ResolvedDecoderOutputs? = null
+
 
     @Volatile
     override var isLoaded: Boolean = false
@@ -333,12 +401,24 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
         val blankLabel = vocabulary.getOrNull(blankId) ?: "<out-of-range>"
         Log.d(TAG, "Blank id: $blankId  ('$blankLabel')")
 
-        // Derive numDurations from the decoder's first output dimension
-        val decOutNames = decSession!!.outputNames.toList()
-        val jointOutInfo = decSession!!.outputInfo[decOutNames[0]]
-        val jointDim = (jointOutInfo?.info as? ai.onnxruntime.TensorInfo)?.shape?.last()?.toInt() ?: 0
+        // Resolve decoder output names against the actual session, then derive
+        // numDurations from the resolved logits output's last dimension. Name-based,
+        // because exports disagree on output ORDER (orukeet) and append EXTRA outputs
+        // (ultra) - position-based reads misread prednet_lengths/topk_logits as logits
+        // (issue #39). Throws with a clear message if the graph cannot be understood,
+        // surfacing as EngineState.Error at load instead of empty transcribes.
+        val decTensors = decSession!!.outputInfo.mapNotNull { (name, info) ->
+            (info.info as? ai.onnxruntime.TensorInfo)?.let { name to it.shape }
+        }
+        decOut = resolveDecoderOutputs(decTensors, blankId)
+        val jointDim = decTensors.firstOrNull { it.first == decOut!!.logits }!!.second.last().toInt()
         numDurations = if (jointDim > blankId + 1) jointDim - (blankId + 1) else 0
-        Log.d(TAG, "Joint output dim: $jointDim  numDurations: $numDurations")
+        if (numDurations == 0) {
+            Log.w(TAG, "Suspicious numDurations=0 (jointDim=$jointDim, blankId=$blankId) - " +
+                    "resolved logits output '${decOut!!.logits}' has no duration columns")
+        }
+        Log.d(TAG, "Decoder outputs: logits='${decOut!!.logits}' (dim $jointDim)  " +
+                "states='${decOut!!.states1}'/'${decOut!!.states2}'  numDurations: $numDurations")
 
         opts.close()
         isLoaded = true
@@ -516,7 +596,7 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
         encoderOut.floatBuffer.get(encData)
 
         val stateShape = longArrayOf(2L, 1L, 640L)
-        val decOutputNames = session.outputNames.toList()
+        val out = requireNotNull(decOut) { "decoder output names not resolved - load() incomplete" }
 
         // One beam state: the decoder position plus the partial token sequence built so far.
         class BeamState(
@@ -559,7 +639,7 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
             )
             try {
                 session.run(inputs).use { result ->
-                    val logitsTensor = result.get(decOutputNames[0]).get() as OnnxTensor
+                    val logitsTensor = readDecoderOutput(result, out.logits)
                     val logits = FloatArray(logitsTensor.floatBuffer.remaining())
                     logitsTensor.floatBuffer.get(logits)
 
@@ -595,9 +675,9 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
                         (0 until nDur.coerceAtLeast(1)).maxByOrNull { logits[durBase + it] } ?: 0
                     } else 0
 
-                    val s1 = result.get(decOutputNames[2]).get() as OnnxTensor
+                    val s1 = readDecoderOutput(result, out.states1)
                     val lstm1Out = FloatArray(s1.floatBuffer.remaining()).also { s1.floatBuffer.get(it) }
-                    val s2 = result.get(decOutputNames[3]).get() as OnnxTensor
+                    val s2 = readDecoderOutput(result, out.states2)
                     val lstm2Out = FloatArray(s2.floatBuffer.remaining()).also { s2.floatBuffer.get(it) }
 
                     return JointStep(top, duration, lstm1Out, lstm2Out)
@@ -657,6 +737,7 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
         prepSession?.close(); prepSession = null
         encSession?.close(); encSession = null
         decSession?.close(); decSession = null
+        decOut = null
         env?.close(); env = null
         isLoaded = false
         Log.d(TAG, "ParakeetEngine closed")
@@ -783,7 +864,7 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
         var lstmState1 = state.lstmState1.copyOf()
         var lstmState2 = state.lstmState2.copyOf()
 
-        val decOutputNames = session.outputNames.toList()
+        val out = requireNotNull(decOut) { "decoder output names not resolved - load() incomplete" }
 
         val hypothesis = mutableListOf<Int>()
         val emissions = mutableListOf<TokenEmission>()
@@ -846,7 +927,7 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
             try {
                 session.run(inputs).use { result ->
                     // Joint logits: [1, 1, 1, 8198] → flat array of 8198 floats
-                    val logitsTensor = result.get(decOutputNames[0]).get() as OnnxTensor
+                    val logitsTensor = readDecoderOutput(result, out.logits)
                     val logits = FloatArray(logitsTensor.floatBuffer.remaining())
                     logitsTensor.floatBuffer.get(logits)
 
@@ -906,14 +987,10 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
                     // context across blanks. Updating on every step (including blank) lets a
                     // low-margin short word collapse into a degenerate period loop.
                     if (predictedToken != blankId) {
-                        if (decOutputNames.size > 2) {
-                            val s1 = result.get(decOutputNames[2]).get() as OnnxTensor
-                            lstmState1 = FloatArray(s1.floatBuffer.remaining()).also { s1.floatBuffer.get(it) }
-                        }
-                        if (decOutputNames.size > 3) {
-                            val s2 = result.get(decOutputNames[3]).get() as OnnxTensor
-                            lstmState2 = FloatArray(s2.floatBuffer.remaining()).also { s2.floatBuffer.get(it) }
-                        }
+                        val s1 = readDecoderOutput(result, out.states1)
+                        lstmState1 = FloatArray(s1.floatBuffer.remaining()).also { s1.floatBuffer.get(it) }
+                        val s2 = readDecoderOutput(result, out.states2)
+                        lstmState2 = FloatArray(s2.floatBuffer.remaining()).also { s2.floatBuffer.get(it) }
                     }
 
                     // TDT advance rule
@@ -1036,6 +1113,16 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
         Log.d(TAG, "=== $label outputs ===")
         session.outputNames.forEach { n -> Log.d(TAG, "  [$n] ${session.outputInfo[n]}") }
     }
+
+    /**
+     * Reads a named output tensor from a decoder_joint result. All decoder reads go
+     * through resolved names + this helper - never through result output positions
+     * (issue #39: exports differ in output order and count).
+     */
+    private fun readDecoderOutput(result: OrtSession.Result, name: String): OnnxTensor =
+        result.get(name).orElseThrow {
+            IllegalStateException("decoder_joint output '$name' not found in session result")
+        } as OnnxTensor
 
     /**
      * Scans [vocabulary] for a known blank-token label and returns its index.

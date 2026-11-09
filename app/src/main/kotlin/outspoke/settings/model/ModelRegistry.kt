@@ -3,6 +3,21 @@ package dev.brgr.outspoke.settings.model
 private const val PARAKEET_BASE =
     "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main"
 
+// Moondream's post-trained parakeet-tdt-0.6b-v3 (same architecture/tokenizer, better WER),
+// exported to ONNX by Olicorne. int8 encoder/decoder live under /int8/; preprocessor,
+// vocab and config sit at the repo root (nemo128.onnx and vocab.txt are byte-identical to
+// the istupakov v3 export above).
+private const val PARAKEET_ULTRA_BASE =
+    "https://huggingface.co/Olicorne/parakeet-tdt-0.6b-v3-ultra-onnx/resolve/main/int8"
+private const val PARAKEET_ULTRA_ROOT =
+    "https://huggingface.co/Olicorne/parakeet-tdt-0.6b-v3-ultra-onnx/resolve/main"
+
+// Orukeet (oruk's fine-tune of parakeet-tdt-0.6b-v3), INT8 export with a combined
+// decoder+joiner graph. Flat repo layout; nemo128.onnx and vocab.txt are byte-identical
+// to the istupakov v3 files. Weights CC BY-SA 4.0, converter MIT - see NOTICE in README.
+private const val ORUKEET_BASE =
+    "https://huggingface.co/ysdede/orukeet-0.6b-onnx/resolve/main"
+
 // ONNX model files are under /onnx/; tokenizer + config files are at the repo root.
 private const val VOXTRAL_BASE =
     "https://huggingface.co/onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX/resolve/main/onnx"
@@ -95,7 +110,7 @@ object ModelRegistry {
 
     //    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
     val all: List<ModelInfo> =
-        listOf(parakeetV3) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
+        listOf(parakeetV3, parakeetUltra, orukeet) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
 
     private val byId: Map<ModelId, ModelInfo> = all.associateBy { it.id }
 
@@ -130,6 +145,112 @@ private val parakeetV3 = ModelInfo(
             ),
             RemoteFile(filename = "config.json", sizeFraction = 0.01f, sha256 = null),
             RemoteFile(filename = "vocab.txt", sizeFraction = 0.04f, sha256 = null),
+        ),
+    ),
+    requiredFiles = listOf(
+        "encoder-model.int8.onnx",
+        "decoder_joint-model.int8.onnx",
+        "nemo128.onnx",
+        "config.json",
+        "vocab.txt",
+    ),
+)
+
+// Parakeet Ultra: moondream's post-trained parakeet-tdt-0.6b-v3 (same 0.6B architecture
+// and tokenizer, same 25 languages) - clearly better WER on FLEURS, background noise and
+// long-form audio. File sizes verified via HuggingFace API:
+//   int8/encoder-model.int8.onnx         649 431 593 B ≈ 619 MB
+//   int8/decoder_joint-model.int8.onnx    18 203 490 B ≈  17 MB
+//   nemo128.onnx + vocab.txt + config.json ≈ 0.2 MB
+// Total ≈ 668 MB. Engine: ParakeetEngine (tensor names and quantisation-agnostic -
+// verified byte-identical vocab/preprocessor and identical graph I/O vs the v3 export).
+private val parakeetUltra = ModelInfo(
+    id = ModelId.PARAKEET_ULTRA,
+    displayName = "Parakeet Ultra",
+    description = "Moondream's post-trained Parakeet-TDT v3: same size and speed, but more accurate " +
+            "for English and the same 24 other european languages (DE, FR, ES, IT, RU etc.) - notably " +
+            "better in background noise and on long dictations.",
+    approximateSizeMb = 668,
+    source = DownloadSource.Files(
+        baseUrl = PARAKEET_ULTRA_BASE,
+        files = listOf(
+            RemoteFile(
+                filename = "encoder-model.int8.onnx",
+                sizeFraction = 0.97f,
+                sha256 = "714047d70be4b612dce02e0ab2f9e0d6552f78adc421f408d154070796bc2dcf",
+            ),
+            RemoteFile(
+                filename = "decoder_joint-model.int8.onnx",
+                sizeFraction = 0.027f,
+                sha256 = "667ffde2242a560923cba6bc7f69ef03d736f8a36ca9588f2e6f9fa818cf2fc1",
+            ),
+            RemoteFile(
+                filename = "nemo128.onnx",
+                sizeFraction = 0.001f,
+                sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f",
+                urlOverride = "$PARAKEET_ULTRA_ROOT/nemo128.onnx",
+            ),
+            RemoteFile(
+                filename = "vocab.txt",
+                sizeFraction = 0.001f,
+                sha256 = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+                urlOverride = "$PARAKEET_ULTRA_ROOT/vocab.txt",
+            ),
+            RemoteFile(
+                filename = "config.json",
+                sizeFraction = 0.0f,
+                sha256 = null,
+                urlOverride = "$PARAKEET_ULTRA_ROOT/config.json",
+            ),
+        ),
+    ),
+    requiredFiles = listOf(
+        "encoder-model.int8.onnx",
+        "decoder_joint-model.int8.onnx",
+        "nemo128.onnx",
+        "config.json",
+        "vocab.txt",
+    ),
+)
+
+// Orukeet: community fine-tune of parakeet-tdt-0.6b-v3 (same architecture/tokenizer/
+// languages; ~1.5x faster CPU decode, WER on par or better - mixed per language).
+// File sizes verified via HuggingFace API (cross-checked against the repo's manifest.json):
+//   encoder-model.int8.onnx         653 182 378 B ≈ 623 MB
+//   decoder_joint-model.int8.onnx    18 202 844 B ≈  17 MB
+//   nemo128.onnx + vocab.txt + config.json ≈ 0.2 MB
+// Total ≈ 672 MB. Its decoder lists prednet_lengths FIRST (logits last) - the one real
+// export with reordered outputs; load() resolves output names accordingly (issue #39).
+private val orukeet = ModelInfo(
+    id = ModelId.ORUKEET,
+    displayName = "Orukeet (v3 fine-tune)",
+    description = "Community fine-tune of Parakeet-TDT v3 for English and 24 other european languages. " +
+            "Roughly 30 % faster CPU decoding than Parakeet-V3 with similar accuracy.",
+    approximateSizeMb = 672,
+    source = DownloadSource.Files(
+        baseUrl = ORUKEET_BASE,
+        files = listOf(
+            RemoteFile(
+                filename = "encoder-model.int8.onnx",
+                sizeFraction = 0.97f,
+                sha256 = "7b55f2a504a20a8e462899f5befd45f4a1784948d76ed0127902d9cf39405487",
+            ),
+            RemoteFile(
+                filename = "decoder_joint-model.int8.onnx",
+                sizeFraction = 0.027f,
+                sha256 = "95d3b1f53f9aadc5ef58e63664a3681a2184ee228b5010e1ef975a1c4ea8318a",
+            ),
+            RemoteFile(
+                filename = "nemo128.onnx",
+                sizeFraction = 0.001f,
+                sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f",
+            ),
+            RemoteFile(
+                filename = "vocab.txt",
+                sizeFraction = 0.001f,
+                sha256 = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+            ),
+            RemoteFile(filename = "config.json", sizeFraction = 0.0f, sha256 = null),
         ),
     ),
     requiredFiles = listOf(

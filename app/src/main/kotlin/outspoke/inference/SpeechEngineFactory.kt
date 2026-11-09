@@ -13,6 +13,8 @@ import dev.brgr.outspoke.settings.model.ModelId
 object SpeechEngineFactory {
     fun create(modelId: ModelId): SpeechEngine = when (modelId) {
         ModelId.PARAKEET_V3 -> ParakeetEngine()
+        ModelId.PARAKEET_ULTRA -> ParakeetEngine()   // same NeMo TDT ONNX graph as v3 - engine is file-format driven
+        ModelId.ORUKEET -> ParakeetEngine()          // v3 fine-tune; reordered decoder outputs handled by name resolution (issue #39)
         ModelId.VOXTRAL_MINI -> VoxtralEngine()
         ModelId.WHISPER_SMALL -> WhisperEngine()
     }
