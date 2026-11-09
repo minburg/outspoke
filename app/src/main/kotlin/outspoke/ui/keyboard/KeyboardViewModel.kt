@@ -476,6 +476,10 @@ class KeyboardViewModel(
             var failed = false
 
             try {
+                if (!_isRecording.value) {
+                    _uiState.value = KeyboardUiState.Idle
+                    return@launch
+                }
                 // Repo was verified non-null above; re-read defensively in case the binder
                 // detached between the guard and this launch. If it did become null, abort
                 // cleanly rather than capturing audio with nowhere to send it.
