@@ -29,7 +29,7 @@
     <!-- Content descriptions -->
     <string name="cd_back">Back</string>
     <string name="cd_switch_keyboard">Switch keyboard</string>
-    <string name="cd_delete_all">Delete all text</string>
+    <string name="cd_delete_all">Delete text</string>
     <string name="cd_delete_word">Delete last word</string>
     <string name="cd_delete_char">Delete character</string>
     <string name="cd_action_search">Search</string>
@@ -159,8 +159,8 @@
     </string>
     <string name="tutorial_switch_keyboard_title">Switch Keyboard (top right)</string>
     <string name="tutorial_switch_keyboard_desc">Returns to your previous keyboard.</string>
-    <string name="tutorial_delete_all_title">Delete All (far left)</string>
-    <string name="tutorial_delete_all_desc">Clears the entire text field at once.</string>
+    <string name="tutorial_delete_all_title">Delete (far left)</string>
+    <string name="tutorial_delete_all_desc">Deletes the last sentence - or the whole field, depending on the Delete Button setting.</string>
     <string name="tutorial_delete_word_title">Delete Word (left of mic)</string>
     <string name="tutorial_delete_word_desc">Removes the last word.</string>
     <string name="tutorial_delete_char_title">Delete Character (right of mic)</string>

@@ -49,12 +49,12 @@ class KeyboardViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, "HOLD")
 
     /**
-     * What the delete (trash) button does: `"DELETE_ALL"` (default) or
-     * `"DELETE_LAST_SENTENCE"`. Collected eagerly so [deleteAll] can read a
+     * What the delete (trash) button does: `"DELETE_LAST_SENTENCE"` (default) or
+     * `"DELETE_ALL"`. Collected eagerly so [deleteAll] can read a
      * synchronous snapshot without a suspend context.
      */
     val deleteButtonMode: StateFlow<String> = appPreferences.deleteButtonMode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "DELETE_ALL")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "DELETE_LAST_SENTENCE")
 
     /**
      * `true` when the user opted into raw (unprocessed) microphone capture,
@@ -387,9 +387,9 @@ class KeyboardViewModel(
     }
 
     /**
-     * Performs the configured delete action: clears the whole editor field
-     * ([deleteButtonMode] == `"DELETE_ALL"`, the default) or removes only the
-     * last sentence before the cursor (`"DELETE_LAST_SENTENCE"`).
+     * Performs the configured delete action: removes only the last sentence before
+     * the cursor ([deleteButtonMode] == `"DELETE_LAST_SENTENCE"`, the default) or
+     * clears the whole editor field (`"DELETE_ALL"`).
      */
     fun deleteAll() {
         if (deleteButtonMode.value == "DELETE_LAST_SENTENCE") {

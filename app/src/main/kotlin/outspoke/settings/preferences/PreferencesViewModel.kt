@@ -29,7 +29,7 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     val deleteButtonMode: StateFlow<String> = prefs.deleteButtonMode.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = "DELETE_ALL",
+        initialValue = "DELETE_LAST_SENTENCE",
     )
 
     fun setDeleteButtonMode(mode: String) {

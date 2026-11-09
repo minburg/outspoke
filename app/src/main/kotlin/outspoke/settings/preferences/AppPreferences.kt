@@ -34,12 +34,12 @@ class AppPreferences(private val context: Context) {
 
     /**
      * What the keyboard's delete (trash) button does:
-     *   `"DELETE_ALL"` (default) — clears the entire editor field.
-     *   `"DELETE_LAST_SENTENCE"` — removes only the last sentence before the cursor,
-     *   so a long document is never wiped by a single tap.
+     *   `"DELETE_LAST_SENTENCE"` (default) — removes only the last sentence before the
+     *   cursor, so a long document is never wiped by a single tap.
+     *   `"DELETE_ALL"` — clears the entire editor field.
      */
     val deleteButtonMode: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[keyDeleteButtonMode] ?: "DELETE_ALL"
+        prefs[keyDeleteButtonMode] ?: "DELETE_LAST_SENTENCE"
     }
 
     suspend fun setDeleteButtonMode(mode: String) {
