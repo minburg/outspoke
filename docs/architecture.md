@@ -192,7 +192,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **ModelDownloadManager** downloads via OkHttp with resume support, verifies SHA-256 after each file, emits ModelState.Downloading(progress).
 
-**AppPreferences** (DataStore, store name outspoke_prefs): trigger_mode (String, default HOLD), delete_button_mode (String, DELETE_ALL | DELETE_LAST_SENTENCE, default DELETE_ALL), vad_sensitivity (Float, default 0.0), selected_model_id (String), whisper_language (String, default "auto"), postprocessing_enabled (Boolean, default true), show_pipeline_diagnostics (Boolean, default false), keyboard_tutorial_shown (Boolean, default false), forced_language (String?, default null), format_numbers_as_digits (Boolean, default true), suggestion_bar_enabled (Boolean, default false), suggestion_bar_languages (String, comma-separated BCP-47 tags, default ""), suggestion_bar_dismissed (Boolean, default false), raw_mic_capture (Boolean, default false — true captures from AudioSource.UNPROCESSED to bypass AEC, needed for the speakerphone use case), preferredMicId (Int, default 0).
+**AppPreferences** (DataStore, store name outspoke_prefs): trigger_mode (String, default HOLD), delete_button_mode (String, DELETE_ALL | DELETE_LAST_SENTENCE, default DELETE_LAST_SENTENCE), vad_sensitivity (Float, default 0.0), selected_model_id (String), whisper_language (String, default "auto"), postprocessing_enabled (Boolean, default true), show_pipeline_diagnostics (Boolean, default false), keyboard_tutorial_shown (Boolean, default false), forced_language (String?, default null), format_numbers_as_digits (Boolean, default true), suggestion_bar_enabled (Boolean, default false), suggestion_bar_languages (String, comma-separated BCP-47 tags, default ""), suggestion_bar_dismissed (Boolean, default false), raw_mic_capture (Boolean, default false — true captures from AudioSource.UNPROCESSED to bypass AEC, needed for the speakerphone use case), preferredMicId (Int, default 0).
 
 ---
 
@@ -479,7 +479,7 @@ InferenceService watches <filesDir>/models/ for CLOSE_WRITE / MOVED_TO events. W
 ## 13. Build Configuration and ABI Splits
 
 - compileSdk 36, minSdk 30 (Android 11+), targetSdk 36
-- versionCode 11, versionName 0.3.1
+- versionCode 12, versionName 0.4.0
 - Kotlin 2.3.20, AGP 8.13.2, JVM target 11
 - buildFeatures: compose = true, buildConfig = true
 - Release: isMinifyEnabled = true, isShrinkResources = true, ProGuard enabled

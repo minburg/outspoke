@@ -1,0 +1,5 @@
+New feature release (v0.4.0).
+
+New models in Settings: Parakeet Ultra (better in noise and on long dictations, same size) and Orukeet (about 30% faster, similar accuracy). V3 stays the default.
+
+Fixed: an ANR when the keyboard service started in the background; the model stays loaded when voice input runs from another keyboard; suggestion-bar corrections no longer mangle neighbouring words in long texts. The delete button now defaults to deleting the last sentence, not the whole field.
