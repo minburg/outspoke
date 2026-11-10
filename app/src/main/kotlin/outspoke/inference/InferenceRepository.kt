@@ -204,6 +204,8 @@ internal fun String.collapseRepeatedPhrases(): String {
         // Bounded by [MAX_REPEATED_PHRASE_WORDS] so the scan stays near-linear.
         for (len in minOf(MAX_REPEATED_PHRASE_WORDS, remaining / 2) downTo 1) {
             val phrase = words.subList(i, i + len)
+            // Repeated digits and counting patterns are content, not model loops.
+            if (phrase.all(NumberNormaliser::isNumberToken)) continue
             val nextPhrase = words.subList(i + len, i + len * 2)
 
             val matches = phrase.size == nextPhrase.size &&
@@ -256,7 +258,7 @@ internal fun String.collapseStutters(): String {
     while (i < words.size) {
         val currentWord = words[i]
         val normCurrent = currentWord.normalizedForComparison()
-        if (normCurrent.isEmpty()) {
+        if (normCurrent.isEmpty() || NumberNormaliser.isNumberToken(currentWord)) {
             result.add(currentWord)
             i++
             continue

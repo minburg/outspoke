@@ -129,6 +129,8 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **InferenceRepository**
 
+Number formatting validates phrase boundaries before combining number words, preserving countdowns and punctuation-separated lists. Stutter and phrase cleanup retain repeated numeric tokens, including number words, so dictated codes are not shortened.
+
 - Receives Flow<AudioChunk> from AudioCaptureManager.
 - Maintains a rolling audio window (see Section 6).
 - Emits Flow<TranscriptResult> consumed by KeyboardViewModel -> TextInjector.
