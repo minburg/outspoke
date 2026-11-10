@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.*
 import kotlin.math.log10
 import kotlin.math.sqrt
 import kotlinx.coroutines.isActive
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "AudioCaptureManager"
 
@@ -91,14 +92,14 @@ class AudioCaptureManager(private val context: Context) {
      * so that the inference layer can emit a final result before tearing down.
      */
     @Volatile
-    private var stopRequested: Boolean = false
+    private var activeStop: AtomicBoolean? = null
 
     /**
      * Signals the active [startCapture] flow to exit its read loop and complete normally.
      * The flow will finish within one 40 ms chunk read cycle (~40 ms latency).
      */
     fun stopCapture() {
-        stopRequested = true
+        activeStop?.set(true)
     }
 
     /**
@@ -122,8 +123,11 @@ class AudioCaptureManager(private val context: Context) {
      */
     // Permission is checked manually via PermissionHelper before AudioRecord is created.
     @SuppressLint("MissingPermission")
-    fun startCapture(vadEnabled: Boolean = true, rawSource: Boolean = false): Flow<AudioChunk> =
-        channelFlow {
+    fun startCapture(vadEnabled: Boolean = true, rawSource: Boolean = false): Flow<AudioChunk> {
+        // Allocate before collection so releasing the button during startup is not lost.
+        val stopRequested = AtomicBoolean(false)
+        activeStop = stopRequested
+        return channelFlow {
             if (!PermissionHelper.hasRecordPermission(context)) {
                 throw SecurityException(
                     "RECORD_AUDIO permission is not granted. " +
@@ -131,7 +135,7 @@ class AudioCaptureManager(private val context: Context) {
                 )
             }
 
-            stopRequested = false   // reset for this capture session
+            if (stopRequested.get()) return@channelFlow
 
             // Only create a filter when VAD is enabled; null means pass-through (VAD disabled).
             val vad: VadFilter? = if (vadEnabled) {
@@ -176,7 +180,7 @@ class AudioCaptureManager(private val context: Context) {
                 recorder.startRecording()
                 Log.d(TAG, "AudioRecord started - chunk=$CHUNK_SAMPLES samples, buf=$bufferBytes bytes")
 
-                while (currentCoroutineContext().isActive && !stopRequested) {
+                while (currentCoroutineContext().isActive && !stopRequested.get()) {
                     val read = recorder.read(buffer, 0, buffer.size)
                     when {
                         read > 0 -> {
@@ -211,7 +215,7 @@ class AudioCaptureManager(private val context: Context) {
                 //   2. The VAD hangover window (up to 450 ms) that has not yet expired.
                 // Draining both ensures the last word is never cut off mid-phoneme.
 
-                if (stopRequested && currentCoroutineContext().isActive) {
+                if (stopRequested.get() && currentCoroutineContext().isActive) {
                     // Phase 1: drain any remaining hardware buffer data (non-blocking reads).
                     var drained: Int
                     do {
@@ -252,6 +256,7 @@ class AudioCaptureManager(private val context: Context) {
                 Log.d(TAG, "AudioRecord stopped and released")
             }
         }.flowOn(Dispatchers.IO)
+    }
 
     /**
      * Computes the RMS amplitude of [samples] and normalises it to [0.0, 1.0] relative to
