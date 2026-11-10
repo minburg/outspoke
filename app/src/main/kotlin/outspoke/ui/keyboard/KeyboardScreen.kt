@@ -3,6 +3,8 @@ package dev.brgr.outspoke.ui.keyboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +76,7 @@ fun KeyboardScreen(
     onDeleteWord: () -> Unit,
     onDeleteAll: () -> Unit,
     onEnterAction: () -> Unit,
+    onInsertSpace: () -> Unit = {},
     enterAction: EnterAction = EnterAction.DONE,
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
@@ -196,9 +199,17 @@ fun KeyboardScreen(
                         onOpenCompanionApp = onOpenCompanionApp,
                         onRetry = onRetry ?: onRecordStart,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onInsertSpace, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            imageVector = MyIcons.SpaceBar,
+                            contentDescription = stringResource(R.string.cd_insert_space),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
 
-                    Box(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.width(48.dp)) {
                         KeyboardActionButton(
                             icon = MyIcons.Keyboard,
                             contentDescription = stringResource(R.string.cd_switch_keyboard),
@@ -386,6 +397,7 @@ fun KeyboardScreen(
             onDeleteWord = viewModel::deleteWord,
             onDeleteAll = viewModel::deleteAll,
             onEnterAction = viewModel::performEnterAction,
+            onInsertSpace = viewModel::insertSpace,
             enterAction = enterAction,
             onSwitchKeyboard = onSwitchKeyboard,
             onOpenCompanionApp = onOpenCompanionApp,

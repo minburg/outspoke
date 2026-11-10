@@ -198,4 +198,5 @@
     <string name="calib_run_again">Run again</string>
     <string name="calib_no_mics">No microphones found.</string>
     <string name="calib_current">Current</string>
+    <string name="cd_insert_space">Insert space</string>
 </resources>

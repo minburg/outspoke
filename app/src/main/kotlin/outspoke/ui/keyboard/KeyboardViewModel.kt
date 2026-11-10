@@ -40,6 +40,8 @@ class KeyboardViewModel(
     /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
+    fun insertSpace() { textInjector?.insertSpace() }
+
     /**
      * `"HOLD"` (default) or `"TAP_TOGGLE"`.
      * Collected eagerly so the TalkButton always has the latest value without
