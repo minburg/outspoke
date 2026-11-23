@@ -50,6 +50,7 @@ real human voice recordings are committed to this repository.
 | `single-thanks.wav` | "Thanks." | ~0.5 s | Piper TTS |
 | `single-thankyou.wav` | "Thank you." | ~0.7 s | Piper TTS |
 | `german-hallo.wav` | German utterance containing "hallo" | ~1.7 s | Piper TTS (de_DE-thorsten-medium) |
+| `num-countdown2.wav` | "Ten, nine, eight, seven, six, five, four, three, two, one." (paused) — number-sequence regression anchor for `NumbersRealAudioTest` | ~4.2 s | Piper TTS (en_US-lessac-medium, length 1.4) |
 | `multi-4sent.wav` | four sentences concatenated with pauses (no-loss/no-duplication battery) | ~10.9 s | Piper TTS + ffmpeg |
 
 ## Multi-Sentence Pipeline Fixtures
