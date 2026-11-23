@@ -1822,6 +1822,11 @@ class InferenceRepository(
                 raw.cleanTranscript(language = engine.currentLanguage, formatNumbersAsDigits = formatNumbersAsDigits)
             else raw
             val finalText = if (cleaned.isBlank()) raw else cleaned
+            // Mirror the legacy path's raw-vs-cleaned logcat pairing so on-device triage
+            // can tell acoustic word loss (absent from `raw`) from formatting loss
+            // (present in `raw`, gone in `clean`).
+            Log.d(TAG, "[FINAL] raw   = Final(\"$raw\")")
+            Log.d(TAG, "[FINAL] clean = Final(\"$finalText\")")
             val base = TranscriptResult.Final(finalText, isUtteranceBoundary = isUtteranceBoundary, confidence = confidence)
             val toSend = if (isScriptHallucination(finalText, engine.currentLanguage)) {
                 val stripped = stripScriptHallucinations(finalText, engine.currentLanguage)
