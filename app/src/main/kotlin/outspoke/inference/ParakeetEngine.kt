@@ -1071,10 +1071,16 @@ class ParakeetEngine : SpeechEngine, ChunkStreamingEngine {
                 val token = vocabulary[id]
                 // Remove the SentencePiece word-boundary marker before processing.
                 val bare = token.removePrefix("▁")
-                // Strip any leading digit run - NeMo fills unused slots with their index
-                // (e.g. "▁1980ess" → bare = "1980ess" → effective = "ess").
-                // If nothing meaningful remains after stripping, skip the token entirely.
-                val effective = bare.dropWhile { it.isDigit() }
+                // Strip any leading digit run when it prefixes a letter - NeMo fills unused
+                // slots with their index (e.g. "▁1980ess" → bare = "1980ess" → effective =
+                // "ess"). A pure-digit token ("0".."9", SentencePiece byte tokens) is a real
+                // emission - dictated numbers arrive as one byte token per digit - so it must
+                // pass through untouched. Stripping those silently deleted every digit the
+                // model decoded (numbers vanished from "buying twenty items" output).
+                val digitsStripped = bare.dropWhile { it.isDigit() }
+                val effective = if (bare.firstOrNull()?.isDigit() == true && digitsStripped.firstOrNull()?.isLetter() == true)
+                    digitsStripped
+                else bare
                 if (effective.isBlank()) continue
                 when {
                     token.startsWith("▁") -> {
