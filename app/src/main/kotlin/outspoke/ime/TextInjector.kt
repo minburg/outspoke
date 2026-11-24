@@ -869,6 +869,21 @@ class TextInjector(
      * Insert a newline character at the current cursor position, replacing any
      * active selection.
      */
+    /** Preserve the composing words before inserting an explicit separator. */
+    fun insertSpace() {
+        inputConnection.finishComposingText()
+        committedWords.addAll(composingWords)
+        composingWords = emptyList()
+        lastPartial = ""
+        inputConnection.commitText(" ", 1)
+    }
+
+    /** Called once after a successful recording, never for an intermediate chunk. */
+    fun finishTranscription(addSpace: Boolean) {
+        inputConnection.finishComposingText()
+        if (addSpace && supportsComposing) ensureSeparatorSpace()
+    }
+
     fun sendNewline() {
         lastPartial = ""
         inputConnection.commitText("\n", 1)

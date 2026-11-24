@@ -50,6 +50,8 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 
 **Number formatting:** `NumberNormaliser` combines only grammatically valid number phrases. Punctuation and separate counting words end a phrase; the countdown from ten to one must remain ten separate numbers, never their sum. Stutter and phrase cleanup preserve number-only repetitions such as dictated codes.
 
+**Recording completion:** the space key preserves composing text before inserting a space. `trailing_space` defaults to false and adds a separator once after successful flow completion, including when the last utterance ended at a silence boundary.
+
 **VAD is dual-layer:** `SileroVadFilter` (Silero v4 ONNX) is primary; `RMSVadFilter` (energy threshold) is the automatic fallback if the ONNX VAD model fails to load. Runtime neural errors switch the existing smoother to energy detection for the rest of the recording, preserving speech instead of classifying failures as silence.
 
 **Word-suggestion / correction feature (new in v0.2.0):**

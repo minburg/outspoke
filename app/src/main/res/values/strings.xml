@@ -198,4 +198,7 @@
     <string name="calib_run_again">Run again</string>
     <string name="calib_no_mics">No microphones found.</string>
     <string name="calib_current">Current</string>
+    <string name="cd_insert_space">Insert space</string>
+    <string name="pref_trailing_space_title">Space after dictation</string>
+    <string name="pref_trailing_space_summary">Add a space after you stop recording and the full transcription is finished.</string>
 </resources>
