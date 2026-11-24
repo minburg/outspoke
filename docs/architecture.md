@@ -158,6 +158,7 @@ Number formatting validates phrase boundaries before combining number words, pre
 - Extends InputMethodService; implements LifecycleOwner and SavedStateRegistryOwner to host Compose.
 - Hosts the keyboard UI via ImeComposeView.
 - Binds to InferenceService on keyboard show and starts it when shown so it can survive IME recreation. The engine is never unloaded on hide or keyboard switch — only under memory pressure, a model change, or model-file deletion; `reloadIfNeeded()` restores it after such an unload.
+- Applies FLAG_KEEP_SCREEN_ON while capture is active and clears it when capture stops.
 - Forwards InputConnection changes to TextInjector and KeyboardViewModel.
 
 **TextInjector**
