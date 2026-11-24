@@ -69,6 +69,44 @@ class NumbersRealAudioTest {
         return chunks
     }
 
+    /**
+     * Regression anchor for the detokenize digit-stripping bug: the model decodes dictated
+     * numbers as byte-level digit tokens ("2" + "0"), which the index-padding strip in
+     * `ParakeetEngine.detokenize` used to delete wholesale, producing "I was buying items."
+     * The digits must survive to the committed text as the digit run "20".
+     */
+    @Test
+    fun `dictated digits survive detokenization into the final text`() {
+        Assume.assumeTrue(modelAvailable)
+        engine.setLanguage("en")
+        val finalText = pipelineFinal("num-buying.wav")
+        assertThat(finalText)
+            .describedAs("Digit emission must not be stripped (got '%s')", finalText)
+            .contains("20 items")
+    }
+
+    @Test
+    fun `dictated digit string survives as consecutive digits`() {
+        Assume.assumeTrue(modelAvailable)
+        engine.setLanguage("en")
+        val finalText = pipelineFinal("num-code2.wav")
+        assertThat(finalText)
+            .describedAs("Code digits must survive (got '%s')", finalText)
+            .contains("55123")
+    }
+
+    private fun pipelineFinal(fixture: String): String {
+        val samples = wavSamples(fixture)
+        val repo = InferenceRepository(engine)
+        val results = runBlocking {
+            repo.transcribe(flowOf(*chunkify(samples).toTypedArray()), postprocessingEnabled = true)
+                .toList()
+        }
+        return results.filterIsInstance<TranscriptResult.Final>().lastOrNull()?.text
+            ?: results.filterIsInstance<TranscriptResult.Partial>().lastOrNull()?.text
+            ?: ""
+    }
+
     @Test
     fun `spoken countdown normalises to separate digits not a sum`() {
         Assume.assumeTrue(modelAvailable)
