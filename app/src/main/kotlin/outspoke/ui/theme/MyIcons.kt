@@ -9,6 +9,23 @@ import androidx.compose.ui.unit.dp
 
 object MyIcons {
 
+    val SpaceBar: ImageVector by lazy {
+        materialIcon(name = "Filled.SpaceBar") {
+            materialPath {
+                moveTo(4f, 10f)
+                lineTo(6f, 10f)
+                lineTo(6f, 14f)
+                lineTo(18f, 14f)
+                lineTo(18f, 10f)
+                lineTo(20f, 10f)
+                lineTo(20f, 16f)
+                lineTo(4f, 16f)
+                close()
+            }
+        }
+    }
+
+
     val MicOff: ImageVector
         get() {
             if (_micOff != null) {

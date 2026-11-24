@@ -1,5 +1,7 @@
 package dev.brgr.outspoke.settings.screens
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +35,7 @@ fun InputPreferencesScreen(
     viewModel: PreferencesViewModel = viewModel(),
     onNavigateToCalibration: () -> Unit = {},
 ) {
+    val trailingSpace by viewModel.trailingSpace.collectAsState()
     val triggerMode by viewModel.triggerMode.collectAsState()
     val deleteButtonMode by viewModel.deleteButtonMode.collectAsState()
     val rawMicCapture by viewModel.rawMicCapture.collectAsState()
@@ -48,6 +51,19 @@ fun InputPreferencesScreen(
             triggerMode = triggerMode,
             onTriggerModeChange = viewModel::setTriggerMode,
         )
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth().toggleable(
+                value = trailingSpace, role = Role.Switch, onValueChange = viewModel::setTrailingSpace,
+            ).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.pref_trailing_space_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.pref_trailing_space_summary), style = MaterialTheme.typography.bodyMedium)
+            }
+            Switch(checked = trailingSpace, onCheckedChange = null)
+        }
         HorizontalDivider()
         DeleteButtonSection(
             deleteButtonMode = deleteButtonMode,

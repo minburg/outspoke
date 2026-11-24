@@ -40,6 +40,11 @@ class KeyboardViewModel(
     /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
+    val trailingSpace = appPreferences.trailingSpace
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun insertSpace() { textInjector?.insertSpace() }
+
     /**
      * `"HOLD"` (default) or `"TAP_TOGGLE"`.
      * Collected eagerly so the TalkButton always has the latest value without
@@ -473,7 +478,9 @@ class KeyboardViewModel(
             // job see captureJob != myJob and return immediately - preventing stale
             // partial results from bleeding into the fresh TextInjector state.
             val myJob = coroutineContext[Job]
+            var hasTranscript = false
             var failed = false
+            val addTrailingSpace = trailingSpace.value
 
             try {
                 if (!_isRecording.value) {
@@ -529,6 +536,7 @@ class KeyboardViewModel(
                                 TAG, "Final transcript: \"${result.text}\"" +
                                         if (result.isUtteranceBoundary) " [utterance boundary]" else ""
                             )
+                            hasTranscript = hasTranscript || result.text.isNotBlank()
                             textInjector?.commitFinal(result.text)
                         }
 
@@ -580,6 +588,7 @@ class KeyboardViewModel(
                     }
                 }
 
+                if (hasTranscript && !failed) textInjector?.finishTranscription(addTrailingSpace)
                 // Completion, including an empty final utterance, releases the recording UI.
                 if (_uiState.value == KeyboardUiState.Transcribing ||
                     _uiState.value == KeyboardUiState.Listening ||

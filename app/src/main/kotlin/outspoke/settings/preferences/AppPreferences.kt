@@ -19,6 +19,15 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  */
 class AppPreferences(private val context: Context) {
 
+    private val keyTrailingSpace = booleanPreferencesKey("trailing_space")
+
+    /** Add a space after the complete recording has been transcribed. */
+    val trailingSpace: Flow<Boolean> = context.dataStore.data.map { it[keyTrailingSpace] ?: false }
+
+    suspend fun setTrailingSpace(enabled: Boolean) {
+        context.dataStore.edit { it[keyTrailingSpace] = enabled }
+    }
+
     private val keyTriggerMode = stringPreferencesKey("trigger_mode")
 
     /** `"HOLD"` or `"TAP_TOGGLE"`. Defaults to `"HOLD"`. */

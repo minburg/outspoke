@@ -16,6 +16,14 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
     private val prefs = AppPreferences(application)
     private val downloader = SuggestionFileDownloader()
 
+    val trailingSpace = prefs.trailingSpace.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), false,
+    )
+
+    fun setTrailingSpace(enabled: Boolean) {
+        viewModelScope.launch { prefs.setTrailingSpace(enabled) }
+    }
+
     val triggerMode: StateFlow<String> = prefs.triggerMode.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
