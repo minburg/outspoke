@@ -40,6 +40,11 @@ class KeyboardViewModel(
     /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
 
+    val trailingSpace = appPreferences.trailingSpace
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun insertSpace() { textInjector?.insertSpace() }
+
     /**
      * `"HOLD"` (default) or `"TAP_TOGGLE"`.
      * Collected eagerly so the TalkButton always has the latest value without
@@ -281,6 +286,7 @@ class KeyboardViewModel(
     /** Called by [OutspokeInputMethodService] whenever [InferenceService.engineState] changes. */
     fun setEngineState(state: EngineState) {
         _engineState.value = state
+        if (captureJob?.isActive == true) return
         when (state) {
             EngineState.Unloaded -> _uiState.value = KeyboardUiState.EngineLoading(
                 KeyboardUiState.LoadingReason.ModelNotDownloaded
@@ -372,6 +378,7 @@ class KeyboardViewModel(
         captureJob?.cancel()
         captureJob = null
         audioCaptureManager.stopCapture()
+        _isRecording.value = false
         _isContinuousMode.value = false
         _uiState.value = KeyboardUiState.Idle
     }
@@ -414,6 +421,8 @@ class KeyboardViewModel(
     }
 
     private var captureJob: Job? = null
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
     /**
      * Set by [dev.brgr.outspoke.ime.OutspokeInputMethodService] to a lambda that requests
@@ -455,6 +464,7 @@ class KeyboardViewModel(
         }
 
         captureJob?.cancel()
+        _isRecording.value = true
         _uiState.value = KeyboardUiState.Listening
         _diagnostics.value = PipelineDiagnostics()
         _wordSuggestions.value = emptyList()
@@ -468,8 +478,15 @@ class KeyboardViewModel(
             // job see captureJob != myJob and return immediately - preventing stale
             // partial results from bleeding into the fresh TextInjector state.
             val myJob = coroutineContext[Job]
+            var hasTranscript = false
+            var failed = false
+            val addTrailingSpace = trailingSpace.value
 
             try {
+                if (!_isRecording.value) {
+                    _uiState.value = KeyboardUiState.Idle
+                    return@launch
+                }
                 // Repo was verified non-null above; re-read defensively in case the binder
                 // detached between the guard and this launch. If it did become null, abort
                 // cleanly rather than capturing audio with nowhere to send it.
@@ -497,11 +514,12 @@ class KeyboardViewModel(
                     // Stale-session guard: if this job has been superseded (e.g. the field
                     // was cleared and a new session started), discard this result entirely
                     // so no old-session text is injected into the fresh TextInjector.
-                    if (captureJob != null && captureJob != myJob) return@collect
+                    if (captureJob != myJob || failed) return@collect
 
                     when (result) {
                         is TranscriptResult.Partial -> {
-                            _uiState.value = KeyboardUiState.Processing(result.text)
+                            _uiState.value = if (_isRecording.value) KeyboardUiState.Processing(result.text)
+                                else KeyboardUiState.Transcribing
                             textInjector?.setPartial(result.text)
                             // Update alignment recovery counter from the injector.
                             val injector = textInjector
@@ -518,16 +536,14 @@ class KeyboardViewModel(
                                 TAG, "Final transcript: \"${result.text}\"" +
                                         if (result.isUtteranceBoundary) " [utterance boundary]" else ""
                             )
+                            hasTranscript = hasTranscript || result.text.isNotBlank()
                             textInjector?.commitFinal(result.text)
-                            updateWordAtCursor()
-                            if (!result.isUtteranceBoundary) {
-                                _isContinuousMode.value = false
-                                _uiState.value = KeyboardUiState.Idle
-                                captureJob = null
-                            }
                         }
 
                         is TranscriptResult.Failure -> {
+                            failed = true
+                            _isRecording.value = false
+                            audioCaptureManager.stopCapture()
                             Log.e(TAG, "Transcription failure", result.cause)
                             _isContinuousMode.value = false
                             _uiState.value = KeyboardUiState.Error(
@@ -555,6 +571,10 @@ class KeyboardViewModel(
                         // retry without tapping to clear it.
                         is TranscriptResult.NoSpeech -> {
                             Log.d(TAG, "NoSpeech — surfacing 'didn't catch that'")
+                            if (_isRecording.value) {
+                                _uiState.value = KeyboardUiState.Listening
+                                return@collect
+                            }
                             _uiState.value = KeyboardUiState.NoSpeech
                             viewModelScope.launch {
                                 delay(2000)
@@ -568,16 +588,15 @@ class KeyboardViewModel(
                     }
                 }
 
-                // The flow completed normally. If still in Transcribing (or Listening), it
-                // means VAD filtered out all audio (nothing was said) so InferenceRepository
-                // emitted no Final result. Reset to Idle so the button becomes usable again.
+                if (hasTranscript && !failed) textInjector?.finishTranscription(addTrailingSpace)
+                // Completion, including an empty final utterance, releases the recording UI.
                 if (_uiState.value == KeyboardUiState.Transcribing ||
-                    _uiState.value == KeyboardUiState.Listening
+                    _uiState.value == KeyboardUiState.Listening ||
+                    _uiState.value is KeyboardUiState.Processing
                 ) {
-                    Log.d(TAG, "Transcription flow ended with no Final result - resetting to Idle")
+                    Log.d(TAG, "Transcription flow completed - resetting to Idle")
                     _isContinuousMode.value = false
                     _uiState.value = KeyboardUiState.Idle
-                    captureJob = null
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -601,11 +620,22 @@ class KeyboardViewModel(
                     reason = KeyboardUiState.ErrorReason.AudioCaptureFailed,
                     detail = e.message,
                 )
+            } finally {
+                if (captureJob == myJob) {
+                    audioCaptureManager.stopCapture()
+                    _isRecording.value = false
+                    _isContinuousMode.value = false
+                    captureJob = null
+                    if (_uiState.value is KeyboardUiState.Error) textInjector?.clear()
+                    setEngineState(_engineState.value)
+                    updateWordAtCursor()
+                }
             }
         }
     }
 
     fun onRecordStop() {
+        _isRecording.value = false
         // Always reset continuous mode when recording stops from any code path.
         _isContinuousMode.value = false
 
@@ -707,6 +737,7 @@ class KeyboardViewModel(
         // Cancel the capture coroutine immediately - don't wait for the audio loop to drain.
         captureJob?.cancel()
         captureJob = null
+        _isRecording.value = false
         _isContinuousMode.value = false
         audioCaptureManager.stopCapture()
         _uiState.value = KeyboardUiState.Idle
@@ -715,6 +746,8 @@ class KeyboardViewModel(
     override fun onCleared() {
         super.onCleared()
         captureJob?.cancel()
+        audioCaptureManager.stopCapture()
+        _isRecording.value = false
         _isContinuousMode.value = false
         textInjector = null
         inferenceRepository = null

@@ -10,6 +10,61 @@ import org.junit.Test
  */
 class NumberNormaliserTest {
 
+    @Test
+    fun `countdown stays a sequence instead of being summed`() {
+        assertEquals("10 9 8 7 6 5 4 3 2 1", normaliseEN("ten nine eight seven six five four three two one"))
+    }
+
+    @Test
+    fun `countdown survives the full transcript cleanup`() {
+        assertEquals("10 9 8 7 6 5 4 3 2 1", "ten nine eight seven six five four three two one".cleanTranscript())
+    }
+
+    @Test
+    fun `repeated digits survive transcript cleanup`() {
+        assertEquals("1 1 1 2 2 2", "one one one two two two".cleanTranscript())
+        assertEquals("1 2 1 2", "one two one two".cleanTranscript())
+        assertEquals("5 5", "5 5".cleanTranscript())
+    }
+
+    @Test
+    fun `separate numbers retain their boundaries`() {
+        val cases = mapOf(
+            "one two three four five" to "1 2 3 4 5",
+            "ten, nine, eight." to "10, 9, 8.",
+            "one and two" to "1 and 2",
+            "twenty and five" to "20 and 5",
+            "one a two" to "1 a 2",
+            "fifty five" to "55",
+            "fifty, five" to "50, 5",
+            "twenty five six" to "25 6",
+            "first second third" to "1st 2nd 3rd",
+            "twenty first" to "21st",
+            "three hundredth" to "300th",
+            "one hundred and fifteen" to "115",
+            "one thousand two hundred and thirty four" to "1234",
+            "one million two hundred thousand three hundred and four" to "1200304",
+            "one hundred, two hundred" to "100, 200",
+            "zero one two" to "0 1 2",
+            "10 nine 8 seven" to "10 9 8 7",
+        )
+        cases.forEach { (input, expected) -> assertEquals(input, expected, normaliseEN(input)) }
+    }
+
+    @Test
+    fun `german counting and compound numbers retain their meaning`() {
+        val cases = mapOf(
+            "zehn neun acht sieben sechs fünf vier drei zwei eins" to "10 9 8 7 6 5 4 3 2 1",
+            "eins und zwei" to "1 und 2",
+            "ein und zwanzig" to "21",
+            "einundzwanzig zweiundzwanzig" to "21 22",
+            "zwanzig fünf" to "20 5",
+            "zwei hundert und fünf" to "205",
+            "erste zweite dritte" to "1. 2. 3.",
+        )
+        cases.forEach { (input, expected) -> assertEquals(input, expected, normaliseDE(input)) }
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
 
     /** Convenience: split a string into words, normalise, rejoin. */

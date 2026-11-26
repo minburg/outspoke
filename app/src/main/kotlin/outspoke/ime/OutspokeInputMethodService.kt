@@ -166,6 +166,15 @@ class OutspokeInputMethodService :
             ),
         )[KeyboardViewModel::class.java]
 
+        lifecycleScope.launch {
+            keyboardViewModel.isRecording.collect { recording ->
+                window?.window?.let { win ->
+                    if (recording) win.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    else win.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+        }
+
         // When the keyboard is reshown after being hidden, sync the window height to the
         // current bar state. The per-frame animation callback handles all transitions while
         // the keyboard is visible; this is only needed for the initial show after a hide.
@@ -199,6 +208,12 @@ class OutspokeInputMethodService :
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // Mark the already-bound foreground service as started so it survives IME recreation.
+        try {
+            startService(inferenceServiceIntent())
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Unable to retain inference service; keeping the existing binding", e)
+        }
         val targetHeight = keyboardHeightPx + (if (barVisible) barSlotHeightPx else 0)
         Log.d(
             TAG,

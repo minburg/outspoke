@@ -2,9 +2,14 @@ package dev.brgr.outspoke.inference
 
 import ai.onnxruntime.OnnxTensor
 import android.util.Log
+import dev.brgr.outspoke.BuildConfig
 import dev.brgr.outspoke.audio.AudioChunk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
@@ -204,6 +209,8 @@ internal fun String.collapseRepeatedPhrases(): String {
         // Bounded by [MAX_REPEATED_PHRASE_WORDS] so the scan stays near-linear.
         for (len in minOf(MAX_REPEATED_PHRASE_WORDS, remaining / 2) downTo 1) {
             val phrase = words.subList(i, i + len)
+            // Repeated digits and counting patterns are content, not model loops.
+            if (phrase.all(NumberNormaliser::isNumberToken)) continue
             val nextPhrase = words.subList(i + len, i + len * 2)
 
             val matches = phrase.size == nextPhrase.size &&
@@ -256,7 +263,7 @@ internal fun String.collapseStutters(): String {
     while (i < words.size) {
         val currentWord = words[i]
         val normCurrent = currentWord.normalizedForComparison()
-        if (normCurrent.isEmpty()) {
+        if (normCurrent.isEmpty() || NumberNormaliser.isNumberToken(currentWord)) {
             result.add(currentWord)
             i++
             continue
@@ -1330,6 +1337,27 @@ class InferenceRepository(
             else -> result
         }
 
+    private val sessionMutex = Mutex()
+    private var closed = false
+
+    /** Model teardown must not race a recording or its final decode. */
+    suspend fun closeEngine(onlyIfIdle: Boolean = false): Boolean {
+        if (onlyIfIdle) {
+            if (!sessionMutex.tryLock()) return false
+        } else {
+            sessionMutex.lock()
+        }
+        try {
+            if (!closed) {
+                closed = true
+                engine.close()
+            }
+            return true
+        } finally {
+            sessionMutex.unlock()
+        }
+    }
+
     /**
      * @param postprocessingEnabled When `false` all transcript-cleaning steps (filler removal,
      *   stutter collapse, repetition deduplication, capitalisation) are skipped and the raw
@@ -1337,6 +1365,17 @@ class InferenceRepository(
      *   Defaults to `true` (post-processing active).
      */
     fun transcribe(
+        audio: Flow<AudioChunk>,
+        postprocessingEnabled: Boolean = true,
+        formatNumbersAsDigits: Boolean = true,
+    ): Flow<TranscriptResult> = flow {
+        sessionMutex.withLock {
+            check(!closed) { "Speech model is no longer available. Open the keyboard again to reload it." }
+            emitAll(transcribeSession(audio, postprocessingEnabled, formatNumbersAsDigits))
+        }
+    }
+
+    private fun transcribeSession(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
         formatNumbersAsDigits: Boolean = true,
@@ -1820,6 +1859,14 @@ class InferenceRepository(
                 raw.cleanTranscript(language = engine.currentLanguage, formatNumbersAsDigits = formatNumbersAsDigits)
             else raw
             val finalText = if (cleaned.isBlank()) raw else cleaned
+            // Mirror the legacy path's raw-vs-cleaned logcat pairing so on-device triage
+            // can tell acoustic word loss (absent from `raw`) from formatting loss
+            // (present in `raw`, gone in `clean`). Debug builds only: these lines carry
+            // transcribed text, which must never reach logcat in a release build.
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "[FINAL] raw   = Final(\"$raw\")")
+                Log.d(TAG, "[FINAL] clean = Final(\"$finalText\")")
+            }
             val base = TranscriptResult.Final(finalText, isUtteranceBoundary = isUtteranceBoundary, confidence = confidence)
             val toSend = if (isScriptHallucination(finalText, engine.currentLanguage)) {
                 val stripped = stripScriptHallucinations(finalText, engine.currentLanguage)
@@ -1874,6 +1921,7 @@ class InferenceRepository(
         } else if (totalSamples > 0) {
             Log.d(TAG, "[FINAL] end-of-stream flush ${totalSamples.toSec()}")
             flushAsFinal(isUtteranceBoundary = false)
+            streamFailure?.let { send(TranscriptResult.Failure(it)) }
         }
     }.flowOn(Dispatchers.Default)
 

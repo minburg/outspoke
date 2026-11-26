@@ -95,6 +95,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **SileroVadFilter** (primary)
 
+- Runtime neural VAD failures switch to energy detection for the rest of the recording, retaining onset and hangover state. Input tensors are closed even when inference throws.
 - Silero VAD v4 ONNX. RNN state tensors h/c shape [2,1,64] carried across chunks.
 - Speech probability threshold: 0.3.
 - Three layers: onset gate (2 frames/60 ms), pre-roll buffer (15 frames/450 ms lead-in), hangover.
@@ -129,6 +130,8 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **InferenceRepository**
 
+Number formatting validates phrase boundaries before combining number words, preserving countdowns and punctuation-separated lists. Stutter and phrase cleanup retain repeated numeric tokens, including number words, so dictated codes are not shortened.
+
 - Receives Flow<AudioChunk> from AudioCaptureManager.
 - Maintains a rolling audio window (see Section 6).
 - Emits Flow<TranscriptResult> consumed by KeyboardViewModel -> TextInjector.
@@ -140,7 +143,8 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 - FGS promotion goes through `FgsPromoter`: every start command reaches `onStartCommand`, which must `startForeground` within the 5 s deadline or the process is ANR'd (issue #37) — `microphone` type, falling back to `specialUse` while the app is backgrounded, `stopSelf()` if both are rejected. A pure IME bind arms no deadline and stays notification-silent until the keyboard window shows or an activity resumes, which upgrades the type back to `microphone`.
 - Notification channel: outspoke_inference, notification ID 1001.
 - Owns the SpeechEngine instance; reloads on selectedModelId preference change.
-- Uses a Mutex to protect engine swaps.
+- Uses a Mutex to protect engine swaps. The repository serializes recording sessions and engine teardown, including the final decode; memory-pressure unload skips an active session.
+- Observes distinct selected model IDs so unrelated preference changes do not reload the model.
 - Exposes StateFlow<EngineState> to bound clients.
 - FileObserver on models/ directory detects newly downloaded models.
 - Stays alive independently of IME bind/unbind; shuts down only when explicitly stopped.
@@ -153,7 +157,8 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 - Extends InputMethodService; implements LifecycleOwner and SavedStateRegistryOwner to host Compose.
 - Hosts the keyboard UI via ImeComposeView.
-- Binds to InferenceService on keyboard show. The engine is never unloaded on hide or keyboard switch — only under memory pressure, a model change, or model-file deletion; `reloadIfNeeded()` restores it after such an unload.
+- Binds to InferenceService on keyboard show and starts it when shown so it can survive IME recreation. The engine is never unloaded on hide or keyboard switch — only under memory pressure, a model change, or model-file deletion; `reloadIfNeeded()` restores it after such an unload.
+- Applies FLAG_KEEP_SCREEN_ON while capture is active and clears it when capture stops.
 - Forwards InputConnection changes to TextInjector and KeyboardViewModel.
 
 **TextInjector**
@@ -179,7 +184,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 | Value | storageDirName | Status |
 |---|---|---|
 | PARAKEET_V3 | parakeet-v3 | Active |
-| PARAKEET_ULTRA | parakeet-ultra | Active |
+| PARAKEET_ULTRA | parakeet-ultra | Active (default) |
 | ORUKEET | orukeet | Active |
 | VOXTRAL_MINI | voxtral-mini-4b | Disabled (resource limits) |
 | WHISPER_SMALL | whisper-small-int8 | Disabled (resource limits) |
@@ -192,7 +197,9 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 
 **ModelDownloadManager** downloads via OkHttp with resume support, verifies SHA-256 after each file, emits ModelState.Downloading(progress).
 
-**AppPreferences** (DataStore, store name outspoke_prefs): trigger_mode (String, default HOLD), delete_button_mode (String, DELETE_ALL | DELETE_LAST_SENTENCE, default DELETE_LAST_SENTENCE), vad_sensitivity (Float, default 0.0), selected_model_id (String), whisper_language (String, default "auto"), postprocessing_enabled (Boolean, default true), show_pipeline_diagnostics (Boolean, default false), keyboard_tutorial_shown (Boolean, default false), forced_language (String?, default null), format_numbers_as_digits (Boolean, default true), suggestion_bar_enabled (Boolean, default false), suggestion_bar_languages (String, comma-separated BCP-47 tags, default ""), suggestion_bar_dismissed (Boolean, default false), raw_mic_capture (Boolean, default false — true captures from AudioSource.UNPROCESSED to bypass AEC, needed for the speakerphone use case), preferredMicId (Int, default 0).
+**ModelViewModel** merges download states into the model list. When a download completes and the finished model is the only model on disk, it is auto-activated (first download = activation); with several models downloaded the selection stays manual. Deleting the active model falls back to PARAKEET_ULTRA when ready, otherwise to any other ready model.
+
+**AppPreferences** (DataStore, store name outspoke_prefs): trigger_mode (String, default HOLD), trailing_space (Boolean, default false; applied once after successful recording completion), delete_button_mode (String, DELETE_ALL | DELETE_LAST_SENTENCE, default DELETE_LAST_SENTENCE), vad_sensitivity (Float, default 0.0), selected_model_id (String), whisper_language (String, default "auto"), postprocessing_enabled (Boolean, default true), show_pipeline_diagnostics (Boolean, default false), keyboard_tutorial_shown (Boolean, default false), forced_language (String?, default null), format_numbers_as_digits (Boolean, default true), suggestion_bar_enabled (Boolean, default false), suggestion_bar_languages (String, comma-separated BCP-47 tags, default ""), suggestion_bar_dismissed (Boolean, default false), raw_mic_capture (Boolean, default false — true captures from AudioSource.UNPROCESSED to bypass AEC, needed for the speakerphone use case), preferredMicId (Int, default 0).
 
 ---
 

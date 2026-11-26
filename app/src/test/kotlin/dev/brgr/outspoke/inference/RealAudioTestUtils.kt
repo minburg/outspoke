@@ -10,7 +10,7 @@ import java.util.Locale
  * Priority:
  *  1. System property `-Dtest.model.dir=/path/to/models`
  *  2. Environment variable `OUTSPOKE_TEST_MODEL_DIR`
- *  3. `~/.cache/outspoke-test-model/parakeet-tdt-0.6b-v3/`
+ *  3. `~/.cache/outspoke-test-model/parakeet-ultra/`
  *
  * @throws IllegalStateException if no model directory is found.
  */
@@ -32,7 +32,7 @@ fun resolveModelDir(): File {
     // 3. Cache directory
     val cacheDir = File(
         System.getProperty("user.home"),
-        ".cache/outspoke-test-model/parakeet-tdt-0.6b-v3"
+        ".cache/outspoke-test-model/parakeet-ultra"
     )
     if (cacheDir.exists() && cacheDir.listFiles()?.isNotEmpty() == true) return cacheDir
 
