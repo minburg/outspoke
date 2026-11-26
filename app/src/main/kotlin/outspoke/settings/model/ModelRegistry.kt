@@ -110,7 +110,7 @@ object ModelRegistry {
 
     //    val all: List<ModelInfo> = listOf(parakeetV3, voxtralMini, whisperLargeV3Turbo)
     val all: List<ModelInfo> =
-        listOf(parakeetV3, parakeetUltra, orukeet) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
+        listOf(parakeetUltra, parakeetV3, orukeet) // for now removed voxtralMini and whisperLargeV3Turbo as I could not get it to run on-device within reasonable resource limits
 
     private val byId: Map<ModelId, ModelInfo> = all.associateBy { it.id }
 
@@ -121,9 +121,9 @@ object ModelRegistry {
 
 private val parakeetV3 = ModelInfo(
     id = ModelId.PARAKEET_V3,
-    displayName = "Parakeet-V3 (Default)",
+    displayName = "Parakeet-V3",
     description = "NeMo TDT model for on-device ASR optimised for English and 24 other european languages like DE, FR, ES, IT, RU etc. " +
-            "Very fast and compact - the recommended choice for most devices.",
+            "Very fast and compact - the predecessor of Parakeet Ultra.",
     approximateSizeMb = 700,
     source = DownloadSource.Files(
         baseUrl = PARAKEET_BASE,
@@ -166,10 +166,10 @@ private val parakeetV3 = ModelInfo(
 // verified byte-identical vocab/preprocessor and identical graph I/O vs the v3 export).
 private val parakeetUltra = ModelInfo(
     id = ModelId.PARAKEET_ULTRA,
-    displayName = "Parakeet Ultra",
+    displayName = "Parakeet Ultra (Default)",
     description = "Moondream's post-trained Parakeet-TDT v3: same size and speed, but more accurate " +
             "for English and the same 24 other european languages (DE, FR, ES, IT, RU etc.) - notably " +
-            "better in background noise and on long dictations.",
+            "better in background noise and on long dictations. The recommended choice for most devices.",
     approximateSizeMb = 668,
     source = DownloadSource.Files(
         baseUrl = PARAKEET_ULTRA_BASE,
