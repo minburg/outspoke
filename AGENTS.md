@@ -91,6 +91,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 - **`val` over `var`**; avoid nullable types unless genuinely optional.
 - **`application.yml`** is not used (Android project) — preferences go through `DataStore` (`settings/preferences/`).
 - **Model files** are stored in `<filesDir>/models/<storageDirName>/` — no external storage permission.
+- **Backup is an allowlist of `<filesDir>/datastore/`** — set in *both* `res/xml/backup_rules.xml` (≤ API 30) and `res/xml/data_extraction_rules.xml` (API 31+, `<cloud-backup>` *and* `<device-transfer>`). An empty or absent section means "back up everything", which puts the ~630 MB `models/` download and `suggestion_files/` packs into a ~25 MB cloud quota. Anything new under `filesDir` is therefore excluded by default; if the preference store ever moves, both rules move with it.
 - **Suggestion files** are stored in `<filesDir>/suggestion_files/<tag>/` — same constraint.
 - **SHA-256** is verified after each file download; add hashes to `RemoteFile` entries whenever available.
 - ABI splits produce per-ABI APKs: `armeabi-v7a` (×1), `arm64-v8a` (×2), universal (×0 offset). `versionCode = defaultVersionCode * 10 + abiOffset`.

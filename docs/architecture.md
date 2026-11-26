@@ -390,6 +390,8 @@ If all three layers fail, the entire partial is returned as new content (alignme
         lm_de.arpa
       (one subdirectory per downloaded language)
 
+**Backup scope.** Only `<filesDir>/datastore/` (the DataStore preference file) is eligible for Android auto-backup or device-to-device transfer; `models/` and `suggestion_files/` are excluded by allowlisting that one directory in `res/xml/backup_rules.xml` (API ≤ 30) and in **both** the `<cloud-backup>` and `<device-transfer>` sections of `res/xml/data_extraction_rules.xml` (API 31+). An empty section is not "nothing", it is "everything", so the two files must stay explicit: the previous template state swept ~630 MB of re-downloadable weights toward a ~25 MB cloud quota. Weights are always re-downloaded through the model screen.
+
 ### Download flow
 
 1. ModelDownloadManager fetches each RemoteFile via OkHttp.
