@@ -124,9 +124,12 @@
 
     <!-- Keyboard status messages -->
     <string name="status_transcribing">Wird transkribiert …</string>
-    <string name="status_engine_model_missing">Modell nicht heruntergeladen - Outspoke öffnen</string>
+    <!-- Einzeilig neben der Aktions-Schaltfläche "Erneut versuchen"/"Outspoke öffnen"; längere Texte
+         werden im Pill abgeschnitten, deshalb die Aktion nicht doppelt nennen. -->
+    <string name="status_engine_model_missing">Modell nicht heruntergeladen</string>
     <string name="status_engine_loading">Transkriptions-Engine wird geladen …</string>
-    <string name="status_error_mic_permission">Mikrofonberechtigung fehlt - Outspoke öffnen</string>
+    <string name="status_error_mic_permission">Mikrofonberechtigung fehlt</string>
+    <string name="status_error_mic_busy">Mikrofon belegt - andere App schließen</string>
     <string name="status_error_mic_init">Mikrofon konnte nicht geöffnet werden</string>
     <string name="status_error_transcription">Transkription fehlgeschlagen</string>
     <string name="status_error_audio_capture">Audioaufnahme fehlgeschlagen</string>

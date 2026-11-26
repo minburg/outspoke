@@ -39,8 +39,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * Launch:
  * `adb shell am start -n dev.brgr.outspoke/dev.brgr.outspoke.devtools.KeyboardPreviewActivity
  * --es state listening`
- * with `state` in idle | listening | continuous | processing | no_speech | error | loading
- * | whisper | suggestions.
+ * with `state` in idle | listening | continuous | processing | no_speech | error | mic_busy
+ * | mic_permission | loading | no_model | whisper | suggestions.
  */
 class KeyboardPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,8 +114,17 @@ private fun stateSpec(state: String): KeyboardPreviewSpec = when (state) {
     "error" -> KeyboardPreviewSpec(
         KeyboardUiState.Error(KeyboardUiState.ErrorReason.TranscriptionFailed), 0f, false, false, "auto",
     )
+    "mic_busy" -> KeyboardPreviewSpec(
+        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicBusy), 0f, false, false, "auto",
+    )
     "loading" -> KeyboardPreviewSpec(
         KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting), 0f, false, false, "auto",
+    )
+    "no_model" -> KeyboardPreviewSpec(
+        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.ModelNotDownloaded), 0f, false, false, "auto",
+    )
+    "mic_permission" -> KeyboardPreviewSpec(
+        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied), 0f, false, false, "auto",
     )
     "whisper" -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false, true, "de")
     "suggestions" -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false, false, "auto")

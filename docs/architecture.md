@@ -83,6 +83,7 @@ Single Gradle module (app). All Kotlin source lives under app/src/main/kotlin/ (
 - Emits 480-sample (30 ms) chunks as a cold Flow<AudioChunk>.
 - When the user has run mic calibration, applies the selected microphone via AudioRecord.setPreferredDevice (no-op when unset or the device is gone).
 - On stop: drains the hardware buffer then waits HANGOVER_DRAIN_SAFETY_FRAMES = 20 frames (600 ms) to flush VAD hangover before the flow completes.
+- **Capture refuses to run on a dead microphone.** startRecording() must leave the recorder in RECORDSTATE_RECORDING (startRecordingOrThrow), and the read loop polls getActiveRecordingConfiguration().isClientSilenced every 300 ms, firing on 2 consecutive hits. Android's input arbitration never fails the losing app — it keeps the recorder "recording" and feeds digital silence — so without these checks the UI shows Listening, the engine decodes zeros, and no error is raised. Both paths throw MicrophoneBusyException → KeyboardUiState.ErrorReason.MicBusy (transient, retry).
 
 **VadFilter interface**
 

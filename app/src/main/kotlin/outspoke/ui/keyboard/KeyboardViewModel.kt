@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.brgr.outspoke.audio.AudioCaptureManager
+import dev.brgr.outspoke.audio.MicrophoneBusyException
 import dev.brgr.outspoke.audio.SpectrumFrame
 import dev.brgr.outspoke.ime.EnterAction
 import dev.brgr.outspoke.ime.TextInjector
@@ -612,6 +613,16 @@ class KeyboardViewModel(
                 _isContinuousMode.value = false
                 _uiState.value = KeyboardUiState.Error(
                     reason = KeyboardUiState.ErrorReason.MicPermissionDenied,
+                )
+            } catch (e: MicrophoneBusyException) {
+                // Permission is fine and the recorder was built; another app owns the mic. Without
+                // the capture-side detection this surfaced as an endless "Listening" state fed by
+                // digital silence. The detail is left out of the pill - both causes ask for the same
+                // user action, and the exception message is in logcat.
+                Log.e(TAG, "Microphone is in use by another app", e)
+                _isContinuousMode.value = false
+                _uiState.value = KeyboardUiState.Error(
+                    reason = KeyboardUiState.ErrorReason.MicBusy,
                 )
             } catch (e: IllegalStateException) {
                 Log.e(TAG, "AudioRecord failed to initialise", e)

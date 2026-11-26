@@ -45,6 +45,14 @@ sealed class KeyboardUiState {
     /** Typed reasons for [Error] - mapped to localized strings in the UI layer. */
     enum class ErrorReason {
         MicPermissionDenied,
+
+        /**
+         * Permission granted and the recorder built, but the microphone belongs to another app:
+         * either the platform refused the start or it client-silenced the session mid-recording
+         * (Android feeds digital silence instead of failing). Recoverable by closing the other
+         * app, so it is treated as a transient error with a retry action.
+         */
+        MicBusy,
         MicInitFailed,
         TranscriptionFailed,
         AudioCaptureFailed,

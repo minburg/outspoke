@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   Auto-backup rules for Android 11 (API 30) and below; API 31+ uses data_extraction_rules.xml.
+   Referenced from AndroidManifest.xml as android:fullBackupContent.
+
+   This is an ALLOWLIST. filesDir holds models/ (a Parakeet-V3 download is ~630 MB) and
+   suggestion_files/ (dictionary + ARPA packs, tens of MB per language). With no <include> here,
+   auto-backup walked the whole of filesDir into a ~25 MB cloud quota: the backup failed silently,
+   and the parts that did fit were multi-hundred-megabyte weights that the app re-downloads
+   anyway. Listing datastore/ means only preferences are archived, and anything a future release
+   puts under filesDir is excluded by default instead of quietly eating the quota again.
+
+   If the preference store ever moves off files/datastore/ (databases/, noBackupFilesDir/, ...),
+   this rule has to move with it or settings stop being backed up with no failure to notice.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- DataStore preferences: files/datastore/outspoke_prefs.preferences_pb -->
+    <include domain="file" path="datastore"/>
 </full-backup-content>

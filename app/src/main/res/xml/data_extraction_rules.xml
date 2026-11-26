@@ -1,20 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   Backup/restore rules for Android 12 (API 31) and above; older releases use backup_rules.xml.
+   Referenced from AndroidManifest.xml as android:dataExtractionRules.
+
+   Both sections are ALLOWLISTS, and both must be listed: a section that is simply absent falls
+   back to "everything", which would put filesDir - models/ (~630 MB of downloaded weights) and
+   suggestion_files/ (dictionary + ARPA language packs) - into the transfer again. The cloud
+   section would blow the ~25 MB quota outright; device-to-device transfer has no such cap but
+   would still carry hundreds of megabytes of re-downloadable weights, including any half-written
+   partial download, onto the new phone.
+
+   What survives is exactly the DataStore preference file: model selection, language, trigger
+   mode, delete-button mode, VAD sensitivity, calibration choice. Models are re-downloaded from
+   the in-app model screen by design.
+
+   If the preference store ever moves off files/datastore/ (databases/, noBackupFilesDir/, ...),
+   both includes have to move with it.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- DataStore preferences: files/datastore/outspoke_prefs.preferences_pb -->
+        <include domain="file" path="datastore"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="file" path="datastore"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

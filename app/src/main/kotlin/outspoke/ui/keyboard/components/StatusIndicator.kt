@@ -53,7 +53,9 @@ import dev.brgr.outspoke.ui.theme.tabularFigures
  * - [KeyboardUiState.EngineLoading] → neutral pill, spinner + loading message + "Open Outspoke" action
  *
  * For transient errors ([KeyboardUiState.ErrorReason.TranscriptionFailed],
- * [KeyboardUiState.ErrorReason.AudioCaptureFailed], [KeyboardUiState.ErrorReason.MicInitFailed])
+ * [KeyboardUiState.ErrorReason.AudioCaptureFailed],
+ * [KeyboardUiState.ErrorReason.MicInitFailed],
+ * [KeyboardUiState.ErrorReason.MicBusy])
  * a "Try again" button is shown alongside the error so the user can retry immediately without
  * leaving the keyboard. For errors that require external action (permission denied, engine load
  * failed) the "Open Outspoke" button is shown instead.
@@ -92,6 +94,7 @@ fun StatusIndicator(
                     KeyboardUiState.ErrorReason.TranscriptionFailed,
                     KeyboardUiState.ErrorReason.AudioCaptureFailed,
                     KeyboardUiState.ErrorReason.MicInitFailed,
+                    KeyboardUiState.ErrorReason.MicBusy,
                 )
                 ErrorIndicator(
                     message = localizedErrorMessage(state),
@@ -116,6 +119,7 @@ private fun localizedErrorMessage(state: KeyboardUiState.Error): String {
     val primary = stringResource(
         when (state.reason) {
             KeyboardUiState.ErrorReason.MicPermissionDenied -> R.string.status_error_mic_permission
+            KeyboardUiState.ErrorReason.MicBusy -> R.string.status_error_mic_busy
             KeyboardUiState.ErrorReason.MicInitFailed -> R.string.status_error_mic_init
             KeyboardUiState.ErrorReason.TranscriptionFailed -> R.string.status_error_transcription
             KeyboardUiState.ErrorReason.AudioCaptureFailed -> R.string.status_error_audio_capture

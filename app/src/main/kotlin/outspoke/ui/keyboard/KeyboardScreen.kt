@@ -203,28 +203,43 @@ fun KeyboardScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (uiState is KeyboardUiState.Error) {
-                                Box(modifier = Modifier.weight(1f)) {}
-                                Spacer(modifier = Modifier.width(8.dp))
+                            // Status pill (plus Whisper chips) share one weighted cell in front of the two
+                            // fixed keys. Weighted, because an unweighted status block is measured at its
+                            // full desired width *before* the keys are placed: a long error string such as
+                            // "Microphone in use - close the other recording app" then slid both trailing
+                            // keys off the right edge of the window. Errors stay centred - which is what the
+                            // dummy spacer pair this replaces achieved - every other state stays
+                            // left-aligned, exactly as before.
+                            Box(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement =
+                                        if (uiState is KeyboardUiState.Error) {
+                                            Arrangement.Center
+                                        } else {
+                                            Arrangement.Start
+                                        },
+                                ) {
+                                    StatusIndicator(
+                                        uiState = uiState,
+                                        diagnostics = diagnostics,
+                                        onOpenCompanionApp = onOpenCompanionApp,
+                                        onRetry = onRetry ?: onRecordStart,
+                                        modifier = Modifier.weight(1f, fill = false),
+                                    )
+                                    // Language chips for Whisper models - on the same line as the status
+                                    // pill, and only while the engine is idle: mid-recording they are
+                                    // useless, and the row has no room for both chips and a long message.
+                                    if (showLanguageChips) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        LanguageSelector(
+                                            selectedLanguage = whisperLanguage,
+                                            onLanguageSelected = onWhisperLanguageSelected,
+                                        )
+                                    }
+                                }
                             }
-
-                            StatusIndicator(
-                                uiState = uiState,
-                                diagnostics = diagnostics,
-                                onOpenCompanionApp = onOpenCompanionApp,
-                                onRetry = onRetry ?: onRecordStart,
-                            )
-                            // Language chips for Whisper models - on the same line as the status pill,
-                            // and only while the engine is idle: mid-recording they are useless and the
-                            // row has no room for both a long status message and the chips.
-                            if (showLanguageChips) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                LanguageSelector(
-                                    selectedLanguage = whisperLanguage,
-                                    onLanguageSelected = onWhisperLanguageSelected,
-                                )
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
                             // Both trailing keys of the status row are chrome-matched: one bare icon
                             // next to a bordered key read as a disabled control.
                             Box(modifier = Modifier.width(FunctionKeySize + 4.dp)) {

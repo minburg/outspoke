@@ -143,9 +143,13 @@
     <!-- Keyboard status messages -->
     <string name="status_transcribing">Transcribing…</string>
     <string name="status_no_speech">Didn\'t catch that — try again</string>
-    <string name="status_engine_model_missing">Model not downloaded - open Outspoke to download</string>
+    <!-- Status-pill strings: one line, inside a pill that shares the keyboard's status row with a
+         "Retry" or "Open Outspoke" action and is bounded by the row width - longer text ellipsises,
+         and naming the action here twice is what used to make that inevitable. -->
+    <string name="status_engine_model_missing">Model not downloaded</string>
     <string name="status_engine_loading">Loading transcription engine…</string>
-    <string name="status_error_mic_permission">Microphone permission denied - open Outspoke to grant it</string>
+    <string name="status_error_mic_permission">Microphone permission denied</string>
+    <string name="status_error_mic_busy">Microphone in use - close the other app</string>
     <string name="status_error_mic_init">Could not open the microphone</string>
     <string name="status_error_transcription">Transcription failed</string>
     <string name="status_error_audio_capture">Audio capture failed</string>
