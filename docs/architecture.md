@@ -184,7 +184,7 @@ Number formatting validates phrase boundaries before combining number words, pre
 | Value | storageDirName | Status |
 |---|---|---|
 | PARAKEET_V3 | parakeet-v3 | Active |
-| PARAKEET_ULTRA | parakeet-ultra | Active |
+| PARAKEET_ULTRA | parakeet-ultra | Active (default) |
 | ORUKEET | orukeet | Active |
 | VOXTRAL_MINI | voxtral-mini-4b | Disabled (resource limits) |
 | WHISPER_SMALL | whisper-small-int8 | Disabled (resource limits) |
@@ -196,6 +196,8 @@ Number formatting validates phrase boundaries before combining number words, pre
 **ModelStorageManager** stores all files in <filesDir>/models/<storageDirName>/. Checks requiredFiles list for readiness; uses INSTALLED_MARKER file for ZIP-installed models.
 
 **ModelDownloadManager** downloads via OkHttp with resume support, verifies SHA-256 after each file, emits ModelState.Downloading(progress).
+
+**ModelViewModel** merges download states into the model list. When a download completes and the finished model is the only model on disk, it is auto-activated (first download = activation); with several models downloaded the selection stays manual. Deleting the active model falls back to PARAKEET_ULTRA when ready, otherwise to any other ready model.
 
 **AppPreferences** (DataStore, store name outspoke_prefs): trigger_mode (String, default HOLD), trailing_space (Boolean, default false; applied once after successful recording completion), delete_button_mode (String, DELETE_ALL | DELETE_LAST_SENTENCE, default DELETE_LAST_SENTENCE), vad_sensitivity (Float, default 0.0), selected_model_id (String), whisper_language (String, default "auto"), postprocessing_enabled (Boolean, default true), show_pipeline_diagnostics (Boolean, default false), keyboard_tutorial_shown (Boolean, default false), forced_language (String?, default null), format_numbers_as_digits (Boolean, default true), suggestion_bar_enabled (Boolean, default false), suggestion_bar_languages (String, comma-separated BCP-47 tags, default ""), suggestion_bar_dismissed (Boolean, default false), raw_mic_capture (Boolean, default false — true captures from AudioSource.UNPROCESSED to bypass AEC, needed for the speakerphone use case), preferredMicId (Int, default 0).
 

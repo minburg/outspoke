@@ -63,6 +63,24 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
                         _errorMessage.emit("Download failed for ${ModelRegistry[id].displayName}")
                     }
                 }
+                // Auto-activate a model as soon as its download completes if it is the
+                // only model on disk: for a fresh install the first download *is* the
+                // activation, so the manual select click would only be friction. With
+                // several models present the choice stays explicitly the user's.
+                for ((id, state) in serviceStates) {
+                    if (state is ModelState.Ready && previousStates[id] !is ModelState.Ready &&
+                        _selectedModelId.value != id
+                    ) {
+                        val context = getApplication<Application>()
+                        val readyOnDisk = ModelRegistry.all.count {
+                            ModelStorageManager.isModelReady(context, it)
+                        }
+                        if (readyOnDisk == 1) {
+                            Log.d(TAG, "Auto-activating $id: only downloaded model")
+                            selectModel(id)
+                        }
+                    }
+                }
                 previousStates = serviceStates
                 _modelStates.update { current -> current + serviceStates }
             }
@@ -101,9 +119,13 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteModel(modelId: ModelId) {
         ModelStorageManager.deleteModel(getApplication(), modelId)
         _modelStates.update { it + (modelId to ModelState.NotDownloaded) }
-        // Fall back to the default model if the active model was just deleted.
-        if (_selectedModelId.value == modelId && modelId != ModelId.DEFAULT) {
-            selectModel(ModelId.DEFAULT)
+        // If the active model was just deleted, fall back to the default when it is
+        // still on disk, otherwise to any other downloaded model.
+        if (_selectedModelId.value == modelId) {
+            val context = getApplication<Application>()
+            val fallback = ModelId.DEFAULT.takeIf { ModelStorageManager.isModelReady(context, it) }
+                ?: ModelRegistry.all.firstOrNull { ModelStorageManager.isModelReady(context, it) }?.id
+            if (fallback != null && fallback != modelId) selectModel(fallback)
         }
         Log.d(TAG, "Model $modelId deleted from internal storage")
     }

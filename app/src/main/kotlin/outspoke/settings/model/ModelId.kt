@@ -19,7 +19,7 @@ enum class ModelId(val storageDirName: String) {
 
     companion object {
         /** The model used when no preference has been saved yet. */
-        val DEFAULT: ModelId = PARAKEET_V3
+        val DEFAULT: ModelId = PARAKEET_ULTRA
 
         /** Returns the [ModelId] whose [storageDirName] matches [name], or [DEFAULT] if none found. */
         fun fromName(name: String): ModelId =
