@@ -7,40 +7,50 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
+import dev.brgr.outspoke.ui.theme.LocalOutspokeStatusColors
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
+import dev.brgr.outspoke.ui.theme.tabularFigures
 
 /**
  * Crossfades between six distinct visual states driven by [uiState].
  *
- * - [KeyboardUiState.Idle]          → small grey mic icon (+ diagnostics badge if non-clean)
- * - [KeyboardUiState.Listening]     → pulsing filled circle (accent colour)
- * - [KeyboardUiState.Processing]    → spinner + partial transcript text
- * - [KeyboardUiState.Transcribing]  → spinner + "Transcribing…" label (mic off, engine busy)
- * - [KeyboardUiState.Error]         → warning icon + error message + recovery action(s)
- * - [KeyboardUiState.EngineLoading] → spinner + loading message + "Open Outspoke" action
+ * Every state renders inside a [StatusPill]: one tonal pill whose colour carries the tone and
+ * whose icon, spinner or word carries the meaning — colour is never the only signal.
+ *
+ * - [KeyboardUiState.Idle]          → neutral pill, ready dot, small mic icon (+ diagnostics badge if non-clean)
+ * - [KeyboardUiState.Listening]     → accent-toned pill with a pulsing dot and "Listening"
+ * - [KeyboardUiState.Processing]    → accent-toned pill, spinner + partial transcript text
+ * - [KeyboardUiState.Transcribing]  → neutral pill, spinner + "Transcribing…" label (mic off, engine busy)
+ * - [KeyboardUiState.Error]         → error-toned pill: warning icon + error message + recovery action(s)
+ * - [KeyboardUiState.NoSpeech]      → warning-toned pill (audio heard, nothing recognised)
+ * - [KeyboardUiState.EngineLoading] → neutral pill, spinner + loading message + "Open Outspoke" action
  *
  * For transient errors ([KeyboardUiState.ErrorReason.TranscriptionFailed],
  * [KeyboardUiState.ErrorReason.AudioCaptureFailed], [KeyboardUiState.ErrorReason.MicInitFailed])
@@ -127,19 +137,23 @@ private fun localizedLoadingMessage(state: KeyboardUiState.EngineLoading): Strin
 
 @Composable
 private fun IdleIndicator(diagnostics: PipelineDiagnostics = PipelineDiagnostics()) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val statusColors = LocalOutspokeStatusColors.current
+    StatusPill(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
+        // Success, not the accent: the accent means "the mic is live", this dot only says the
+        // engine is loaded and waiting.
+        StatusDot(color = statusColors.success)
         Icon(
             imageVector = MyIcons.Mic,
             contentDescription = stringResource(R.string.cd_status_idle),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(16.dp),
         )
         if (!diagnostics.isClean) {
-            Spacer(modifier = Modifier.width(6.dp))
+            // Counters move while the user watches them, so they get tabular figures.
             Text(
                 text = diagnostics.summary(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.labelSmall.tabularFigures,
+                color = statusColors.warning,
                 maxLines = 1,
             )
         }
@@ -159,26 +173,34 @@ private fun ListeningIndicator() {
         label = "pulseScale",
     )
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(20.dp)
-            .scale(pulseScale)
-            .background(MaterialTheme.colorScheme.primary, CircleShape),
-    ) { /* pulsing filled circle - no inner content needed */ }
+    StatusPill(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .scale(pulseScale)
+                .background(MaterialTheme.colorScheme.primary, CircleShape),
+        ) { /* pulsing live dot - no inner content needed */ }
+        Text(
+            text = stringResource(R.string.status_listening),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
 private fun ProcessingIndicator(partial: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    StatusPill(containerColor = MaterialTheme.colorScheme.primaryContainer) {
         GradientArcSpinner(modifier = Modifier.size(16.dp))
         if (partial.isNotEmpty()) {
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = partial,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
     }
@@ -187,9 +209,8 @@ private fun ProcessingIndicator(partial: String) {
 /** Shown after the mic stops while the engine is still running its final inference pass. */
 @Composable
 private fun TranscribingIndicator() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    StatusPill(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         GradientArcSpinner(modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = stringResource(R.string.status_transcribing),
             style = MaterialTheme.typography.bodySmall,
@@ -202,12 +223,16 @@ private fun TranscribingIndicator() {
 /** Shown briefly when the model detected audio but couldn't resolve a word. */
 @Composable
 private fun NoSpeechIndicator() {
-    Text(
-        text = stringResource(R.string.status_no_speech),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-    )
+    val statusColors = LocalOutspokeStatusColors.current
+    StatusPill(containerColor = statusColors.warningContainer) {
+        StatusDot(color = statusColors.warning)
+        Text(
+            text = stringResource(R.string.status_no_speech),
+            style = MaterialTheme.typography.bodySmall,
+            color = statusColors.onWarningContainer,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
@@ -216,46 +241,29 @@ private fun ErrorIndicator(
     onOpenCompanionApp: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = MyIcons.Warning,
-                contentDescription = stringResource(R.string.cd_status_error),
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                maxLines = 2,
-            )
-        }
-        if (onRetry != null) {
-            Spacer(modifier = Modifier.height(2.dp))
-            TextButton(
-                onClick = onRetry,
-                modifier = Modifier.height(36.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.action_retry),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        } else if (onOpenCompanionApp != null) {
-            Spacer(modifier = Modifier.height(2.dp))
-            TextButton(
-                onClick = onOpenCompanionApp,
-                modifier = Modifier.height(36.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.action_open_outspoke),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+    // One pill, one line: the action sits inside it, because a second row would not fit
+    // the fixed-height keyboard window and used to be clipped off its top edge.
+    StatusPill(containerColor = MaterialTheme.colorScheme.errorContainer) {
+        // No leading dot here: the warning glyph already carries the state, and a dot
+        // next to it is three signals for one message.
+        Icon(
+            imageVector = MyIcons.Warning,
+            contentDescription = stringResource(R.string.cd_status_error),
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        when {
+            onRetry != null -> PillAction(stringResource(R.string.action_retry), onRetry)
+            onOpenCompanionApp != null ->
+                PillAction(stringResource(R.string.action_open_outspoke), onOpenCompanionApp)
         }
     }
 }
@@ -265,31 +273,76 @@ private fun EngineLoadingIndicator(
     message: String,
     onOpenCompanionApp: (() -> Unit)? = null,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            GradientArcSpinner(modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-            )
-        }
+    StatusPill(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
+        GradientArcSpinner(modifier = Modifier.size(16.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
         if (onOpenCompanionApp != null) {
-            Spacer(modifier = Modifier.height(2.dp))
-            TextButton(
-                onClick = onOpenCompanionApp,
-                modifier = Modifier.height(36.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.action_open_outspoke),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            PillAction(stringResource(R.string.action_open_outspoke), onOpenCompanionApp)
         }
     }
+}
+
+/**
+ * Text action inside a [StatusPill]. The keyboard cannot afford a second row for the action,
+ * so the pill owns it: label in the accent colour, full pill height as the touch area.
+ */
+@Composable
+private fun RowScope.PillAction(label: String, onClick: () -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        modifier = Modifier
+            .fillMaxHeight()
+            .clip(OutspokeShapes.chip)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp),
+    )
+}
+
+/**
+ * Tonal pill shared by every [StatusIndicator] state.
+ *
+ * The container colour carries the tone (neutral / accent / warning / error); the pill's own
+ * content - dot, icon, spinner or word - carries the meaning, so a state never depends on
+ * colour alone.
+ */
+@Composable
+private fun StatusPill(
+    containerColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = modifier
+            // Fixed height: the keyboard is a fixed-height IME window, so a pill that grows
+            // (long message, large font scale) would push the key row off the window. Text is
+            // single-line and ellipsized instead.
+            .height(32.dp)
+            .clip(OutspokeShapes.chip)
+            .background(containerColor, OutspokeShapes.chip)
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+/** Leading tone dot inside a [StatusPill]; pairs with the state's icon or word. */
+@Composable
+private fun StatusDot(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.size(8.dp).background(color, CircleShape))
 }
 
 /**

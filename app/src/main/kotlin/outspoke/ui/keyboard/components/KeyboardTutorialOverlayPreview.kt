@@ -1,11 +1,12 @@
 package dev.brgr.outspoke.ui.keyboard.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.keyboard.KeyboardScreen
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
 
 
 /**
@@ -34,18 +36,24 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  */
 @Composable
 private fun FakeKeyboard(positions: TutorialPositions) {
+    // Mirrors the shipped key chrome: `surface` panel with a 1 dp outline on the strip.
+    val keyModifier = Modifier
+        .clip(OutspokeShapes.key)
+        .background(MaterialTheme.colorScheme.surface, OutspokeShapes.key)
+        .border(
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            OutspokeShapes.key,
+        )
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                modifier = keyModifier
+                    .size(44.dp)
                     .onGloballyPositioned { positions.record(TutorialButtonId.SWITCH_KEYBOARD, it) },
             )
         }
@@ -67,10 +75,8 @@ private fun FakeKeyboard(positions: TutorialPositions) {
                 TutorialButtonId.ENTER,
             ).forEach { id ->
                 Box(
-                    modifier = Modifier
+                    modifier = keyModifier
                         .size(width = 72.dp, height = 44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
                         .onGloballyPositioned { positions.record(id, it) },
                 )
             }
@@ -92,6 +98,8 @@ private fun BoxScope.TutorialSpotlightLayer(
     highlightId: TutorialButtonId,
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
+    // Read the scrim role outside the Canvas draw lambda, which is not a composable scope.
+    val scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = TUTORIAL_SCRIM_ALPHA)
     val infiniteTransition = rememberInfiniteTransition(label = "tutorialGlow")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.50f, targetValue = 1.00f,
@@ -112,7 +120,7 @@ private fun BoxScope.TutorialSpotlightLayer(
             .matchParentSize()
             .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen),
     ) {
-        drawRect(Color(0xBB000000))
+        drawRect(scrimColor)
         spotBounds?.let { b ->
             val radius = (b.width + b.height) / 4f + 8.dp.toPx()
             drawCircle(
@@ -153,8 +161,8 @@ private fun BoxScope.TutorialCardLayer(
     // Card + nav row: stacked in a Column when cardAtBottom, otherwise card floats at top
     if (!cardAtBottom) {
         Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = OutspokeShapes.card,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             elevation = CardDefaults.cardElevation(0.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -177,8 +185,8 @@ private fun BoxScope.TutorialCardLayer(
     ) {
         if (cardAtBottom) {
             Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = OutspokeShapes.card,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -190,13 +198,16 @@ private fun BoxScope.TutorialCardLayer(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(
-                onClick = {}, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Secondary action: text button, mirroring the shipped overlay.
+            TextButton(
+                onClick = {},
+                modifier = Modifier.height(36.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 Text(
                     text = "Skip",
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -223,14 +234,14 @@ private fun TutorialCardBody(title: String, description: String, stepIndex: Int,
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 "${stepIndex + 1} / $totalSteps",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

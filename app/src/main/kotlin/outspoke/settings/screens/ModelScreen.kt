@@ -18,8 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.model.*
+import dev.brgr.outspoke.ui.theme.LocalOutspokeStatusColors
+import dev.brgr.outspoke.ui.theme.LocalOutspokeSurfaceRoles
 import dev.brgr.outspoke.ui.theme.MyIcons
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
 import dev.brgr.outspoke.ui.theme.OutspokeTheme
+import dev.brgr.outspoke.ui.theme.tabularFigures
 
 /**
  * Displays the full model catalog - one card per registered model - and allows the user
@@ -112,19 +116,15 @@ private fun ModelCard(
     onRetry: () -> Unit,
     onSelect: () -> Unit,
 ) {
-    val borderColor = when {
-        isSelected -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.outlineVariant
-    }
-
+    // Selection is communicated by the "Active model" chip and its check glyph below,
+    // not by card chrome - every card keeps the same hairline + fill so the list stays
+    // one elevation language.
     Card(
         modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(width = if (isSelected) 2.dp else 1.dp, color = borderColor),
+        shape = OutspokeShapes.card,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            else
-                MaterialTheme.colorScheme.surface,
+            containerColor = LocalOutspokeSurfaceRoles.current.card,
         ),
     ) {
         Column(
@@ -134,31 +134,15 @@ private fun ModelCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Title row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = modelInfo.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.model_size_format, modelInfo.approximateSizeMb),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (isSelected) {
-                    Icon(
-                        imageVector = MyIcons.CheckCircle,
-                        contentDescription = stringResource(R.string.cd_active_model),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
+            Text(
+                text = modelInfo.displayName,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.model_size_format, modelInfo.approximateSizeMb),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             Text(
                 text = modelInfo.description,
@@ -169,7 +153,8 @@ private fun ModelCard(
             // State-specific actions
             when (state) {
                 is ModelState.NotDownloaded -> NotDownloadedActions(modelInfo, onDownload)
-                is ModelState.Downloading -> DownloadingActions(state.progressFraction, onCancel)
+                is ModelState.Downloading ->
+                    DownloadingActions(state.progressFraction, modelInfo.approximateSizeMb, onCancel)
                 is ModelState.Ready -> ReadyActions(isSelected, onSelect, onDelete)
                 is ModelState.Corrupted -> CorruptedActions(onRetry)
             }
@@ -246,22 +231,24 @@ private fun MobileDataWarningDialog(
 }
 
 @Composable
-private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
+private fun DownloadingActions(progress: Float, sizeMb: Int, onCancel: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth(),
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Tabular digits: the percentage changes while the row is on screen.
             Text(
-                text = "${(progress * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
+                text = stringResource(
+                    R.string.model_progress_format,
+                    (progress * 100).toInt(),
+                    sizeMb,
+                ),
+                style = MaterialTheme.typography.labelMedium.tabularFigures,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Icon(
@@ -271,7 +258,15 @@ private fun DownloadingActions(progress: Float, onCancel: () -> Unit) {
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
-        OutlinedButton(
+        LinearProgressIndicator(
+            progress = { progress },
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp),
+        )
+        TextButton(
             onClick = onCancel,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.action_cancel)) }
@@ -298,14 +293,34 @@ private fun ReadyActions(
                 Text(stringResource(R.string.action_set_as_active))
             }
         } else {
-            Text(
-                text = stringResource(R.string.model_active_label),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .weight(1f)
-                    .align(Alignment.CenterVertically),
-            )
+            // Success tonal chip with the check glyph: "active" is a done/verified state,
+            // never the accent, and the glyph keeps it readable without colour.
+            val statusColors = LocalOutspokeStatusColors.current
+            Surface(
+                shape = OutspokeShapes.chip,
+                color = statusColors.successContainer,
+                modifier = Modifier.align(Alignment.CenterVertically),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = MyIcons.CheckCircle,
+                        contentDescription = stringResource(R.string.cd_active_model),
+                        tint = statusColors.onSuccessContainer,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.model_active_label),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = statusColors.onSuccessContainer,
+                    )
+                }
+            }
+            // Keep the delete button pinned to the trailing edge like in the unselected state.
+            Spacer(Modifier.weight(1f))
         }
         OutlinedButton(
             onClick = { isDeleteDialogVisible = true },
@@ -489,7 +504,7 @@ private fun NotDownloadedActionsPreview() {
 @Preview(showBackground = true, name = "Action · Downloading 70%")
 @Composable
 private fun DownloadingActionsPreview() {
-    OutspokeTheme { DownloadingActions(progress = 0.7f, onCancel = {}) }
+    OutspokeTheme { DownloadingActions(progress = 0.7f, sizeMb = 1_037, onCancel = {}) }
 }
 
 @Preview(showBackground = true, name = "Action · Ready (selected)")

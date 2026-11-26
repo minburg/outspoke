@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <!-- Material 3 light scheme background, matching OutspokeTheme in light mode. -->
-    <color name="splash_background">#FFFBFE</color>
+    <!-- App background in light mode, matching OutspokeTheme; keeps the splash and the
+         window background from flashing a different colour than the first frame. -->
+    <color name="splash_background">#FFF3F6F5</color>
 </resources>

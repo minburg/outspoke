@@ -3,12 +3,17 @@ package dev.brgr.outspoke.ui.keyboard.components
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +23,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
+import kotlinx.coroutines.delay
 
 /**
  * Total height of the suggestion bar chips row when visible (excludes the 1dp divider).
@@ -46,7 +53,22 @@ private val SuggestionBarShowEasing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 private val SuggestionBarHideEasing = CubicBezierEasing(0.4f, 0f, 1f, 1f)
 
 /**
+ * How long the slot keeps its layout height after the bar is told to hide.
+ *
+ * The collapse must land *before* the service shrinks the IME window
+ * (`OutspokeInputMethodService.SUGGESTION_BAR_HIDE_DELAY_MS`), otherwise the still-reserved
+ * slot overlaps the top of the keyboard content for the remainder of the animation - the
+ * shelf background paints over the status row and clips it. Collapsing slightly early only
+ * costs the last few percent of the slide-out, which [clipToBounds] trims away anyway.
+ */
+private const val SLOT_COLLAPSE_DELAY_MS = 250L
+
+/**
  * Horizontal strip of word-suggestion chips with a visual divider and a dismiss button.
+ *
+ * The bar sits on a `surfaceContainerLow` shelf — one step lighter than the strip, no shadow —
+ * and closes with a 1 dp `outlineVariant` hairline above the keys.  Candidates are tonal pills:
+ * the top-ranked word in `primaryContainer`, the rest in `surfaceVariant`.
  *
  * ## Animation strategy — no window resize during animation
  *
@@ -107,18 +129,33 @@ fun SuggestionBar(
         label = "suggestionBarTranslation",
     )
 
-    // The slot always occupies its full height in the layout — the keyboard content below
-    // is never displaced during animation. clipToBounds hides the bar when translated away.
+    // The slot holds its height for the whole animation — the keyboard content below is never
+    // displaced mid-flight — then collapses to 0, because a hidden bar must not keep reserving
+    // height the window no longer has. clipToBounds hides the bar while it is translated away.
+    var slotOccupied by remember { mutableStateOf(visible) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            slotOccupied = true
+        } else {
+            delay(SLOT_COLLAPSE_DELAY_MS)
+            slotOccupied = false
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(SUGGESTION_BAR_TOTAL_HEIGHT_DP.dp)
+            .height(if (slotOccupied) SUGGESTION_BAR_TOTAL_HEIGHT_DP.dp else 0.dp)
             .clipToBounds(),
     ) {
         Column(
-            modifier = Modifier.graphicsLayer {
-                translationY = animatedTranslationDp.toPx()
-            },
+            modifier = Modifier
+                // The bar is one step lighter than the strip so the candidate row reads as a
+                // separate shelf; it carries no shadow - the strip has no elevation language.
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .graphicsLayer {
+                    translationY = animatedTranslationDp.toPx()
+                },
         ) {
             Row(
                 modifier = Modifier
@@ -147,19 +184,11 @@ fun SuggestionBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    items(suggestions) { suggestion ->
-                        SuggestionChip(
+                    itemsIndexed(suggestions) { index, suggestion ->
+                        WordSuggestionChip(
+                            word = suggestion,
+                            primary = index == 0,
                             onClick = { onSuggestionTapped(suggestion) },
-                            label = {
-                                Text(
-                                    text = suggestion,
-                                    style = MaterialTheme.typography.labelLarge,
-                                )
-                            },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                            ),
-                            elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 1.dp),
                         )
                     }
                 }
@@ -173,6 +202,46 @@ fun SuggestionBar(
     }
 }
 
+/**
+ * One candidate word.
+ *
+ * The first entry is the spell-checker's top-ranked candidate, so it carries the selected-pill
+ * tone (`primaryContainer`); the alternatives stay neutral `surfaceVariant`. Both are ordinary
+ * taps — the tone marks the recommended word, it does not mean "already applied".
+ */
+@Composable
+private fun WordSuggestionChip(
+    word: String,
+    primary: Boolean,
+    onClick: () -> Unit,
+) {
+    SuggestionChip(
+        onClick = onClick,
+        label = {
+            Text(
+                text = word,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        },
+        shape = OutspokeShapes.chip,
+        colors = SuggestionChipDefaults.suggestionChipColors(
+            containerColor = if (primary) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            labelColor = if (primary) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        ),
+        // Flat: the strip has no elevation language, the tonal fill does the separation.
+        elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 0.dp),
+        border = null,
+    )
+}
+
 // ── Previews ─────────────────────────────────────────────────────────────────
 
 /**
@@ -182,7 +251,7 @@ fun SuggestionBar(
  */
 @Composable
 private fun SuggestionBarContent(suggestions: List<String>) {
-    Column {
+    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -203,19 +272,11 @@ private fun SuggestionBarContent(suggestions: List<String>) {
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(suggestions) { suggestion ->
-                    SuggestionChip(
+                itemsIndexed(suggestions) { index, suggestion ->
+                    WordSuggestionChip(
+                        word = suggestion,
+                        primary = index == 0,
                         onClick = {},
-                        label = {
-                            Text(
-                                text = suggestion,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        },
-                        colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
-                        elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 1.dp),
                     )
                 }
             }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only screen harness for visual verification (not packaged in release builds).
+  Keyboard strip: KeyboardPreviewActivity with string extra "state" =
+      idle | listening | suggestions | whisper | error
+  App screens: CompanionPreviewActivity with string extra "screen" =
+      home | model | pref_input | pref_speech | tools | calibration
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+                android:name="dev.brgr.outspoke.devtools.KeyboardPreviewActivity"
+                android:exported="true"
+                android:label="Outspoke Keyboard Preview"
+                android:theme="@style/Theme.Outspoke" />
+        <activity
+                android:name="dev.brgr.outspoke.devtools.CompanionPreviewActivity"
+                android:exported="true"
+                android:label="Outspoke Screens"
+                android:theme="@style/Theme.Outspoke" />
+    </application>
+</manifest>

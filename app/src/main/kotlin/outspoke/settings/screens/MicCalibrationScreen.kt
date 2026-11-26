@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,17 +52,13 @@ import dev.brgr.outspoke.audio.MicScore
 import dev.brgr.outspoke.settings.preferences.CalibrationState
 import dev.brgr.outspoke.settings.preferences.MicCalibrationViewModel
 import dev.brgr.outspoke.settings.preferences.MicResult
+import dev.brgr.outspoke.ui.theme.LocalOutspokeStatusColors
+import dev.brgr.outspoke.ui.theme.LocalOutspokeSurfaceRoles
 import dev.brgr.outspoke.ui.theme.MyIcons
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
+import dev.brgr.outspoke.ui.theme.tabularFigures
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
-
-private val RecordGreen = Color(0xFF2E7D32)
-
-/** Live "recording now" state — the pulsing capture indicator. */
-private val CaptureRed = Color(0xFFD32F2F)
-
-/** "Get ready" standby state — the calm capture indicator before each window opens. */
-private val CaptureAmber = Color(0xFFEF6C00)
 
 /**
  * Microphone calibration screen. Records a short "thanks" reference clip on every input
@@ -151,11 +148,22 @@ fun MicCalibrationScreen(
                         )
                     }
                 if (s.bestMicId != 0) {
-                    Text(
-                        text = stringResource(R.string.calib_saved),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RecordGreen,
-                    )
+                    // Saved confirmation pairs the success tint with a check glyph so the
+                    // "done" reading survives without colour.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = MyIcons.CheckCircle,
+                            contentDescription = null,
+                            tint = LocalOutspokeStatusColors.current.success,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.calib_saved),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LocalOutspokeStatusColors.current.success,
+                        )
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -163,11 +171,17 @@ fun MicCalibrationScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Surface(onClick = viewModel::reset) {
+                    Button(
+                        onClick = viewModel::reset,
+                        shape = OutspokeShapes.chip,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
                         Text(
                             text = stringResource(R.string.calib_run_again),
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 }
@@ -188,11 +202,19 @@ fun MicCalibrationScreen(
                             textAlign = TextAlign.Center,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Surface(onClick = viewModel::reset) {
+                        Button(
+                            // startCalibration() no-ops unless the state is Idle, so the
+                            // error state must be cleared first; together these two calls
+                            // restart the measurement pass through the normal start path.
+                            onClick = {
+                                viewModel.reset()
+                                viewModel.startCalibration()
+                            },
+                            shape = OutspokeShapes.chip,
+                        ) {
                             Text(
                                 text = stringResource(R.string.action_retry),
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.labelLarge,
                             )
                         }
                     }
@@ -205,6 +227,8 @@ fun MicCalibrationScreen(
 /**
  * A single microphone row. When [score] is non-null (calibration complete) the high-frequency
  * percentage and SNR are shown; [isBest] / [isCurrent] add a badge on the trailing edge.
+ * The "Best" badge is a success-tonal chip carrying a check glyph, so the winner reads
+ * without relying on its colour.
  */
 @Composable
 private fun MicRow(
@@ -213,28 +237,55 @@ private fun MicRow(
     isBest: Boolean,
     isCurrent: Boolean,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val statusColors = LocalOutspokeStatusColors.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = OutspokeShapes.card,
+        colors = CardDefaults.cardColors(containerColor = LocalOutspokeSurfaceRoles.current.card),
+    ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = mic.label, style = MaterialTheme.typography.bodyLarge)
+                Text(text = mic.label, style = MaterialTheme.typography.titleMedium)
                 if (score != null) {
                     Text(
-                        text = "${stringResource(R.string.calib_hf)} ${(score.hfFraction * 100f).roundToInt()}%  ·  " +
-                            "${stringResource(R.string.calib_snr)} ${score.snrDb.roundToInt()} dB",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = stringResource(
+                            R.string.calib_score_format,
+                            (score.hfFraction * 100f).roundToInt(),
+                            score.snrDb.roundToInt(),
+                        ),
+                        // Scores differ between rows only by digits - tabular figures keep
+                        // the columns aligned.
+                        style = MaterialTheme.typography.bodySmall.tabularFigures,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             when {
-                isBest -> Text(
-                    text = stringResource(R.string.calib_best),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = RecordGreen,
-                )
+                isBest -> Surface(
+                    shape = OutspokeShapes.chip,
+                    color = statusColors.successContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = MyIcons.CheckCircle,
+                            contentDescription = null,
+                            tint = statusColors.onSuccessContainer,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.calib_best),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = statusColors.onSuccessContainer,
+                        )
+                    }
+                }
                 isCurrent -> Text(
                     text = stringResource(R.string.calib_current),
                     style = MaterialTheme.typography.labelSmall,
@@ -245,7 +296,11 @@ private fun MicRow(
     }
 }
 
-/** A circular green record-style button with a mic glyph and a caption beneath it. */
+/**
+ * A circular record-style button with a mic glyph and a caption beneath it. The accent
+ * (`primary`) marks it as "the action that starts capture"; disabled, it drops to the
+ * neutral variant fill.
+ */
 @Composable
 private fun RecordButton(
     onClick: () -> Unit,
@@ -257,7 +312,8 @@ private fun RecordButton(
             modifier = Modifier
                 .size(88.dp)
                 .background(
-                    color = if (enabled) RecordGreen else MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surfaceVariant,
                     shape = CircleShape,
                 )
                 .clickable(enabled = enabled, onClick = onClick),
@@ -266,7 +322,8 @@ private fun RecordButton(
             Icon(
                 imageVector = MyIcons.Mic,
                 contentDescription = label,
-                tint = if (enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (enabled) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(40.dp),
             )
         }
@@ -298,7 +355,8 @@ private fun CaptureStage(
     ) {
         Text(
             text = stringResource(R.string.calib_mic_of, index + 1, total),
-            style = MaterialTheme.typography.labelLarge,
+            // The counter changes while this screen is on view.
+            style = MaterialTheme.typography.labelLarge.tabularFigures,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -312,7 +370,8 @@ private fun CaptureStage(
         Text(
             text = stringResource(if (isLive) R.string.calib_speak_now else R.string.calib_get_ready),
             style = MaterialTheme.typography.headlineSmall,
-            color = if (isLive) CaptureRed else CaptureAmber,
+            color = if (isLive) MaterialTheme.colorScheme.error
+            else LocalOutspokeStatusColors.current.warning,
         )
         if (isLive) {
             Spacer(modifier = Modifier.height(20.dp))
@@ -347,13 +406,17 @@ private fun rememberCaptureProgress(index: Int, isLive: Boolean): Float {
 }
 
 /**
- * The large circular capture indicator, styled like the start button. In the live state it's
- * red and pulses with an expanding "ping" ring to signal "recording now"; otherwise it's a calm
- * amber standby.
+ * The large circular capture indicator. In the live state it's a solid `error` disc with an
+ * expanding "ping" ring to signal "recording now"; otherwise it's a calm tonal `warningContainer`
+ * standby. Both fills pair with their on-container role so the mic glyph keeps contrast in
+ * light and dark.
  */
 @Composable
 private fun CaptureIndicator(isLive: Boolean) {
-    val color = if (isLive) CaptureRed else CaptureAmber
+    val colorScheme = MaterialTheme.colorScheme
+    val statusColors = LocalOutspokeStatusColors.current
+    val color = if (isLive) colorScheme.error else statusColors.warningContainer
+    val glyphTint = if (isLive) colorScheme.onError else statusColors.onWarningContainer
     val transition = rememberInfiniteTransition(label = "capture")
     val ping by transition.animateFloat(
         initialValue = 1f,
@@ -407,14 +470,17 @@ private fun CaptureIndicator(isLive: Boolean) {
             Icon(
                 imageVector = MyIcons.Mic,
                 contentDescription = null,
-                tint = Color.White,
+                tint = glyphTint,
                 modifier = Modifier.size(40.dp),
             )
         }
     }
 }
 
-/** A determinate progress bar filling over the capture window. */
+/**
+ * A determinate progress bar filling over the capture window. The fill is the accent -
+ * same "capture is live" signal as the waveform and the keyboard talk button.
+ */
 @Composable
 private fun CaptureProgress(fraction: Float) {
     Box(
@@ -422,13 +488,13 @@ private fun CaptureProgress(fraction: Float) {
             .fillMaxWidth()
             .height(6.dp)
             .clip(RoundedCornerShape(3.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(CaptureRed, RoundedCornerShape(3.dp)),
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp)),
         )
     }
 }
@@ -451,8 +517,9 @@ private fun MicProgressDots(current: Int, total: Int, isLive: Boolean) {
                     .size(if (state == DotState.Current) 14.dp else 10.dp)
                     .background(
                         color = when (state) {
-                            DotState.Done -> RecordGreen
-                            DotState.Current -> if (isLive) CaptureRed else CaptureAmber
+                            DotState.Done -> LocalOutspokeStatusColors.current.success
+                            DotState.Current -> if (isLive) MaterialTheme.colorScheme.error
+                            else LocalOutspokeStatusColors.current.warning
                             DotState.Upcoming -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         shape = CircleShape,

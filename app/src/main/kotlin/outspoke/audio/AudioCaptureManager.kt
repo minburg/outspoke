@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.settings.preferences.AppPreferences
@@ -46,6 +47,13 @@ private const val NOISE_FLOOR_DB = -60f
  */
 private const val WAVEFORM_DISPLAY_GAIN = 1.5f
 
+/**
+ * Minimum spacing between [spectrum] emissions. Every chunk is still fed to the analyzer (its
+ * attack/release filter needs the full 33 Hz cadence to behave), but 33 Hz of recomposition is
+ * wasted motion - the meter only needs ~20 Hz.
+ */
+private const val SPECTRUM_EMIT_INTERVAL_MS = 50L
+
 // Capture source: MediaRecorder.AudioSource.DEFAULT — the vendor-recommended source.
 // It arrives at a usable level with the platform's standard voice processing, so no
 // application-side gain is applied.
@@ -85,6 +93,7 @@ class AudioCaptureManager(private val context: Context) {
     private val prefs = AppPreferences(context.applicationContext)
 
     private val _amplitude = MutableStateFlow(0f)
+    private val _spectrum = MutableStateFlow<SpectrumFrame?>(null)
 
     /**
      * Set to `true` by [stopCapture] to end the read loop on the next iteration.
@@ -96,7 +105,7 @@ class AudioCaptureManager(private val context: Context) {
 
     /**
      * Signals the active [startCapture] flow to exit its read loop and complete normally.
-     * The flow will finish within one 40 ms chunk read cycle (~40 ms latency).
+     * The flow will finish within one 30 ms chunk read cycle (~30 ms latency).
      */
     fun stopCapture() {
         activeStop?.set(true)
@@ -109,7 +118,15 @@ class AudioCaptureManager(private val context: Context) {
     val amplitude: StateFlow<Float> = _amplitude.asStateFlow()
 
     /**
-     * Starts microphone capture and emits each 40 ms [AudioChunk] downstream.
+     * Band energies of the most recently captured chunk for the keyboard level meter, or `null`
+     * when no chunk has been analysed yet and once capture stops.
+     *
+     * Emitted at [SPECTRUM_EMIT_INTERVAL_MS]; the analyzer itself runs on every chunk.
+     */
+    val spectrum: StateFlow<SpectrumFrame?> = _spectrum.asStateFlow()
+
+    /**
+     * Starts microphone capture and emits each 30 ms [AudioChunk] downstream.
      *
      * **Prerequisites:** [PermissionHelper.hasRecordPermission] must return `true` before
      * calling this. If the permission is absent a [SecurityException] is thrown immediately
@@ -175,6 +192,10 @@ class AudioCaptureManager(private val context: Context) {
             applyPreferredMic(recorder)
 
             val buffer = ShortArray(CHUNK_SAMPLES)
+            // One analyzer per capture session: its DC-blocker and attack/release state must not
+            // leak from a previous recording into this one.
+            val analyzer = SpectrumAnalyzer()
+            var lastSpectrumEmitMs = 0L
 
             try {
                 recorder.startRecording()
@@ -188,6 +209,16 @@ class AudioCaptureManager(private val context: Context) {
                             val chunk = AudioChunk(samples = samples)
                             val rms = calculateRms(chunk.samples)
                             _amplitude.value = normaliseAmplitude(rms)
+
+                            // Analysis runs on every chunk so its time constants stay honest;
+                            // publication is decimated (see SPECTRUM_EMIT_INTERVAL_MS). The
+                            // copy keeps the reused analyzer buffer away from the UI thread.
+                            val bands = analyzer.process(chunk.samples)
+                            val nowMs = SystemClock.elapsedRealtime()
+                            if (nowMs - lastSpectrumEmitMs >= SPECTRUM_EMIT_INTERVAL_MS) {
+                                lastSpectrumEmitMs = nowMs
+                                _spectrum.value = SpectrumFrame(bands.copyOf())
+                            }
 
                             val toSend = vad?.process(chunk, rms) ?: listOf(chunk)
                             for (c in toSend) {
@@ -253,6 +284,8 @@ class AudioCaptureManager(private val context: Context) {
                 recorder.stop()
                 recorder.release()
                 _amplitude.value = 0f
+                analyzer.reset()
+                _spectrum.value = null
                 Log.d(TAG, "AudioRecord stopped and released")
             }
         }.flowOn(Dispatchers.IO)

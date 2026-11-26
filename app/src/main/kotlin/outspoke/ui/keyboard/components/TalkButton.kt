@@ -18,13 +18,30 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import dev.brgr.outspoke.R
+import dev.brgr.outspoke.ui.theme.LocalOutspokeStatusColors
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /** How many dp upward the user must drag to engage continuous mode. */
+/**
+ * Diameter of the talk button. Also the value the keyboard's content area reserves above
+ * the button row, so [dev.brgr.outspoke.ui.keyboard.KeyboardScreen] must never hardcode a
+ * taller clearance than this.
+ */
+// Budget note: the IME window is 20 % of the screen height (~160 dp on a 1080p phone),
+// and the status row + waveform + key row all live in it. Status row (42) + gap (4) +
+// waveform (22) + this button (68) + top padding (4) + gesture-pill clearance (20) = 160 dp,
+// so growing any of these pushes the status row off the top of the window.
+internal val TalkButtonSize = 68.dp
+
+/** Function-key size on the keyboard row; every other key slot is a multiple of this. */
+internal val FunctionKeySize = 42.dp
+
 private const val CONTINUOUS_DRAG_THRESHOLD_DP = 56
 
 /** Gap between the TalkButton top and the bottom of the lock hint indicator. */
@@ -45,6 +62,10 @@ private const val LOCK_HINT_GAP_DP = 8
  * **Continuous mode** (HOLD) - button shows a pulsing [Stop] icon.  Tap once to stop recording.
  *
  * **TAP_TOGGLE mode** - single tap starts recording; another tap stops it.  No hold needed.
+ *
+ * **Colour language** - the resting key is the accent (`primary`): it is the one affordance
+ * that starts dictating, so it owns the one signal colour.  While audio is live the key turns
+ * `error`, because the same interaction now *stops* the mic.
  *
  * @param triggerMode          `"HOLD"` (default) or `"TAP_TOGGLE"`.
  * @param isContinuous         `true` when continuous (locked) mode is active (HOLD mode only).
@@ -112,21 +133,22 @@ fun TalkButton(
             (if (effectiveListening && !isContinuousActive) dragProgress * 0.05f else 0f)
 
     //  Colours
+    val statusColors = LocalOutspokeStatusColors.current
     val backgroundColor by animateColorAsState(
         targetValue = when {
             !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-            isContinuousActive -> MaterialTheme.colorScheme.error
-            effectiveListening -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.surfaceVariant
+            // Any live recording state reads as "tap to stop"; the stop role is a container-grade
+            // red instead of colorScheme.error, which in dark mode is a pastel meant for text.
+            isContinuousActive || effectiveListening -> statusColors.stop
+            else -> MaterialTheme.colorScheme.primary
         },
         label = "talkButtonBackground",
     )
     val iconTint by animateColorAsState(
         targetValue = when {
             !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-            isContinuousActive -> MaterialTheme.colorScheme.onError
-            effectiveListening -> MaterialTheme.colorScheme.onPrimary
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
+            isContinuousActive || effectiveListening -> statusColors.onStop
+            else -> MaterialTheme.colorScheme.onPrimary
         },
         label = "talkButtonIconTint",
     )
@@ -145,7 +167,7 @@ fun TalkButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(72.dp)
+            .size(TalkButtonSize)
             .then(
                 if (enabled) Modifier.pointerInput(triggerMode, true) {
                     val thresholdPx = CONTINUOUS_DRAG_THRESHOLD_DP * density
@@ -233,14 +255,16 @@ fun TalkButton(
         ) {
             Icon(
                 imageVector = if (isContinuousActive) MyIcons.Stop else MyIcons.Mic,
-                contentDescription = when {
-                    !enabled -> "Talk button disabled - engine not ready"
-                    isContinuousActive -> "Stop continuous recording"
-                    isListening && triggerMode == "TAP_TOGGLE" -> "Tap to stop recording"
-                    isListening -> "Stop recording"
-                    triggerMode == "TAP_TOGGLE" -> "Tap to start recording"
-                    else -> "Start recording (hold) · swipe up to lock"
-                },
+                contentDescription = stringResource(
+                    when {
+                        !enabled -> R.string.cd_talk_disabled
+                        isContinuousActive -> R.string.cd_stop_continuous
+                        isListening && triggerMode == "TAP_TOGGLE" -> R.string.cd_tap_stop
+                        isListening -> R.string.cd_stop_recording
+                        triggerMode == "TAP_TOGGLE" -> R.string.cd_tap_start
+                        else -> R.string.cd_hold_start_lock
+                    },
+                ),
                 tint = iconTint,
                 modifier = Modifier.size(32.dp),
             )

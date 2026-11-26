@@ -20,7 +20,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 | Package | Key files | Responsibility |
 |---|---|---|
 |`inference`|`SpeechEngine`, `ParakeetEngine`, `ChunkStreamingEngine`, `WhisperEngine`, `VoxtralEngine`, `InferenceRepository`, `InferenceService`, `SpeechEngineFactory`, `TranscriptResult`, `EngineState`, `PipelineDiagnostics`, `NumberNormaliser`, `GrammarCorrector`, `AcousticCandidates`|ASR pipeline, sliding window, post-processing, foreground service, acoustic word-alternative capture|
-| `audio` | `AudioCaptureManager`, `MicCalibrationManager`, `SileroVadFilter`, `RMSVadFilter`, `VadFilter`, `AudioChunk`, `PermissionHelper` | Mic capture + VAD + optional mic calibration |
+| `audio` | `AudioCaptureManager`, `SpectrumAnalyzer`, `MicCalibrationManager`, `SileroVadFilter`, `RMSVadFilter`, `VadFilter`, `AudioChunk`, `PermissionHelper` | Mic capture + VAD + spectrum analysis for the level meter + optional mic calibration |
 | `ime` | `OutspokeInputMethodService`, `TextInjector`, `TranscriptAligner`, `EnterAction`, `WordSuggestionProvider` | Keyboard / text insertion |
 | `ime/correction` | `WordCorrector`, `CandidateGenerator`, `ArpaLanguageModel`, `SuggestionFileDownloader`, `SuggestionFileManager`, `SuggestionLanguage`, `DoubleMetaphone`, `KolnerPhonetik`, `EditDistance` | On-device word correction + language pack management |
 | `settings/model` | `ModelRegistry`, `ModelId`, `ModelDownloadManager`, `ModelStorageManager`, `ModelState`, `ModelViewModel`, `DownloadService` | Model lifecycle |
@@ -28,7 +28,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 | `settings/screens` | `HomeScreen`, `ModelScreen`, `PreferencesScreen`, `MicCalibrationScreen` | Settings Compose UI |
 | `ui/keyboard` | `KeyboardViewModel`, `KeyboardUiState`, `KeyboardScreen`, `ImeComposeView`, `WordAtCursor` | IME Compose hosting, UI state |
 | `ui/keyboard/components` | `TalkButton`, `SuggestionBar`, `WaveformBar`, `StatusIndicator`, `KeyboardActionButton`, `KeyboardTutorialOverlay`, `LanguageSelector` | Keyboard UI sub-components |
-| `ui/theme` | `OutspokeKeyboardTheme` | Compose theming |
+| `ui/theme` | `Theme`, `Color`, `Type`, `MyIcons` | Fixed palette (app + keyboard schemes), status/surface locals, shapes, type ramp |
 
 ## Architecture — What Isn't Obvious from Single Files
 
@@ -50,9 +50,19 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 
 **Number formatting:** `NumberNormaliser` combines only grammatically valid number phrases. Punctuation and separate counting words end a phrase; the countdown from ten to one must remain ten separate numbers, never their sum. Stutter and phrase cleanup preserve number-only repetitions such as dictated codes.
 
+**The keyboard strip is a fixed-height box that clips.** The IME window is 20 % of the usable screen height (~160 dp on a 1080 p phone), so the vertical budget is exactly: status row (42 dp) + 4 + waveform (22) + talk button (68) + 4 top + 20 bottom gesture-pill clearance. Nothing may add a row: `StatusPill` is a fixed 32 dp single line with ellipsized text, error / engine-loading actions live *inside* the pill (`PillAction`), and the Whisper language chips sit in the status row (hidden while recording). The 20 dp bottom floor is not decoration — gesture-nav devices report a 0 px nav bar while the system gesture pill still covers the bottom ~14 dp of the window.
+
+**Never fake a colour role with `colorScheme.x.copy(alpha=…)`.** States that Material has no role for go through `LocalOutspokeStatusColors` (success / warning / `stop` red for the live talk button) or `LocalOutspokeSurfaceRoles` (card / raised fills — in dark mode `surfaceContainer` is *lighter* than the page, so cards need the explicit role). Material dynamic colour is deliberately off: wallpaper-derived purples clashed with the brand teal.
+
+**Visual check without a mic:** debug-only activities render the real screens — `am start -n dev.brgr.outspoke/dev.brgr.outspoke.devtools.KeyboardPreviewActivity --es state idle|listening|suggestions|whisper|error` and `…/CompanionPreviewActivity --es screen home|model|pref_input|pref_speech|tools|calibration`; toggle dark mode with `cmd uimode night yes`. They live in `app/src/debug/` and are never packaged in release builds.
+
 **Recording completion:** the space key preserves composing text before inserting a space. `trailing_space` defaults to false and adds a separator once after successful flow completion, including when the last utterance ended at a silence boundary. The IME observes `KeyboardViewModel.isRecording` for `FLAG_KEEP_SCREEN_ON`, independently of transcript UI state.
 
 **VAD is dual-layer:** `SileroVadFilter` (Silero v4 ONNX) is primary; `RMSVadFilter` (energy threshold) is the automatic fallback if the ONNX VAD model fails to load. Runtime neural errors switch the existing smoother to energy detection for the rest of the recording, preserving speech instead of classifying failures as silence.
+
+**Keyboard level meter is a mirrored band spectrum:** `audio/SpectrumAnalyzer` runs a 512-point FFT over each 480-sample chunk (DC blocker → Hann → radix-2 FFT → 20 log-spaced bands, -60 dBFS floor) with no per-chunk allocation, and `AudioCaptureManager` publishes the result as `spectrum: StateFlow<SpectrumFrame?>` — analysed every chunk (the attack/release smoothing needs the 33 Hz cadence) but emitted at ~20 Hz with a **copied** band array, because the analyzer reuses its buffer and must never mutate what Compose is drawing. `WaveformBar` draws band `i` at `centre ± i` (bass centre, treble edges — sibilants bloom at both ends) in one Canvas pass; temporal smoothing lives in the analyzer, not in 20 Compose animation states. `spectrum = null` (idle, or a capture path without analysis) falls back to the RMS gaussian row at the *same* 41-bar width. Its design rationale and rejected variants: `docs/level-meter-proposal.md`.
+
+**The suggestion bar is a slot sibling, never an overlay:** `KeyboardScreen` puts the bar slot and the keyboard content in a `Column` and lets the content take the remaining height, while the service grows/shrinks the IME window by the slot height. `SuggestionBar` holds its slot for the whole slide-out and collapses it 50 ms *before* the service shrinks the window. The previous shape — a fixed-height, bottom-pinned content box sized from a service-supplied `keyboardContentHeightPx`, with the bar overlaid on top — let those two numbers disagree, which drew the bar shelf across the status row and cut the status pill in half. Do not reintroduce a px height passed down for layout.
 
 **Word-suggestion / correction feature (new in v0.2.0):**
 - `SuggestionBar` (keyboard UI) appears after a dictation commit and shows up to 5 correction candidates for the word under the cursor.

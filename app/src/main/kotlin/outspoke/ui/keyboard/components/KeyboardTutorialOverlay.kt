@@ -5,7 +5,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
+import dev.brgr.outspoke.ui.theme.OutspokeShapes
 
 
 /** Identifies each keyboard button in the first-run tutorial walk-through. */
@@ -85,13 +85,21 @@ private val TUTORIAL_STEPS = listOf(
 )
 
 /**
+ * Opacity of the tutorial scrim (`0xBB` of `255`). Kept as a constant because the preview
+ * mirror of this overlay ([KeyboardTutorialOverlayPreview]) paints the same scrim and must not
+ * drift from the shipped value.
+ */
+internal const val TUTORIAL_SCRIM_ALPHA = 187 / 255f
+
+/**
  * Step-by-step spotlight tutorial that overlays the live keyboard.
  *
- * A dark translucent scrim covers the keyboard; one button at a time is punched
+ * A translucent `scrim` covers the keyboard; one button at a time is punched
  * through with a circular spotlight and highlighted by a pulsing coloured ring.
- * An explanation card appears in the open area above (or below when the spotlight
- * is in the upper half, e.g. the Switch Keyboard button).
- * "Skip" dismisses immediately; "Next" advances through all six steps; on the
+ * An explanation card (`surfaceContainerHigh`, [OutspokeShapes.card], no shadow) appears in the
+ * open area above (or below when the spotlight is in the upper half, e.g. the Switch Keyboard
+ * button).
+ * "Skip" dismisses immediately as a text button; "Next" advances through all six steps; on the
  * final step the button reads "Got it!" and dismisses the tutorial permanently.
  *
  * @param positions      Shared [TutorialPositions] populated by [KeyboardScreen]'s buttons.
@@ -117,6 +125,8 @@ fun KeyboardTutorialOverlay(
     val step = TUTORIAL_STEPS[currentStep]
 
     val primaryColor = MaterialTheme.colorScheme.primary
+    // Read the scrim role outside the Canvas draw lambda, which is not a composable scope.
+    val scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = TUTORIAL_SCRIM_ALPHA)
 
     // Pulsing glow for the spotlight ring
     val infiniteTransition = rememberInfiniteTransition(label = "tutorialGlow")
@@ -155,8 +165,8 @@ fun KeyboardTutorialOverlay(
                 .fillMaxSize()
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen),
         ) {
-            // Draw opaque dark scrim
-            drawRect(Color(0xBB000000))
+            // Draw the scrim role at the tutorial's fixed opacity
+            drawRect(scrimColor)
 
             // Punch a circular hole where the current button sits.
             // Average width+height rather than taking the max so wide buttons
@@ -245,9 +255,9 @@ private fun StepContent(
         // Explanation card at the top - used when the spotlight is in the lower half
         if (!cardAtBottom) {
             Card(
-                shape = RoundedCornerShape(12.dp),
+                shape = OutspokeShapes.card,
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
@@ -281,9 +291,9 @@ private fun StepContent(
         ) {
             if (cardAtBottom) {
                 Card(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = OutspokeShapes.card,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -302,16 +312,16 @@ private fun StepContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
+                // Secondary action: a text button, so only "Next" carries a filled container.
+                TextButton(
                     onClick = onSkip,
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                 ) {
                     Text(
                         text = skipLabel,
                         style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Button(
@@ -346,8 +356,8 @@ private fun ExplanationCardContent(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = "${stepIndex + 1} / $totalSteps",
@@ -357,8 +367,8 @@ private fun ExplanationCardContent(
         }
         Text(
             text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

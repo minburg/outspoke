@@ -72,6 +72,7 @@ private fun SettingsNavHost(navController: NavHostController) {
         SettingsRoutes.PREF_INPUT -> stringResource(R.string.nav_title_input)
         SettingsRoutes.PREF_SPEECH -> stringResource(R.string.nav_title_speech)
         SettingsRoutes.PREF_TOOLS -> stringResource(R.string.nav_title_tools)
+        SettingsRoutes.CALIBRATION -> stringResource(R.string.nav_title_calib)
         else -> stringResource(R.string.app_name)
     }
 

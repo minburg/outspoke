@@ -162,5 +162,23 @@
         Standardquelle wird das Lautsprecher-Signal aus dem Mikrofon entfernt und es wird Stille transkribiert. In
         lauten Räumen etwas weniger saubere Aufnahme.
     </string>
+
+    <!-- Gemeinsamer Status-Wortlaut (Chips, badges) -->
+    <string name="status_listening">Hört zu</string>
+
+    <!-- Tastatur: accessible Namen für Sprachtaste und Statusanzeige -->
+    <string name="cd_talk_disabled">Sprachtaste deaktiviert - Engine nicht bereit</string>
+    <string name="cd_stop_continuous">Daueraufnahme beenden</string>
+    <string name="cd_tap_stop">Tippen, um Aufnahme zu beenden</string>
+    <string name="cd_stop_recording">Aufnahme beenden</string>
+    <string name="cd_tap_start">Tippen, um Aufnahme zu starten</string>
+    <string name="cd_hold_start_lock">Aufnahme starten (halten) - zum Fixieren nach oben wischen</string>
+
+    <!-- Modell-Download -->
+    <string name="model_progress_format">%1$d %% von ca. %2$d MB</string>
+
+    <!-- Mikrofon-Kalibrierung -->
+    <string name="nav_title_calib">Mikrofon-Kalibrierung</string>
+    <string name="calib_score_format">Hochton %1$d %%  ·  SNR %2$d dB</string>
 </resources>
 

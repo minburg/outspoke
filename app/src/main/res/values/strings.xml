@@ -192,8 +192,6 @@
     <string name="calib_get_ready">Get ready to say \'thanks\'</string>
     <string name="calib_done">Calibration complete</string>
     <string name="calib_best">Best microphone</string>
-    <string name="calib_hf">High-freq</string>
-    <string name="calib_snr">SNR</string>
     <string name="calib_saved">Saved as preferred microphone</string>
     <string name="calib_run_again">Run again</string>
     <string name="calib_no_mics">No microphones found.</string>
@@ -201,4 +199,22 @@
     <string name="cd_insert_space">Insert space</string>
     <string name="pref_trailing_space_title">Space after dictation</string>
     <string name="pref_trailing_space_summary">Add a space after you stop recording and the full transcription is finished.</string>
+
+    <!-- Shared status wording (chips, badges) -->
+    <string name="status_listening">Listening</string>
+
+    <!-- Keyboard: accessible names for the talk button and status pill -->
+    <string name="cd_talk_disabled">Talk button disabled - engine not ready</string>
+    <string name="cd_stop_continuous">Stop continuous recording</string>
+    <string name="cd_tap_stop">Tap to stop recording</string>
+    <string name="cd_stop_recording">Stop recording</string>
+    <string name="cd_tap_start">Tap to start recording</string>
+    <string name="cd_hold_start_lock">Start recording (hold) - swipe up to lock</string>
+
+    <!-- Model download progress -->
+    <string name="model_progress_format">%1$d%% of ~%2$d MB</string>
+
+    <!-- Microphone calibration -->
+    <string name="nav_title_calib">Microphone Calibration</string>
+    <string name="calib_score_format">High-freq %1$d%%  ·  SNR %2$d dB</string>
 </resources>

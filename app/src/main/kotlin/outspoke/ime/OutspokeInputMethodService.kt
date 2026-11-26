@@ -396,7 +396,10 @@ class OutspokeInputMethodService :
      * Should be >= the visual animation duration so the window never shrinks mid-animation.
      * A small additional buffer (50 ms) absorbs frame-timing variance.
      */
-    private val SUGGESTION_BAR_HIDE_DELAY_MS = 270L  // 220 ms anim + 50 ms buffer
+    // Must be >= SUGGESTION_BAR_ANIM_DURATION_MS (300 ms) or the window shrinks mid-slide and
+    // cuts the bar's exit animation short; + 20 ms absorbs frame-timing variance. The bar
+    // collapses its slot 50 ms before this fires, so the two never fight over the same pixels.
+    private val SUGGESTION_BAR_HIDE_DELAY_MS = 320L
 
     /** Runnable that actually shrinks the window after the bar hide animation completes. */
     private val shrinkWindowRunnable = Runnable {
@@ -485,7 +488,6 @@ class OutspokeInputMethodService :
                             )
                         },
                         onSuggestionBarHeightChanged = { barPx -> updateImeHeight(barPx) },
-                        keyboardContentHeightPx = keyboardHeightPx,
                         navBarHeightPx = navBarHeightPx,
                     )
                 }

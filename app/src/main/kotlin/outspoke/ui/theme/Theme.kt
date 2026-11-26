@@ -1,84 +1,248 @@
 package dev.brgr.outspoke.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+/**
+ * Outspoke's one visual system.
+ *
+ * Both the companion app and the keyboard use the same "Graphite" tokens; the keyboard
+ * gets its own slightly stronger neutral ramp because it floats above arbitrary host
+ * apps and must separate its keys without shadows. Material You (dynamic colour) is
+ * deliberately not used: a dictation keyboard has exactly one signal colour - teal for
+ * "the mic is live" - and wallpaper-derived palettes destroy that, which is also how the
+ * old purple `tertiary` default ended up painting the waveform.
+ */
+
+// ── Companion app ─────────────────────────────────────────────────────────────
+
+private val AppLightColorScheme = lightColorScheme(
+    primary = AppPrimaryLight, onPrimary = AppOnPrimaryLight,
+    primaryContainer = AppPrimaryContainerLight, onPrimaryContainer = AppOnPrimaryContainerLight,
+    secondary = AppSecondaryLight, onSecondary = AppOnSecondaryLight,
+    secondaryContainer = AppSecondaryContainerLight, onSecondaryContainer = AppOnSecondaryContainerLight,
+    // Tertiary is a second neutral-green, never a third hue: nothing in this app should
+    // compete with the accent.
+    tertiary = AppSecondaryLight, onTertiary = AppOnSecondaryLight,
+    tertiaryContainer = AppSecondaryContainerLight, onTertiaryContainer = AppOnSecondaryContainerLight,
+    error = AppErrorLight, onError = AppOnErrorLight,
+    errorContainer = AppErrorContainerLight, onErrorContainer = AppOnErrorContainerLight,
+    background = AppBackgroundLight, onBackground = AppOnBackgroundLight,
+    surface = AppSurfaceLight, onSurface = AppOnSurfaceLight,
+    surfaceVariant = AppSurfaceVariantLight, onSurfaceVariant = AppOnSurfaceVariantLight,
+    surfaceContainerLowest = AppSurfaceLowestLight, surfaceContainerLow = AppSurfaceLowLight,
+    surfaceContainer = AppSurfaceContainerLight, surfaceContainerHigh = AppSurfaceHighLight,
+    surfaceContainerHighest = AppSurfaceHighestLight,
+    surfaceDim = AppBackgroundLight, surfaceBright = AppSurfaceLowestLight,
+    outline = AppOutlineLight, outlineVariant = AppOutlineVariantLight,
+    inverseSurface = AppInverseSurfaceLight, inverseOnSurface = AppInverseOnSurfaceLight,
+    inversePrimary = AppInversePrimaryLight,
+    scrim = Color(0xFF000000),
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+private val AppDarkColorScheme = darkColorScheme(
+    primary = AppPrimaryDark, onPrimary = AppOnPrimaryDark,
+    primaryContainer = AppPrimaryContainerDark, onPrimaryContainer = AppOnPrimaryContainerDark,
+    secondary = AppSecondaryDark, onSecondary = AppOnSecondaryDark,
+    secondaryContainer = AppSecondaryContainerDark, onSecondaryContainer = AppOnSecondaryContainerDark,
+    tertiary = AppSecondaryDark, onTertiary = AppOnSecondaryDark,
+    tertiaryContainer = AppSecondaryContainerDark, onTertiaryContainer = AppOnSecondaryContainerDark,
+    error = AppErrorDark, onError = AppOnErrorDark,
+    errorContainer = AppErrorContainerDark, onErrorContainer = AppOnErrorContainerDark,
+    background = AppBackgroundDark, onBackground = AppOnBackgroundDark,
+    surface = AppSurfaceDark, onSurface = AppOnSurfaceDark,
+    surfaceVariant = AppSurfaceVariantDark, onSurfaceVariant = AppOnSurfaceVariantDark,
+    surfaceContainerLowest = AppSurfaceLowestDark, surfaceContainerLow = AppSurfaceLowDark,
+    surfaceContainer = AppSurfaceContainerDark, surfaceContainerHigh = AppSurfaceHighDark,
+    surfaceContainerHighest = AppSurfaceHighestDark,
+    surfaceDim = AppBackgroundDark, surfaceBright = AppSurfaceHighestDark,
+    outline = AppOutlineDark, outlineVariant = AppOutlineVariantDark,
+    inverseSurface = AppInverseSurfaceDark, inverseOnSurface = AppInverseOnSurfaceDark,
+    inversePrimary = AppInversePrimaryDark,
+    scrim = Color(0xFF000000),
 )
 
-@Composable
-fun OutspokeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
-}
-
-// Keyboard colour schemes - one for each system theme setting.
-private val KeyboardDarkColorScheme = darkColorScheme(
-    primary = KeyboardAccent,
-    onPrimary = KeyboardOnAccent,
-    background = KeyboardBackground,
-    onBackground = KeyboardOnSurface,
-    surface = KeyboardSurface,
-    onSurface = KeyboardOnSurface,
-    surfaceVariant = KeyboardSurfaceVariant,
-    onSurfaceVariant = KeyboardOnSurfaceVariant,
-    error = KeyboardError,
-)
+// ── Keyboard ──────────────────────────────────────────────────────────────────
 
 private val KeyboardLightColorScheme = lightColorScheme(
-    primary = KeyboardLightAccent,
-    onPrimary = KeyboardLightOnAccent,
-    background = KeyboardLightBackground,
-    onBackground = KeyboardLightOnSurface,
-    surface = KeyboardLightSurface,
-    onSurface = KeyboardLightOnSurface,
-    surfaceVariant = KeyboardLightSurfaceVariant,
-    onSurfaceVariant = KeyboardLightOnSurfaceVariant,
-    error = KeyboardLightError,
+    primary = KeyboardPrimaryLight, onPrimary = KeyboardOnPrimaryLight,
+    primaryContainer = KeyboardPrimaryContainerLight, onPrimaryContainer = KeyboardOnPrimaryContainerLight,
+    secondary = KeyboardSecondaryLight, onSecondary = KeyboardOnPrimaryLight,
+    secondaryContainer = KeyboardSecondaryContainerLight, onSecondaryContainer = KeyboardOnSecondaryContainerLight,
+    tertiary = KeyboardSecondaryLight, onTertiary = KeyboardOnPrimaryLight,
+    tertiaryContainer = KeyboardSecondaryContainerLight, onTertiaryContainer = KeyboardOnSecondaryContainerLight,
+    error = KeyboardErrorLight, onError = KeyboardOnErrorLight,
+    errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF410E0B),
+    background = KeyboardBackgroundLight, onBackground = KeyboardOnBackgroundLight,
+    surface = KeyboardSurfaceLight, onSurface = KeyboardOnSurfaceLight,
+    surfaceVariant = KeyboardSurfaceVariantLight, onSurfaceVariant = KeyboardOnSurfaceVariantLight,
+    surfaceContainerLowest = KeyboardSurfaceLowestLight, surfaceContainerLow = KeyboardSurfaceLowLight,
+    surfaceContainer = KeyboardSurfaceContainerLight, surfaceContainerHigh = KeyboardSurfaceHighLight,
+    surfaceContainerHighest = KeyboardSurfaceHighestLight,
+    outline = KeyboardOutlineLight, outlineVariant = KeyboardOutlineVariantLight,
+    scrim = Color(0xFF000000),
+)
+
+private val KeyboardDarkColorScheme = darkColorScheme(
+    primary = KeyboardPrimaryDark, onPrimary = KeyboardOnPrimaryDark,
+    primaryContainer = KeyboardPrimaryContainerDark, onPrimaryContainer = KeyboardOnPrimaryContainerDark,
+    secondary = KeyboardSecondaryDark, onSecondary = KeyboardOnPrimaryDark,
+    secondaryContainer = KeyboardSecondaryContainerDark, onSecondaryContainer = KeyboardOnSecondaryContainerDark,
+    tertiary = KeyboardSecondaryDark, onTertiary = KeyboardOnPrimaryDark,
+    tertiaryContainer = KeyboardSecondaryContainerDark, onTertiaryContainer = KeyboardOnSecondaryContainerDark,
+    error = KeyboardErrorDark, onError = KeyboardOnErrorDark,
+    errorContainer = Color(0xFF6C2A24), onErrorContainer = Color(0xFFFFDAD5),
+    background = KeyboardBackgroundDark, onBackground = KeyboardOnBackgroundDark,
+    surface = KeyboardSurfaceDark, onSurface = KeyboardOnSurfaceDark,
+    surfaceVariant = KeyboardSurfaceVariantDark, onSurfaceVariant = KeyboardOnSurfaceVariantDark,
+    surfaceContainerLowest = KeyboardSurfaceLowestDark, surfaceContainerLow = KeyboardSurfaceLowDark,
+    surfaceContainer = KeyboardSurfaceContainerDark, surfaceContainerHigh = KeyboardSurfaceHighDark,
+    surfaceContainerHighest = KeyboardSurfaceHighestDark,
+    outline = KeyboardOutlineDark, outlineVariant = KeyboardOutlineVariantDark,
+    scrim = Color(0xFF000000),
+)
+
+// ── Status colours beyond the Material role set ───────────────────────────────
+
+/**
+ * "This is done / healthy" colour. Separate from [androidx.compose.material3.ColorScheme.primary]
+ * because on the keyboard the accent is reserved for the live recording state; a done
+ * badge must never look like the mic is hot.
+ */
+@Immutable
+data class OutspokeStatusColors(
+    val success: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+    /** Fill/tint of the live "tap to stop" talk button; see [StopDark]. */
+    val stop: Color,
+    val onStop: Color,
+)
+
+private val StatusLight = OutspokeStatusColors(
+    success = SuccessLight, successContainer = SuccessContainerLight, onSuccessContainer = OnSuccessContainerLight,
+    warning = WarningLight, warningContainer = WarningContainerLight, onWarningContainer = OnWarningContainerLight,
+    stop = StopLight, onStop = OnStopLight,
+)
+private val StatusDark = OutspokeStatusColors(
+    success = SuccessDark, successContainer = SuccessContainerDark, onSuccessContainer = OnSuccessContainerDark,
+    warning = WarningDark, warningContainer = WarningContainerDark, onWarningContainer = OnWarningContainerDark,
+    stop = StopDark, onStop = OnStopDark,
 )
 
 /**
- * Theme wrapper for the keyboard UI. Follows the system dark/light mode setting so the
- * keyboard blends naturally on both dark and light-themed devices.
+ * Success/"done" colours, provided by both themes. Read it with
+ * `LocalOutspokeStatusColors.current.success`.
+ */
+val LocalOutspokeStatusColors = staticCompositionLocalOf { StatusLight }
+
+// ── Surface roles ─────────────────────────────────────────────────────────────
+
+/**
+ * Surfaces that have no single Material role, because "card" and "page" want to move in
+ * opposite directions in the two schemes: on the light background (#F3F6F5) a card has to
+ * be *lighter* than the page, while on the dark background it has to be *lighter* out of a
+ * surface that equals the page. Picking a stock container per screen is how the two
+ * screens ended up disagreeing, so the pair is named once here.
+ */
+@Immutable
+data class OutspokeSurfaceRoles(
+    /** Card / list-row background sitting on [androidx.compose.material3.ColorScheme.background]. */
+    val card: Color,
+)
+
+private val SurfacesLight = OutspokeSurfaceRoles(card = AppSurfaceLight)
+private val SurfacesDark = OutspokeSurfaceRoles(card = AppSurfaceContainerDark)
+private val KeyboardSurfacesLight = OutspokeSurfaceRoles(card = KeyboardSurfaceLight)
+private val KeyboardSurfacesDark = OutspokeSurfaceRoles(card = KeyboardSurfaceDark)
+
+/** Read it with `LocalOutspokeSurfaceRoles.current.card`. */
+val LocalOutspokeSurfaceRoles = staticCompositionLocalOf { SurfacesLight }
+
+// ── Shapes ────────────────────────────────────────────────────────────────────
+
+/**
+ * One radius scale for the whole product:
+ * [KeyRadius] keyboard keys · [CardRadius] list rows and cards · [DialogRadius] dialogs.
+ */
+object OutspokeShapes {
+    val key: RoundedCornerShape = RoundedCornerShape(12.dp)
+    val card: RoundedCornerShape = RoundedCornerShape(16.dp)
+    val dialog: RoundedCornerShape = RoundedCornerShape(20.dp)
+    val chip: RoundedCornerShape = RoundedCornerShape(percent = 50)
+}
+
+private val OutspokeShapeScheme = Shapes(
+    extraSmall = RoundedCornerShape(6.dp),
+    small = OutspokeShapes.key,
+    medium = OutspokeShapes.card,
+    large = OutspokeShapes.dialog,
+    extraLarge = RoundedCornerShape(28.dp),
+)
+
+// ── Themes ────────────────────────────────────────────────────────────────────
+
+/** Theme for the companion (settings) app. Follows the system light/dark setting. */
+@Composable
+fun OutspokeTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    OutspokeLocals(darkTheme = darkTheme, surfaces = if (darkTheme) SurfacesDark else SurfacesLight) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) AppDarkColorScheme else AppLightColorScheme,
+            typography = OutspokeTypography,
+            shapes = OutspokeShapeScheme,
+            content = content,
+        )
+    }
+}
+
+/**
+ * Theme for the keyboard input view. Follows the system light/dark setting so the strip
+ * reads correctly on both dark and light hosts, while keeping the brand accent identical
+ * in both.
  */
 @Composable
 fun OutspokeKeyboardTheme(content: @Composable () -> Unit) {
-    val colorScheme = if (isSystemInDarkTheme()) KeyboardDarkColorScheme else KeyboardLightColorScheme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
+    val dark = isSystemInDarkTheme()
+    OutspokeLocals(
+        darkTheme = dark,
+        surfaces = if (dark) KeyboardSurfacesDark else KeyboardSurfacesLight,
+    ) {
+        MaterialTheme(
+            colorScheme = if (dark) KeyboardDarkColorScheme else KeyboardLightColorScheme,
+            typography = OutspokeTypography,
+            shapes = OutspokeShapeScheme,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun OutspokeLocals(
+    darkTheme: Boolean,
+    surfaces: OutspokeSurfaceRoles,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(
+        LocalOutspokeStatusColors provides if (darkTheme) StatusDark else StatusLight,
+        LocalOutspokeSurfaceRoles provides surfaces,
         content = content,
     )
 }
-
-
-
-

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.brgr.outspoke.audio.AudioCaptureManager
+import dev.brgr.outspoke.audio.SpectrumFrame
 import dev.brgr.outspoke.ime.EnterAction
 import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.ime.WordSuggestionProvider
@@ -39,6 +40,12 @@ class KeyboardViewModel(
 
     /** Normalised RMS amplitude [0.0, 1.0] - updated by [AudioCaptureManager] per chunk. */
     val amplitude: StateFlow<Float> = audioCaptureManager.amplitude
+
+    /**
+     * Log-spaced band energies for the level meter, or `null` while capture is idle.
+     * Passive: the flow only carries values while a recording is running.
+     */
+    val spectrum: StateFlow<SpectrumFrame?> = audioCaptureManager.spectrum
 
     val trailingSpace = appPreferences.trailingSpace
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

@@ -60,7 +60,11 @@ fun InputPreferencesScreen(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.pref_trailing_space_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.pref_trailing_space_summary), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.pref_trailing_space_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Switch(checked = trailingSpace, onCheckedChange = null)
         }
@@ -134,6 +138,19 @@ fun ToolsPreferencesScreen(
     }
 }
 
+/**
+ * Selected segments take the tonal "selected pill" fill (`primaryContainer`); unselected
+ * ones stay neutral `surfaceVariant` so only the chosen option carries accent weight.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun segmentColors(): SegmentedButtonColors = SegmentedButtonDefaults.colors(
+    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    inactiveContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
 /** Shared scroll container for the category preference screens. */
 @Composable
 private fun PreferencesColumn(content: @Composable ColumnScope.() -> Unit) {
@@ -173,7 +190,7 @@ private fun MicSection(
 
         Text(
             text = stringResource(R.string.pref_raw_mic_title),
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
         )
         Text(
             text = stringResource(R.string.pref_raw_mic_subtitle),
@@ -188,7 +205,8 @@ private fun MicSection(
             Text(
                 text = if (rawMicCapture) stringResource(R.string.state_enabled)
                 else stringResource(R.string.state_disabled),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
                 checked = rawMicCapture,
@@ -219,6 +237,7 @@ private fun TriggerModeSection(
                 selected = triggerMode == "HOLD",
                 onClick = { onTriggerModeChange("HOLD") },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                colors = segmentColors(),
             ) {
                 Text(stringResource(R.string.pref_trigger_hold))
             }
@@ -226,6 +245,7 @@ private fun TriggerModeSection(
                 selected = triggerMode == "TAP_TOGGLE",
                 onClick = { onTriggerModeChange("TAP_TOGGLE") },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                colors = segmentColors(),
             ) {
                 Text(stringResource(R.string.pref_trigger_tap_toggle))
             }
@@ -254,6 +274,7 @@ private fun DeleteButtonSection(
                 selected = deleteButtonMode == "DELETE_ALL",
                 onClick = { onDeleteButtonModeChange("DELETE_ALL") },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                colors = segmentColors(),
             ) {
                 Text(stringResource(R.string.pref_delete_all))
             }
@@ -261,6 +282,7 @@ private fun DeleteButtonSection(
                 selected = deleteButtonMode == "DELETE_LAST_SENTENCE",
                 onClick = { onDeleteButtonModeChange("DELETE_LAST_SENTENCE") },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                colors = segmentColors(),
             ) {
                 Text(stringResource(R.string.pref_delete_last_sentence))
             }
@@ -291,7 +313,8 @@ private fun VadSection(
             Text(
                 text = if (vadSensitivity) stringResource(R.string.state_enabled)
                 else stringResource(R.string.state_disabled),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
                 checked = vadSensitivity,
@@ -324,7 +347,8 @@ private fun PostprocessingSection(
             Text(
                 text = if (postprocessingEnabled) stringResource(R.string.state_enabled)
                 else stringResource(R.string.pref_postprocessing_disabled_raw),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
                 checked = postprocessingEnabled,
@@ -366,7 +390,8 @@ private fun SuggestionBarSection(
             Text(
                 text = if (suggestionBarEnabled) stringResource(R.string.pref_suggestion_bar_enabled)
                 else stringResource(R.string.pref_suggestion_bar_disabled),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
                 checked = suggestionBarEnabled,
@@ -378,7 +403,7 @@ private fun SuggestionBarSection(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.pref_suggestion_bar_languages_title),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
             )
             Text(
                 text = stringResource(R.string.pref_suggestion_bar_languages_subtitle),
@@ -470,7 +495,8 @@ private fun DiagnosticsSection(
             Text(
                 text = if (showPipelineDiagnostics) stringResource(R.string.pref_diagnostics_visible)
                 else stringResource(R.string.pref_diagnostics_hidden),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
                 checked = showPipelineDiagnostics,
@@ -513,7 +539,7 @@ private fun SuggestionLanguageRow(
         ) {
             Text(
                 text = language.displayName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
 
@@ -563,7 +589,11 @@ private fun SuggestionLanguageRow(
         if (downloadState is SuggestionDownloadState.Downloading) {
             LinearProgressIndicator(
                 progress = { downloadState.progress },
-                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
             )
         }
 
