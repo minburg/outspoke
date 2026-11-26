@@ -122,10 +122,12 @@ class NumbersRealAudioTest {
             ?: results.filterIsInstance<TranscriptResult.Partial>().lastOrNull()?.text
             ?: ""
 
-        assertThat(finalText)
-            .describedAs("Countdown must stream through as individual digits (got '%s')", finalText)
-            .contains("10 9 8 7 6")
-            .contains("5 4 3 2 1")
-            .doesNotContain("55")
+        // Model-independent contract (v0.4.0 regression): every countdown digit must
+        // survive individually, never summed into "55". Digit-sequence equality is
+        // asserted instead of spacing because punctuation between digits (e.g. "10, 9, …")
+        // is a model formatting choice, not part of the contract.
+        assertThat(finalText.filter { it.isDigit() })
+            .describedAs("Countdown digits must survive individually (got '%s')", finalText)
+            .isEqualTo("10987654321")
     }
 }
