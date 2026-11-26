@@ -48,6 +48,17 @@ private const val TAIL_COMMIT_WORDS = 12
 private const val FIELD_SCAN_CHARS = 800
 
 /**
+ * Hard ceiling on what one press of the delete button may remove in last-sentence mode.
+ *
+ * Without it, a field that holds dictated text with no sentence-ending punctuation (a Note app
+ * with a page of comma-spliced prose, a pasted log) counts as "one big sentence" and a single
+ * press wipes the whole page - and a second press would take the page before it. 400 characters
+ * is far above anything one dictation utterance can produce (the inference window caps at 30 s),
+ * so a real sentence is always removable while the page in front of it cannot be.
+ */
+private const val MAX_SENTENCE_DELETE_CHARS = 400
+
+/**
  * Number of words to drop from the *tail* of the composing span when [TextInjector.resetAfterTrim]
  * commits it to the field.
  *
@@ -1000,18 +1011,24 @@ class TextInjector(
     }
 
     /**
-     * Deletes the last sentence from the text before the cursor.
+     * Deletes the last sentence from the text before the cursor, up to [MAX_SENTENCE_DELETE_CHARS].
      *
      * A sentence boundary is a sentence-ending punctuation (`.`, `!`, `?`)
      * immediately followed by whitespace. The trailing whitespace after the
      * final punctuation is deleted together with the sentence; the separating
      * whitespace before the sentence is kept.
      *
-     * When no boundary exists the whole text before the cursor is treated as
-     * one sentence and deleted. Text after the cursor is never touched.
+     * Only the last [MAX_SENTENCE_DELETE_CHARS] characters are ever examined, so text that has no
+     * sentence-ending punctuation anywhere (a page of prose in a Note app) cannot be swallowed: the
+     * deletion stops at the window edge instead of at the start of the field. When the window is
+     * full and no boundary was found inside it, the cut snaps forward to the next word start so a
+     * word is never sliced in half - the partial word left behind belongs to the older text.
+     *
+     * Text after the cursor is never touched.
      */
     fun deleteLastSentence() {
-        val before = inputConnection.getTextBeforeCursor(100_000, 0)?.toString() ?: return
+        val before = inputConnection.getTextBeforeCursor(MAX_SENTENCE_DELETE_CHARS, 0)?.toString()
+            ?: return
         if (before.isEmpty()) return
 
         // Scan backwards for the last "punctuation + whitespace" pair.
@@ -1023,12 +1040,34 @@ class TextInjector(
                 break
             }
         }
-        // With a boundary, keep the separating whitespace and delete from the
-        // character after it; without one, the whole text is one sentence.
-        val deleteCount = if (boundary == 0) before.length else before.length - boundary - 1
+
+        val deleteCount = when {
+            // Keep the separating whitespace and delete from the character after it.
+            boundary > 0 -> before.length - boundary - 1
+
+            // The window covers the whole field: there really is no earlier text to protect.
+            before.length < MAX_SENTENCE_DELETE_CHARS -> before.length
+
+            // Window full and no sentence end inside it - delete the window, snapped to a word
+            // start, and leave everything further back alone.
+            else -> before.length - completeWordStart(before)
+        }
         if (deleteCount > 0) {
             inputConnection.deleteSurroundingText(deleteCount, 0)
         }
+    }
+
+    /**
+     * Index of the first character in [text] that provably starts a whole word: the window's left
+     * edge cut mid-word, so a leading fragment is skipped along with the space that follows it.
+     */
+    private fun completeWordStart(text: String): Int {
+        if (text.isEmpty() || text[0].isWhitespace()) return 0
+        var index = 0
+        while (index < text.length && !text[index].isWhitespace()) index++
+        while (index < text.length && text[index].isWhitespace()) index++
+        // A field with no whitespace inside the window at all: nothing better to snap to.
+        return if (index == text.length) 0 else index
     }
 
     /**

@@ -599,13 +599,65 @@ class TextInjectorTest {
 
     /**
      * No sentence boundary exists (single unpunctuated sentence) - the whole text before
-     * the cursor is treated as one sentence and deleted.
+     * the cursor is treated as one sentence and deleted. Only holds while the field is
+     * shorter than the delete window; see the window tests below for longer text.
      */
     @Test
     fun `deleteLastSentence without boundary deletes all text before cursor`() {
         injector.commitFinal("Ein einziger Satz ohne Punkt")
         injector.deleteLastSentence()
         assertThat(ic.fieldText).isEmpty()
+    }
+
+    /**
+     * A page of dictated prose with no sentence-ending punctuation is NOT one giant sentence:
+     * one press may remove at most the delete window, and the cut lands on a word boundary.
+     */
+    @Test
+    fun `deleteLastSentence stops at the window limit instead of wiping an unpunctuated page`() {
+        val page = (1..200).joinToString(" ") { "word$it" }
+        injector.commitFinal(page)
+
+        injector.deleteLastSentence()
+
+        val deleted = page.length - ic.fieldText.length
+        assertThat(deleted).isGreaterThan(0)
+        assertThat(deleted).isLessThanOrEqualTo(400)
+        assertThat(ic.fieldText).startsWith("word1 ")
+        // The window edge cut mid-word, so the partial word is kept: the page ends on a whole word.
+        assertThat(ic.fieldText.trimEnd().substringAfterLast(' ')).matches("word\\d+")
+    }
+
+    /**
+     * Repeated presses walk back word by word and can never clear a long unpunctuated field:
+     * every press is bounded by the same window.
+     */
+    @Test
+    fun `deleteLastSentence repeated presses keep most of an unpunctuated page`() {
+        val page = (1..200).joinToString(" ") { "word$it" }
+        injector.commitFinal(page)
+
+        injector.deleteLastSentence()
+        injector.deleteLastSentence()
+        injector.deleteLastSentence()
+
+        assertThat(ic.fieldText.length).isGreaterThanOrEqualTo(page.length - 3 * 400)
+        assertThat(ic.fieldText).startsWith("word1 ")
+    }
+
+    /**
+     * A sentence end that sits further back than the window is not chased: only the window is
+     * examined, so old text in front of it survives even though a boundary technically exists.
+     */
+    @Test
+    fun `deleteLastSentence ignores a sentence boundary outside the window`() {
+        val page = "Erster Satz. " + (1..120).joinToString(" ") { "wort$it" }
+        injector.commitFinal(page)
+
+        injector.deleteLastSentence()
+
+        assertThat(page.length - ic.fieldText.length).isLessThanOrEqualTo(400)
+        assertThat(ic.fieldText).startsWith("Erster Satz. wort1 ")
     }
 
     /**
