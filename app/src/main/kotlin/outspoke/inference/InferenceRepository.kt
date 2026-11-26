@@ -2,6 +2,7 @@ package dev.brgr.outspoke.inference
 
 import ai.onnxruntime.OnnxTensor
 import android.util.Log
+import dev.brgr.outspoke.BuildConfig
 import dev.brgr.outspoke.audio.AudioChunk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -1860,9 +1861,12 @@ class InferenceRepository(
             val finalText = if (cleaned.isBlank()) raw else cleaned
             // Mirror the legacy path's raw-vs-cleaned logcat pairing so on-device triage
             // can tell acoustic word loss (absent from `raw`) from formatting loss
-            // (present in `raw`, gone in `clean`).
-            Log.d(TAG, "[FINAL] raw   = Final(\"$raw\")")
-            Log.d(TAG, "[FINAL] clean = Final(\"$finalText\")")
+            // (present in `raw`, gone in `clean`). Debug builds only: these lines carry
+            // transcribed text, which must never reach logcat in a release build.
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "[FINAL] raw   = Final(\"$raw\")")
+                Log.d(TAG, "[FINAL] clean = Final(\"$finalText\")")
+            }
             val base = TranscriptResult.Final(finalText, isUtteranceBoundary = isUtteranceBoundary, confidence = confidence)
             val toSend = if (isScriptHallucination(finalText, engine.currentLanguage)) {
                 val stripped = stripScriptHallucinations(finalText, engine.currentLanguage)
