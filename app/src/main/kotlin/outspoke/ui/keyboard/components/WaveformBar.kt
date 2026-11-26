@@ -47,6 +47,9 @@ internal val WaveformBarHeight = 18.dp
  * row stays as symmetric as the gaussian envelope it replaces. Near-DC energy is filtered out in
  * [dev.brgr.outspoke.audio.SpectrumAnalyzer] so rumble cannot dominate the centre.
  *
+ * Colour is a gradient across the row - accent at the centre fading to muted teal toward the
+ * treble edges - and each bar lifts further into the accent as its band gets louder.
+ *
  * Everything is drawn in one [Canvas] pass, and the temporal smoothing lives in the analyzer, so
  * a frame costs one draw - no per-bar animation state.
  *
@@ -76,7 +79,10 @@ fun WaveformBar(
         label = "waveformAmplitude",
     )
 
-    val quietColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    // Gradient along the row (bass centre bright, treble edges recede) with energy lifting each bar
+    // toward the accent - so a sibilant bloom reads as colour as well as height.
+    val centreColor = MaterialTheme.colorScheme.primary
+    val edgeColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
     val loudColor = MaterialTheme.colorScheme.primary
     val fallbackQuietColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
 
@@ -95,7 +101,8 @@ fun WaveformBar(
                 bands = bands,
                 barWidthPx = barWidth.toPx(),
                 barSpacingPx = barSpacing.toPx(),
-                quietColor = quietColor,
+                centreColor = centreColor,
+                edgeColor = edgeColor,
                 loudColor = loudColor,
             )
         } else {
@@ -118,7 +125,8 @@ private fun DrawScope.drawBands(
     bands: FloatArray,
     barWidthPx: Float,
     barSpacingPx: Float,
-    quietColor: Color,
+    centreColor: Color,
+    edgeColor: Color,
     loudColor: Color,
 ) {
     val maxHeightPx = size.height
@@ -129,7 +137,9 @@ private fun DrawScope.drawBands(
         val energy = bands[index].coerceIn(0f, 1f)
         val barHeight = maxHeightPx * (MIN_BAR_FRACTION + (1f - MIN_BAR_FRACTION) * energy)
         val top = (maxHeightPx - barHeight) / 2f
-        val color = lerp(quietColor, loudColor, energy)
+        // Distance from the centre drives the gradient: 1.0 at the centre bar, 0.0 at the edges.
+        val centreWeight = 1f - index.toFloat() / (bands.size - 1).coerceAtLeast(1)
+        val color = lerp(lerp(edgeColor, centreColor, centreWeight), loudColor, energy)
         val offset = index * stride
 
         drawBar(centre - barWidthPx / 2f, top, barHeight, barWidthPx, color)  // centre bar = lowest band

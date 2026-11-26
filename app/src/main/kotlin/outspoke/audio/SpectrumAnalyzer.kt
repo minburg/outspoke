@@ -28,7 +28,7 @@ class SpectrumFrame(val bands: FloatArray)
  * Pipeline per chunk: one-pole DC blocker (removes handling rumble and 50 Hz hum, which would
  * otherwise dominate the *centre* of the mirrored meter), Hann window, in-place radix-2 FFT of
  * [fftSize] samples (480-sample chunks are zero-padded), then band energies summed from the FFT
- * bins and dB-mapped with the same noise-floor idea as the RMS meter.
+ * bins and dB-mapped with a floor and display gain tuned for band means (see `METER_FLOOR_DB`).
  *
  * All buffers and tables are allocated once in the constructor; [process] allocates nothing.
  * One instance belongs to one capture session - create it per session or call [reset].
@@ -92,7 +92,7 @@ class SpectrumAnalyzer(
     private val smoothed = FloatArray(bandCount)
 
     /**
-     * A full-scale sine concentrated in one bin reaches `fftSize * 0.5` (window sum) `* 0.5`
+     * Calibration: a full-scale sine concentrated in one bin reaches `fftSize * 0.5` (window sum) `* 0.5`
      * (positive/negative split) at the peak, so `0.25 * fftSize` maps amplitude 1.0 to 0 dBFS.
      */
     private val fullScale = 0.25 * fftSize
@@ -197,11 +197,11 @@ class SpectrumAnalyzer(
         }
     }
 
-    /** Same dB mapping as the RMS meter: [METER_FLOOR_DB] reads 0.0, 0 dBFS reads 1.0. */
+    /** dB mapping with the meter's floor and display gain; 0 dBFS band level reads 1.0. */
     private fun normaliseBand(amplitude: Float): Float {
         if (amplitude <= 0f) return 0f
         val db = 20f * log10(amplitude)
-        return ((db - METER_FLOOR_DB) / -METER_FLOOR_DB).coerceIn(0f, 1f)
+        return ((db - METER_FLOOR_DB) / -METER_FLOOR_DB * METER_DISPLAY_GAIN).coerceIn(0f, 1f)
     }
 
     /** Fast attack, slow release - the classic VU-meter response. */
@@ -212,8 +212,21 @@ class SpectrumAnalyzer(
     private companion object {
         const val INTEGER_BITS = 32
 
-        /** Meter floor; mirrors [AudioCaptureManager]'s `NOISE_FLOOR_DB`. */
-        const val METER_FLOOR_DB = -60f
+        /**
+         * Band level that reads 0.0 on the meter.
+         *
+         * Deliberately *above* the RMS meter's -60 dBFS floor: a band is the **mean** power of its
+         * bins, so it sits ~10 dB below the whole-signal RMS the level meter uses. Reusing -60 put
+         * a quiet room at half bar height; -50 keeps idle flat while speech still climbs.
+         */
+        const val METER_FLOOR_DB = -50f
+
+        /**
+         * Display gain on top of the dB mapping. Typical speech (-45..-20 dBFS per band) otherwise
+         * lands at ~0.1..0.6, which reads as "barely moving"; 1.6x puts conversational speech in
+         * the upper half and shouting at full height. Same role as the RMS meter's display gain.
+         */
+        const val METER_DISPLAY_GAIN = 1.6f
         const val ATTACK = 0.5f
         const val RELEASE = 0.15f
 

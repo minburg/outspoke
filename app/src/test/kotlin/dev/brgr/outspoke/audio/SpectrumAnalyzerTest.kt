@@ -46,10 +46,12 @@ class SpectrumAnalyzerTest {
         }
     }
 
+    // Placement is checked well below full scale: with the meter's display gain a loud tone
+    // legitimately pins its band (and a leaking neighbour) at 1.0, which would hide mis-binning.
     @Test
     fun `given a one kilohertz tone, when analysed, then the band covering one kilohertz is loudest`() {
         val subject = analyzer()
-        val result = subject.processAll(List(3) { sineChunk(1_000.0) })
+        val result = subject.processAll(List(3) { sineChunk(1_000.0, amplitude = 0.05) })
 
         val expectedBand = (0 until BAND_COUNT).first { 1_000f in subject.bandRange(it) }
         val loudestBand = result.withIndex().maxByOrNull { it.value }!!.index
@@ -60,7 +62,7 @@ class SpectrumAnalyzerTest {
 
     @Test
     fun `given a one kilohertz tone, when analysed, then distant bands stay quiet`() {
-        val result = analyzer().processAll(List(3) { sineChunk(1_000.0) })
+        val result = analyzer().processAll(List(3) { sineChunk(1_000.0, amplitude = 0.05) })
         val peak = result.max()
 
         // Mirrored meter: the eye reads the outer bars for sibilants and the centre for bass, so a
