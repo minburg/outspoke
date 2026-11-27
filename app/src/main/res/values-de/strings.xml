@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Outspoke</string>
-    <string name="ime_name">Outspoke Voice Keyboard</string>
-    <string name="subtype_en">Englisch (US) - Sprache</string>
-    <string name="subtype_de">Deutsch (DE) - Sprache</string>
+    <string name="ime_name">Outspoke-Sprachtastatur</string>
+    <string name="subtype_en">Englisch (US) – Sprache</string>
+    <string name="subtype_de">Deutsch (DE) – Sprache</string>
 
     <!-- Navigation titles -->
     <string name="nav_title_model">Modell herunterladen</string>
@@ -19,7 +19,7 @@
     <string name="action_cancel">Abbrechen</string>
     <string name="action_delete">Löschen</string>
     <string name="action_retry">Erneut versuchen</string>
-    <string name="action_set_as_active">Als aktiv festlegen</string>
+    <string name="action_set_as_active">Aktivieren</string>
     <string name="action_download_anyway">Trotzdem herunterladen</string>
     <string name="action_open_outspoke">Outspoke öffnen</string>
 
@@ -39,7 +39,7 @@
     <string name="cd_action_enter">Eingabe</string>
     <string name="cd_active_model">Aktives Modell</string>
     <string name="cd_delete_model">Modell löschen</string>
-    <string name="cd_status_idle">Bereit - Schaltfläche drücken zum Diktieren</string>
+    <string name="cd_status_idle">Bereit – zum Diktieren auf die Taste tippen</string>
     <string name="cd_status_error">Fehler</string>
 
     <!-- Home screen -->
@@ -47,78 +47,71 @@
     <string name="home_section_configuration">Konfiguration</string>
     <string name="home_ime_enabled">Tastatur aktiviert</string>
     <string name="home_ime_not_enabled">Tastatur nicht aktiviert</string>
-    <string name="home_ime_enabled_subtitle">Outspoke ist in der Tastaturliste.</string>
-    <string name="home_ime_not_enabled_subtitle">Outspoke in den Systemtastatureinstellungen hinzufügen.</string>
+    <string name="home_ime_enabled_subtitle">Outspoke ist in der Tastaturliste eingetragen.</string>
+    <string name="home_ime_not_enabled_subtitle">Füge Outspoke in den Tastatureinstellungen des Systems hinzu.</string>
     <string name="home_mic_granted">Mikrofonzugriff erteilt</string>
     <string name="home_mic_required">Mikrofonberechtigung erforderlich</string>
-    <string name="home_mic_granted_subtitle">Audio wird vollständig auf dem Gerät verarbeitet.</string>
-    <string name="home_mic_required_subtitle">Tippen, um Mikrofonzugriff zu erteilen.</string>
+    <string name="home_mic_granted_subtitle">Audiodaten werden vollständig lokal auf dem Gerät verarbeitet.</string>
+    <string name="home_mic_required_subtitle">Tippen, um den Mikrofonzugriff zu erlauben.</string>
     <string name="home_model_ready">Modell bereit</string>
     <string name="home_model_not_downloaded">Modell nicht heruntergeladen</string>
-    <string name="home_model_ready_subtitle">Ein Transkriptionsmodell ist installiert und bereit.</string>
-    <string name="home_model_not_downloaded_subtitle">Lade ein Transkriptionsmodell herunter, um die Tastatur zu
-        verwenden.
+    <string name="home_model_ready_subtitle">Ein Transkriptionsmodell ist installiert und einsatzbereit.</string>
+    <string name="home_model_not_downloaded_subtitle">Lade ein Transkriptionsmodell herunter, um die Tastatur nutzen zu
+        können.
     </string>
     <string name="home_pref_input">Mikrofon &amp; Auslösemodus</string>
     <string name="home_pref_speech">Spracherkennung, Nachbearbeitung &amp; Vorschläge</string>
-    <string name="home_pref_tools">Tutorial &amp; Diagnose</string>
+    <string name="home_pref_tools">Anleitung &amp; Diagnose</string>
 
     <!-- Preferences screen -->
     <string name="pref_trigger_mode_title">Auslösemodus</string>
-    <string name="pref_trigger_mode_subtitle">Wie die Sprachaufnahme gestartet und gestoppt wird.</string>
-    <string name="pref_trigger_hold">Halten zum Sprechen</string>
-    <string name="pref_trigger_tap_toggle">Tippen zum Umschalten</string>
-    <string name="pref_delete_title">Löschen-Button</string>
-    <string name="pref_delete_subtitle">Was der Müll-Button auf der Tastatur löscht. \"Letzter Satz\" entfernt nur den
-        letzten Satz vor dem Cursor, damit ein langes Dokument nie versehentlich gelöscht wird.
+    <string name="pref_trigger_mode_subtitle">Legt fest, wie die Sprachaufnahme gestartet und beendet wird.</string>
+    <string name="pref_trigger_hold">Gedrückt halten</string>
+    <string name="pref_trigger_tap_toggle">Antippen zum Umschalten</string>
+    <string name="pref_delete_title">Löschtaste</string>
+    <string name="pref_delete_subtitle">Legt fest, was das Papierkorb-Symbol auf der Tastatur löscht. Mit „Letzter Satz“
+        wird nur der letzte Satz vor dem Cursor entfernt, damit lange Texte nicht versehentlich gelöscht werden.
     </string>
     <string name="pref_delete_all">Gesamter Text</string>
     <string name="pref_delete_last_sentence">Letzter Satz</string>
     <string name="pref_vad_title">Sprachaktivitätserkennung (VAD)</string>
-    <string name="pref_vad_subtitle">Verwendet Silero VAD, um Stille und Hintergrundgeräusche vor der Transkription
-        herauszufiltern. Nur deaktivieren, wenn VAD den Anfang deiner Sprache abschneidet oder leere Ergebnisse erzeugt.
+    <string name="pref_vad_subtitle">Nutzt Silero VAD, um Stille und Hintergrundgeräusche vor der Transkription
+        herauszufiltern. Nur deaktivieren, wenn der Satzanfang abgeschnitten wird oder die Erkennung leer bleibt.
     </string>
     <string name="pref_postprocessing_title">Transkript-Nachbearbeitung</string>
-    <string name="pref_postprocessing_subtitle">Entfernt Füllwörter (äh, ähm, hmm), reduziert Stotter und bereinigt
-        wiederholte Phrasen. Deaktivieren, um die direkte Modellausgabe zu erhalten - nützlich zum Diagnostizieren, ob
-        die Bereinigung Wörter weglässt oder verändert.
+    <string name="pref_postprocessing_subtitle">Entfernt Füllwörter (äh, ähm, hmm), glättet Stottern und bereinigt
+        Wortwiederholungen, die das Modell gelegentlich erzeugt. Deaktivieren, um die unveränderte Rohausgabe zu
+        erhalten – hilfreich zur Fehlersuche, falls Wörter verschluckt oder verändert werden.
     </string>
     <string name="pref_postprocessing_disabled_raw">Deaktiviert (Rohausgabe)</string>
-    <string name="pref_diagnostics_title">Pipeline-Diagnose</string>
-    <string name="pref_diagnostics_subtitle">Zeigt ein Live-Badge auf der Tastatur mit Zählern für Fensterkürzungen,
-        Ausrichtungswiederherstellungen und verworfene leere Schritte. Nützlich zur Diagnose von Pipeline-Problemen;
-        standardmäßig ausgeblendet.
-    </string>
-    <string name="pref_diagnostics_visible">Sichtbar</string>
-    <string name="pref_diagnostics_hidden">Ausgeblendet</string>
-    <string name="pref_tutorial_title">Tastatur-Tutorial</string>
-    <string name="pref_tutorial_subtitle">Zeigt die Schritt-für-Schritt-Anleitung beim nächsten Öffnen der Tastatur
+    <string name="pref_tutorial_title">Tastatur-Einführung</string>
+    <string name="pref_tutorial_subtitle">Zeigt die Schritt-für-Schritt-Erklärung beim nächsten Öffnen der Tastatur
         erneut an.
     </string>
-    <string name="pref_tutorial_reset">Tutorial erneut anzeigen</string>
+    <string name="pref_tutorial_reset">Einführung erneut anzeigen</string>
 
     <!-- Model screen -->
     <string name="model_screen_title">Spracherkennungsmodelle</string>
-    <string name="model_screen_subtitle">Lade ein Modell herunter und tippe auf „Als aktiv festlegen", um es für die
-        Transkription zu verwenden. Es wird immer nur ein Modell geladen.
+    <string name="model_screen_subtitle">Lade ein Modell herunter und tippe auf „Aktivieren“, um es für die
+        Transkription zu nutzen. Es ist immer nur ein Modell gleichzeitig geladen.
     </string>
     <string name="model_size_format">~%d MB</string>
     <string name="model_active_label">Aktives Modell</string>
-    <string name="model_download_failed">Download fehlgeschlagen oder beschädigt</string>
+    <string name="model_download_failed">Download fehlgeschlagen oder Datei beschädigt</string>
     <string name="dialog_delete_title">Löschen bestätigen</string>
-    <string name="dialog_delete_message">Dieses Modell wirklich löschen? Diese Aktion kann nicht rückgängig gemacht
-        werden.
+    <string name="dialog_delete_message">Möchtest du dieses Modell wirklich löschen? Dieser Vorgang kann nicht
+        rückgängig gemacht werden.
     </string>
     <string name="dialog_mobile_data_title">Über mobile Daten herunterladen?</string>
-    <string name="dialog_mobile_data_message">Dieses Modell ist ~%d MB groß. Das Herunterladen verbraucht mobile Daten.
-        Mit WLAN verbinden, um unerwartete Kosten zu vermeiden.
+    <string name="dialog_mobile_data_message">Dieses Modell ist ~%d MB groß. Der Download verbraucht mobile Daten.
+        Verbinde dich mit einem WLAN, um zusätzliche Kosten zu vermeiden.
     </string>
 
     <!-- Inference service notifications -->
-    <string name="notif_channel_name">Outspoke Sprachtranskription</string>
-    <string name="notif_channel_desc">Wird angezeigt, solange die Spracherkennungs-Engine aktiv ist</string>
+    <string name="notif_channel_name">Outspoke-Sprachtranskription</string>
+    <string name="notif_channel_desc">Wird angezeigt, solange die Spracherkennung aktiv ist</string>
     <string name="notif_engine_loading">Transkriptions-Engine wird geladen\u2026</string>
-    <string name="notif_model_not_downloaded">Modell nicht heruntergeladen - Outspoke öffnen</string>
+    <string name="notif_model_not_downloaded">Kein Modell heruntergeladen – Outspoke zum Herunterladen öffnen</string>
     <string name="notif_engine_ready">Outspoke bereit (%s)</string>
     <string name="notif_engine_failed">Engine konnte nicht geladen werden: %s</string>
 
@@ -126,62 +119,98 @@
     <string name="status_transcribing">Wird transkribiert …</string>
     <!-- Einzeilig neben der Aktions-Schaltfläche "Erneut versuchen"/"Outspoke öffnen"; längere Texte
          werden im Pill abgeschnitten, deshalb die Aktion nicht doppelt nennen. -->
-    <string name="status_engine_model_missing">Modell nicht heruntergeladen</string>
+    <string name="status_engine_model_missing">Kein Modell geladen</string>
     <string name="status_engine_loading">Transkriptions-Engine wird geladen …</string>
-    <string name="status_error_mic_permission">Mikrofonberechtigung fehlt</string>
-    <string name="status_error_mic_busy">Mikrofon belegt - andere App schließen</string>
+    <string name="status_error_mic_permission">Mikrofonzugriff verweigert</string>
+    <string name="status_error_mic_busy">Mikrofon belegt – andere App schließen</string>
     <string name="status_error_mic_init">Mikrofon konnte nicht geöffnet werden</string>
     <string name="status_error_transcription">Transkription fehlgeschlagen</string>
     <string name="status_error_audio_capture">Audioaufnahme fehlgeschlagen</string>
     <string name="status_error_engine_load">Engine konnte nicht geladen werden</string>
 
     <!-- First-run keyboard tutorial -->
-    <string name="tutorial_title">So verwendest du Outspoke</string>
     <string name="tutorial_talk_button_title">Sprechtaste (Mitte)</string>
-    <string name="tutorial_talk_button_desc">Halten zum Aufnehmen, loslassen zum Transkribieren. Im Tipp-Modus: einmal
-        tippen zum Starten, nochmals zum Stoppen.
+    <string name="tutorial_talk_button_desc">Gedrückt halten zum Aufnehmen, loslassen zum Transkribieren. Nach oben
+        ziehen und loslassen, um freihändig weiterzusprechen. Im Tipp-Modus: einmal tippen zum Starten, erneut tippen
+        zum Stoppen.
     </string>
     <string name="tutorial_switch_keyboard_title">Tastatur wechseln (oben rechts)</string>
     <string name="tutorial_switch_keyboard_desc">Wechselt zurück zur vorherigen Tastatur.</string>
+    <string name="tutorial_space_title">Leerzeichen (daneben)</string>
+    <string name="tutorial_space_desc">Fügt ein Leerzeichen ein – diese Tastatur hat keine klassische Leertaste. Eine
+        laufende Aufnahme wird dabei nicht unterbrochen.
+    </string>
     <string name="tutorial_delete_all_title">Löschen (ganz links)</string>
-    <string name="tutorial_delete_all_desc">Löscht den letzten Satz – je nach Einstellung das gesamte Textfeld.</string>
+    <string name="tutorial_delete_all_desc">Löscht den letzten Satz – oder je nach Einstellung das gesamte Textfeld.</string>
     <string name="tutorial_delete_word_title">Wort löschen (links vom Mikrofon)</string>
-    <string name="tutorial_delete_word_desc">Entfernt das letzte Wort.</string>
+    <string name="tutorial_delete_word_desc">Löscht das letzte Wort.</string>
     <string name="tutorial_delete_char_title">Zeichen löschen (rechts vom Mikrofon)</string>
-    <string name="tutorial_delete_char_desc">Entfernt das letzte Zeichen.</string>
+    <string name="tutorial_delete_char_desc">Löscht das letzte Zeichen.</string>
     <string name="tutorial_enter_title">Eingabe / Aktion (ganz rechts)</string>
-    <string name="tutorial_enter_desc">Führt die kontextabhängige Aktion aus: Senden, Suchen, Los oder Neue Zeile.
+    <string name="tutorial_enter_desc">Führt die jeweilige Aktion aus: Senden, Suchen, Los oder Zeilenumbruch.
     </string>
     <string name="tutorial_skip">Überspringen</string>
     <string name="tutorial_next">Weiter</string>
     <string name="tutorial_dismiss">Verstanden!</string>
     <!-- Preferences · microphone section -->
     <string name="pref_mic_title">Mikrofon</string>
-    <string name="pref_mic_subtitle">Kalibrieren, um das klarste Mikrofon für kurze Wörter wie \"Thanks\" auszuwählen.</string>
+    <string name="pref_mic_subtitle">Kalibrieren, um das klarste Mikrofon für kurze Wörter wie „Danke“ zu wählen.</string>
     <string name="pref_mic_calibrate">Mikrofone kalibrieren</string>
-    <string name="pref_raw_mic_title">Rohes Mikrofon (ohne Echo-Kompensation)</string>
-    <string name="pref_raw_mic_subtitle">Umgeht die Echo-Kompensation und Rauschunterdrückung der Plattform. Aktivieren, wenn
-        Ton vom eigenen Lautsprecher des Geräts transkribiert wird (z. B. Anrufbeantworter auf Lautsprecher) – mit der
-        Standardquelle wird das Lautsprecher-Signal aus dem Mikrofon entfernt und es wird Stille transkribiert. In
-        lauten Räumen etwas weniger saubere Aufnahme.
+    <string name="pref_raw_mic_title">Roh-Mikrofon (ohne Echokompensation)</string>
+    <string name="pref_raw_mic_subtitle">Umgeht die systemseitige Echokompensation und Rauschunterdrückung. Aktivieren,
+        wenn Ton über den eigenen Gerätelautsprecher transkribiert werden soll (z. B. eine Sprachnachricht auf
+        Lautsprecher) – andernfalls filtert das System den Lautsprecherton heraus und erkennt nur Stille. In lauten
+        Umgebungen etwas störanfälliger.
     </string>
 
     <!-- Gemeinsamer Status-Wortlaut (Chips, badges) -->
-    <string name="status_listening">Hört zu</string>
+    <string name="status_listening">Hört zu …</string>
 
     <!-- Tastatur: accessible Namen für Sprachtaste und Statusanzeige -->
-    <string name="cd_talk_disabled">Sprachtaste deaktiviert - Engine nicht bereit</string>
-    <string name="cd_stop_continuous">Daueraufnahme beenden</string>
-    <string name="cd_tap_stop">Tippen, um Aufnahme zu beenden</string>
-    <string name="cd_stop_recording">Aufnahme beenden</string>
-    <string name="cd_tap_start">Tippen, um Aufnahme zu starten</string>
-    <string name="cd_hold_start_lock">Aufnahme starten (halten) - zum Fixieren nach oben wischen</string>
+    <string name="cd_talk_disabled">Sprechtaste deaktiviert – Engine nicht bereit</string>
+    <string name="cd_stop_continuous">Daueraufnahme stoppen</string>
+    <string name="cd_tap_stop">Tippen, um die Aufnahme zu stoppen</string>
+    <string name="cd_stop_recording">Aufnahme stoppen</string>
+    <string name="cd_tap_start">Tippen, um die Aufnahme zu starten</string>
+    <string name="cd_hold_start_lock">Aufnahme starten (gedrückt halten) – zum Fixieren nach oben wischen</string>
 
     <!-- Modell-Download -->
     <string name="model_progress_format">%1$d %% von ca. %2$d MB</string>
 
     <!-- Mikrofon-Kalibrierung -->
-    <string name="nav_title_calib">Mikrofon-Kalibrierung</string>
+    <string name="nav_title_calib">Mikrofonkalibrierung</string>
     <string name="calib_score_format">Hochton %1$d %%  ·  SNR %2$d dB</string>
+    <string name="calib_subtitle">Wähle das Mikrofon mit der klarsten Hochtonwiedergabe. Das Sprachmodell benötigt diese Details, um kurze Wörter wie „Danke“ sauber zu erkennen.</string>
+    <string name="calib_instructions">Warte auf die rote Anzeige am jeweiligen Mikrofon und sage dann deutlich „Danke“. Das beste Mikrofon wird automatisch ausgewählt.</string>
+    <string name="calib_start">Kalibrierung starten</string>
+    <string name="calib_mic_of">Mikrofon %1$d von %2$d</string>
+    <string name="calib_get_ready">Bereitmachen – gleich „Danke“ sagen</string>
+    <string name="calib_speak_now">Jetzt „Danke“ sagen</string>
+    <string name="calib_done">Kalibrierung abgeschlossen</string>
+    <string name="calib_best">Bestes Mikrofon</string>
+    <string name="calib_saved">Als bevorzugtes Mikrofon gespeichert</string>
+    <string name="calib_run_again">Erneut kalibrieren</string>
+    <string name="calib_no_mics">Keine Mikrofone gefunden.</string>
+    <string name="calib_current">Aktuell</string>
+
+    <!-- Wortvorschläge -->
+    <string name="pref_suggestion_bar_title">Wortvorschläge</string>
+    <string name="pref_suggestion_bar_subtitle">Zeigt nach jedem abgeschlossenen Diktat alternative Wörter für das Wort unter dem Cursor an – Phonetik und Sprachmodell arbeiten komplett lokal auf dem Gerät. Funktioniert offline. Sprachpakete werden separat heruntergeladen, um die App klein zu halten.</string>
+    <string name="pref_suggestion_bar_enabled">Aktiviert</string>
+    <string name="pref_suggestion_bar_disabled">Deaktiviert</string>
+    <string name="pref_suggestion_bar_languages_title">Korrektursprachen</string>
+    <string name="pref_suggestion_bar_languages_subtitle">Lade die Sprachen herunter, in denen du diktierst. Heruntergeladene Sprachen sind automatisch aktiv; entferne das Häkchen, um eine Sprache zu deaktivieren. Vorschläge stammen nur aus ausgewählten Sprachen.</string>
+    <string name="pref_suggestion_bar_no_language">Keine aktive Sprache mit heruntergeladenen Daten – Vorschläge erscheinen erst, wenn mindestens eine Sprache heruntergeladen wurde.</string>
+    <string name="suggestion_lang_download">Herunterladen</string>
+    <string name="suggestion_lang_cancel">Abbrechen</string>
+    <string name="suggestion_lang_delete">Löschen</string>
+    <string name="suggestion_lang_retry">Erneut versuchen</string>
+    <string name="cd_dismiss_suggestion_bar">Vorschläge ausblenden</string>
+
+    <string name="cd_insert_space">Leerzeichen einfügen</string>
+    <string name="pref_trailing_space_title">Leerzeichen nach Diktat</string>
+    <string name="pref_trailing_space_summary">Fügt automatisch ein Leerzeichen ein, sobald die Aufnahme beendet und die Transkription abgeschlossen ist.</string>
+
+    <string name="status_no_speech">Nichts erkannt – bitte erneut versuchen</string>
 </resources>
 
