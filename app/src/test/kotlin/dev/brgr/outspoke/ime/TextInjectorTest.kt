@@ -587,6 +587,44 @@ class TextInjectorTest {
     }
 
     /**
+     * Regression: after the first press the caret sits behind the sentence's own period plus the
+     * gap space ("Erster Satz. "). The old scan read that as an empty sentence between two periods
+     * and deleted nothing, so the second press looked dead.
+     */
+    @Test
+    fun `deleteLastSentence twice in a row walks back sentence by sentence`() {
+        injector.commitFinal("Erster Satz. Zweiter Satz. ")
+
+        injector.deleteLastSentence()
+        assertThat(ic.fieldText).isEqualTo("Erster Satz. ")
+
+        injector.deleteLastSentence()
+        assertThat(ic.fieldText).isEmpty()
+    }
+
+    /**
+     * A gap of several whitespace characters (or newlines) after the punctuation still marks a
+     * sentence end; the whole run is the separator and stays intact.
+     */
+    @Test
+    fun `deleteLastSentence accepts any whitespace run after the punctuation`() {
+        // Seeded through the InputConnection directly: commitFinal would collapse the run.
+        ic.commitText("Erster Satz.\n\n   Zweiter Satz.", 0)
+        injector.deleteLastSentence()
+        assertThat(ic.fieldText).isEqualTo("Erster Satz.\n\n   ")
+    }
+
+    /**
+     * Whitespace-only field: no sentence body exists, so the press just clears the gap.
+     */
+    @Test
+    fun `deleteLastSentence on whitespace-only field clears the whitespace`() {
+        injector.commitFinal("   ")
+        injector.deleteLastSentence()
+        assertThat(ic.fieldText).isEmpty()
+    }
+
+    /**
      * Multiple sentences: the boundary is the last "punctuation + whitespace" pair, so
      * only the final sentence disappears.
      */
@@ -667,6 +705,75 @@ class TextInjectorTest {
     fun `deleteLastSentence on empty field is a no-op`() {
         injector.deleteLastSentence()
         assertThat(ic.fieldText).isEmpty()
+    }
+
+    // ── Punctuation at a mid-sentence insertion point ────────────────────────────────
+
+    /**
+     * Regression: the user selected a word inside a finished sentence and dictated its
+     * replacement. The decoder ends almost every short clip with a period, so the field
+     * read "The quick Red. fox jumps." - a sentence terminator in the middle of a clause.
+     */
+    @Test
+    fun `dictating a replacement over a selection does not add a period`() {
+        ic.commitText("The quick brown fox jumps.", 0)
+        ic.setSelection(10, 15) // "brown"
+
+        injector.commitFinal("Red.")
+
+        assertThat(ic.fieldText).isEqualTo("The quick Red fox jumps.")
+    }
+
+    /**
+     * Same caret, longer dictation: a real sentence keeps its punctuation, because merging it
+     * into the following clause is worse than the period the user dictated.
+     */
+    @Test
+    fun `dictating a full sentence mid-sentence keeps its period`() {
+        ic.commitText("The quick brown fox jumps.", 0)
+        ic.setSelection(10, 15)
+
+        injector.commitFinal("This is a quick fix.")
+
+        assertThat(ic.fieldText).isEqualTo("The quick This is a quick fix. fox jumps.")
+    }
+
+    /**
+     * Caret at the end of the field: nothing continues after it, so end-of-speech punctuation
+     * is untouched - the ordinary dictation path must not change.
+     */
+    @Test
+    fun `dictating at the end of a field keeps the period`() {
+        injector.commitFinal("The quick brown fox.")
+        assertThat(ic.fieldText).isEqualTo("The quick brown fox.")
+    }
+
+    /**
+     * Punctuation after the caret means a sentence boundary already exists there, so the dictated
+     * fragment may keep its own: only a lowercase continuation is "inside an open sentence".
+     */
+    @Test
+    fun `dictating before a sentence boundary keeps the period`() {
+        ic.commitText("alpha. Beta gamma delta.", 0)
+        ic.setSelection(0, 5) // "alpha", followed by ". Beta"
+
+        injector.commitFinal("Red.")
+
+        assertThat(ic.fieldText).isEqualTo("Red. Beta gamma delta.")
+    }
+
+    /**
+     * A doubled dot is wrong however long the dictated text is: the replacement's period and the
+     * one still sitting in the field must collapse to one.
+     */
+    @Test
+    fun `dictating a full sentence before an existing period does not double it`() {
+        ic.commitText("alpha. Beta gamma delta.", 0)
+        ic.setSelection(0, 5)
+
+        injector.commitFinal("This is a quick fix.")
+
+        assertThat(ic.fieldText).isEqualTo("This is a quick fix. Beta gamma delta.")
     }
 }
 

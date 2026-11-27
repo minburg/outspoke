@@ -59,6 +59,14 @@ private const val FIELD_SCAN_CHARS = 800
 private const val MAX_SENTENCE_DELETE_CHARS = 400
 
 /**
+ * A dictated fragment of at most this many words is treated as an *insertion* rather than a
+ * sentence, so a model-emitted trailing period can be dropped when the caret sits mid-sentence
+ * (see [outspoke.ime.TextInjector]). Three words covers word replacement and short phrase
+ * insertion while leaving real dictated sentences alone.
+ */
+private const val SHORT_FRAGMENT_MAX_WORDS = 3
+
+/**
  * Number of words to drop from the *tail* of the composing span when [TextInjector.resetAfterTrim]
  * commits it to the field.
  *
@@ -201,13 +209,31 @@ class TextInjector(
     private var sessionStarted: Boolean = false
 
     /**
-     * Number of times an alignment recovery layer (field-scan or composing-commit) fired
-     * during this recording session.  Exposed to [KeyboardViewModel] for the diagnostic
-     * overlay - a non-zero value means the model drifted and the injector had to recover.
-     * Reset by [clear].
+     * Removes a sentence-final period from a short [text] when the caret is mid-sentence, and
+     * removes any terminator that would sit directly on top of the host text's own.
+     *
+     * Rule 1 is deliberately narrow: only a single trailing `.` is touched (never `...`, never a
+     * decimal like `3.5`, never `!` or `?` which carry intent a period does not), and only for a
+     * fragment of at most [SHORT_FRAGMENT_MAX_WORDS] words. A genuinely dictated sentence keeps its
+     * punctuation - dropping it there would silently merge two sentences instead of separating them.
+     *
+     * Rule 2 has no length limit and no mid-sentence requirement: replacing a selection that did
+     * not include its own period would otherwise leave `Red.. Beta`, and a doubled dot is wrong
+     * however long the dictated text is.
      */
-    var alignmentRecoveryCount: Int = 0
-        private set
+    private fun dropMidSentencePeriod(text: String): String {
+        if (text.isBlank()) return text
+        val body = text.trimEnd()
+        if (!body.endsWith(".") || body.endsWith("..")) return text
+        val after = inputConnection.getTextAfterCursor(4, 0)?.toString().orEmpty()
+        if (after.startsWith(".")) return body.dropLast(1)
+        val beforePeriod = body[body.length - 2]
+        if (beforePeriod.isDigit()) return text
+        if (body.splitToWords().size > SHORT_FRAGMENT_MAX_WORDS) return text
+        if (after.firstOrNull { !it.isWhitespace() }?.isLowerCase() != true) return text
+        Log.d(TAG, "[MID_SENTENCE] caret inside an open sentence - dropping final period")
+        return body.dropLast(1)
+    }
 
     /**
      * Applies [displayCleanFn] to a word list joined by spaces.
@@ -284,8 +310,10 @@ class TextInjector(
      * scan finds no overlap, the composing span is committed as-is and those words are
      * absorbed into [committedWords] so the next successful partial does not re-commit them.
      */
-    fun setPartial(text: String) {
-        if (!supportsComposing || text == lastPartial) return
+    fun setPartial(raw: String) {
+        if (!supportsComposing) return
+        val text = dropMidSentencePeriod(raw)
+        if (text == lastPartial) return
         lastPartial = text
 
         val words = text.splitToWords()
@@ -380,7 +408,6 @@ class TextInjector(
                     // Successfully realigned against the real field content.
                     // Reset committedWords to match and inject only the new tail.
                     Log.d(TAG, "[REALIGN] field-based recovery: re-anchored, +${fieldNewContent.size} words")
-                    alignmentRecoveryCount++
 
                     // Save the active composing words BEFORE clearing - setComposingText
                     // REPLACES the entire composing region in the editor, so without this
@@ -462,7 +489,6 @@ class TextInjector(
                 TAG,
                 "[REALIGN] complete alignment failure (committed=${committedWords.size}, fresh=${words.size}) - committing composing span"
             )
-            alignmentRecoveryCount++
             val hadComposing = composingWords.isNotEmpty()
             composingWords = emptyList()
             composingIsSentenceStart = false
@@ -541,7 +567,8 @@ class TextInjector(
      * [committedWords] and [sessionStarted] are reset so the injector is ready for the
      * next recording session within the same input field.
      */
-    fun commitFinal(text: String) {
+    fun commitFinal(raw: String) {
+        val text = dropMidSentencePeriod(raw)
         lastPartial = ""
         val savedCommitted = committedWords.toList()
         val savedComposing = composingWords          // Saved before reset - needed for composing-anchor fallback
@@ -940,7 +967,6 @@ class TextInjector(
         composingWords = emptyList()
         composingIsSentenceStart = false
         sessionStarted = false
-        alignmentRecoveryCount = 0
         inputConnection.finishComposingText()
     }
 
@@ -1014,9 +1040,13 @@ class TextInjector(
      * Deletes the last sentence from the text before the cursor, up to [MAX_SENTENCE_DELETE_CHARS].
      *
      * A sentence boundary is a sentence-ending punctuation (`.`, `!`, `?`)
-     * immediately followed by whitespace. The trailing whitespace after the
-     * final punctuation is deleted together with the sentence; the separating
-     * whitespace before the sentence is kept.
+     * followed by one or more whitespace characters; the next sentence starts after
+     * that whitespace run. Whitespace behind the caret is *not* part of the sentence
+     * body, so a field ending in `"Hello. Second. "` still reports `Second.` as its
+     * last sentence - otherwise a second press would look at an empty stretch between
+     * two periods, find no sentence, and appear dead. The whitespace separating the
+     * deleted sentence from the older text is kept verbatim; the whitespace behind the
+     * deleted sentence is consumed, so the field never ends on a doubled gap.
      *
      * Only the last [MAX_SENTENCE_DELETE_CHARS] characters are ever examined, so text that has no
      * sentence-ending punctuation anywhere (a page of prose in a Note app) cannot be swallowed: the
@@ -1031,19 +1061,33 @@ class TextInjector(
             ?: return
         if (before.isEmpty()) return
 
-        // Scan backwards for the last "punctuation + whitespace" pair.
-        var boundary = 0
-        for (i in before.length - 1 downTo 1) {
+        // The sentence body ends at the last non-whitespace character before the caret. Anything
+        // behind it is gap whitespace: it belongs to the deletion, never to the body - that is what
+        // keeps a field ending in ". " from looking like an empty last sentence.
+        var bodyEnd = before.length
+        while (bodyEnd > 0 && before[bodyEnd - 1].isWhitespace()) bodyEnd--
+        val lastBodyChar = bodyEnd - 1
+
+        // Scan backwards for the last "punctuation + whitespace" pair, starting at the end of the
+        // body so the sentence's own closing punctuation is never mistaken for its start.
+        var gapStart = 0
+        for (i in lastBodyChar downTo 1) {
             val prev = before[i - 1]
             if (before[i].isWhitespace() && (prev == '.' || prev == '!' || prev == '?')) {
-                boundary = i
+                gapStart = i
                 break
             }
         }
 
+        // The whole whitespace run after that punctuation separates the two sentences and stays
+        // where it is - a paragraph break must not be flattened to a single space. The sentence
+        // body starts after it, and everything from there to the caret goes: body plus the gap that
+        // trailed it, so no double space is left behind.
+        var sentenceStart = gapStart
+        while (sentenceStart < lastBodyChar && before[sentenceStart].isWhitespace()) sentenceStart++
+
         val deleteCount = when {
-            // Keep the separating whitespace and delete from the character after it.
-            boundary > 0 -> before.length - boundary - 1
+            gapStart > 0 -> before.length - sentenceStart
 
             // The window covers the whole field: there really is no earlier text to protect.
             before.length < MAX_SENTENCE_DELETE_CHARS -> before.length
@@ -1205,7 +1249,6 @@ class TextInjector(
         committedWords = mutableListOf()
         composingWords = emptyList()
         sessionStarted = false
-        alignmentRecoveryCount = 0
     }
 
     // splitToWords() is now in TranscriptAligner - imported at the top.
