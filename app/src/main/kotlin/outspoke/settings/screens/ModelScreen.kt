@@ -45,6 +45,10 @@ fun ModelScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // This Scaffold exists only to host the snackbar. Left on its defaults it re-applies the
+        // system-bar insets that the settings Scaffold already consumed, so the model list got the
+        // bottom inset twice - visible as a tall dead strip above the navigation bar.
+        contentWindowInsets = WindowInsets(0),
     ) { padding ->
         ModelListContent(
             modelStates = modelStates,

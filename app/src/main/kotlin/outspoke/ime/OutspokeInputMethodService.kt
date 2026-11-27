@@ -3,6 +3,7 @@ package dev.brgr.outspoke.ime
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.Configuration
 import android.content.res.Resources
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
@@ -13,6 +14,9 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.view.ViewCompat
 import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistry
@@ -175,13 +179,6 @@ class OutspokeInputMethodService :
             }
         }
 
-        // When the keyboard is reshown after being hidden, sync the window height to the
-        // current bar state. The per-frame animation callback handles all transitions while
-        // the keyboard is visible; this is only needed for the initial show after a hide.
-        lifecycleScope.launch {
-            keyboardViewModel.wordSuggestions.collect { }
-        }
-
         // If the user presses record while EngineState is Ready but
         // no InferenceRepository is bound (a binder desync), let the VM nudge us so we can
         // request a reload of the (still-present) model instead of silently opening the
@@ -197,6 +194,10 @@ class OutspokeInputMethodService :
         bindService(inferenceServiceIntent(), inferenceServiceConnection, BIND_AUTO_CREATE)
         isBound = true
         Log.d(TAG, "InferenceService bind requested")
+
+        // Measure once up front so the first window is sized from a cache rather than lazily
+        // inside composition.
+        windowGeometry = computeGeometry()
     }
 
     override fun onBindInput() {
@@ -214,7 +215,13 @@ class OutspokeInputMethodService :
         } catch (e: IllegalStateException) {
             Log.w(TAG, "Unable to retain inference service; keeping the existing binding", e)
         }
-        val targetHeight = keyboardHeightPx + (if (barVisible) barSlotHeightPx else 0)
+        // The display may have changed while the window was hidden (rotation, split-screen
+        // resize) - re-measure before deciding what height to restore.
+        refreshGeometry()
+        // Trust the view model, not the latch: see [suggestionBarShouldBeVisible].
+        val barShowing = suggestionBarShouldBeVisible()
+        barVisible = barShowing
+        val targetHeight = keyboardHeightPx + if (barShowing) barSlotHeightPx else 0
         Log.d(
             TAG,
             "onWindowShown barVisible=$barVisible targetHeight=$targetHeight" +
@@ -237,7 +244,7 @@ class OutspokeInputMethodService :
         // microphone FGS type. Upgrade from specialUse if the service fell back to it when
         // started in the background (issue #37). No-op when already microphone.
         inferenceBinder?.promoteToFgsMicrophone()
-        applyWindowHeight(targetHeight, force = true)
+        applyWindowHeight(targetHeight)
     }
 
     override fun onWindowHidden() {
@@ -276,52 +283,36 @@ class OutspokeInputMethodService :
     }
 
     /**
-     * Height of the navigation bar in pixels, or 0 when gesture navigation is active.
-     *
-     * Two independent sources are consulted to guard against OEM ROMs (e.g. Realme UI)
-     * that return 0 from [WindowManager.currentWindowMetrics] at the service-context level
-     * even when button navigation is active:
-     *
-     *  1. [WindowManager.currentWindowMetrics] (public API, API 30+) — primary source,
-     *     correct on stock AOSP and most devices.
-     *
-     *  2. The `navigation_bar_height` system dimension resource — a private-but-stable
-     *     internal resource present on all known Android versions and OEM ROMs. Used only
-     *     as a fallback when source 1 returns 0, and only when we can confirm button
-     *     navigation is actually active (i.e. the resource itself is > 0 AND the system
-     *     navigation mode is not gesture-only). This avoids adding spurious bottom padding
-     *     on gesture-nav devices where both sources should be 0.
-     *
-     * On gesture navigation both sources return 0, so the result is correctly 0.
-     * On button navigation, if source 1 is broken by the OEM, source 2 saves us.
+     * IME window geometry for the current display: navigation bar height, keyboard window height
+     * and the suggestion-bar slot, all in pixels.
      */
-    private val navBarHeightPx: Int by lazy {
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-
-        // Source 1: public API
-        val fromWindowMetrics = wm.currentWindowMetrics.windowInsets
-            .getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-
-        // Source 2: internal system resource — only consulted when source 1 returns 0,
-        // because on gesture-nav devices the resource may still report the physical bar
-        // height even though no space is reserved. We only trust it when source 1 is 0.
-        if (fromWindowMetrics > 0) {
-            fromWindowMetrics
-        } else {
-            try {
-                val resId = Resources.getSystem()
-                    .getIdentifier("navigation_bar_height", "dimen", "android")
-                if (resId != 0) Resources.getSystem().getDimensionPixelSize(resId) else 0
-            } catch (_: Exception) {
-                0
-            }
-        }
-    }
+    private data class WindowGeometry(
+        val navBarPx: Int,
+        val keyboardPx: Int,
+        val barSlotPx: Int,
+    )
 
     /**
-     * Total height of the IME window for the keyboard panel (excludes the suggestion bar
-     * slot). This equals 20 % of the usable screen height (above the nav bar) PLUS the
-     * nav bar height.
+     * Cached [WindowGeometry]. [KeyboardScreen] reads the navigation-bar padding out of this same
+     * Compose state, so refreshing it re-pads the strip without an explicit recomposition call.
+     *
+     * These three values used to be `by lazy` fields, frozen at the size the display had when the
+     * service was first used. The service instance outlives rotation and split-screen resizing, so
+     * a strip measured in portrait kept its portrait height afterwards — clipped keys in landscape,
+     * a keyboard half the screen tall in split view. [refreshGeometry] re-measures on configuration
+     * change and on every window show.
+     */
+    private var windowGeometry by mutableStateOf<WindowGeometry?>(null)
+
+    private val geometry: WindowGeometry
+        get() = windowGeometry ?: computeGeometry().also { windowGeometry = it }
+
+    /** Height of the navigation bar in pixels, or 0 when gesture navigation is active. */
+    private val navBarHeightPx: Int get() = geometry.navBarPx
+
+    /**
+     * Total height of the IME window for the keyboard panel (excludes the suggestion bar slot):
+     * 20 % of the usable screen height (above the nav bar) PLUS the nav bar height.
      *
      * Why include [navBarHeightPx]:
      * The Android IME window is anchored to the very bottom of the screen — it is NOT
@@ -332,22 +323,80 @@ class OutspokeInputMethodService :
      * and [KeyboardTutorialOverlay]), which is more reliable than [Modifier.navigationBarsPadding]
      * because inset dispatch inside IME windows is broken on some OEM ROMs.
      */
-    private val keyboardHeightPx: Int by lazy {
+    private val keyboardHeightPx: Int get() = geometry.keyboardPx
+
+    /** Pixel height of the suggestion bar slot (chips row + hairline divider). */
+    private val barSlotHeightPx: Int get() = geometry.barSlotPx
+
+    /**
+     * Measures [WindowGeometry] against the display as it is right now.
+     *
+     * The navigation bar height consults two independent sources to guard against OEM ROMs
+     * (e.g. Realme UI) that return 0 from [WindowManager.currentWindowMetrics] at the
+     * service-context level even when button navigation is active:
+     *
+     *  1. [WindowManager.currentWindowMetrics] (public API, API 30+) — primary source,
+     *     correct on stock AOSP and most devices.
+     *
+     *  2. The `navigation_bar_height` system dimension resource — a private-but-stable
+     *     internal resource present on all known Android versions and OEM ROMs. Used only
+     *     as a fallback when source 1 returns 0, because on gesture-nav devices the resource
+     *     may still report the physical bar height even though no space is reserved.
+     *
+     * On gesture navigation both sources return 0, so the result is correctly 0.
+     * On button navigation, if source 1 is broken by the OEM, source 2 saves us.
+     */
+    private fun computeGeometry(): WindowGeometry {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val screenHeight = wm.currentWindowMetrics.bounds.height()
-        val usableHeight = screenHeight - navBarHeightPx
-        (usableHeight * 0.20f).toInt() + navBarHeightPx
+
+        // Source 1: public API
+        val fromWindowMetrics = wm.currentWindowMetrics.windowInsets
+            .getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+
+        // Source 2: internal system resource — only consulted when source 1 returns 0.
+        val navBar = if (fromWindowMetrics > 0) {
+            fromWindowMetrics
+        } else {
+            try {
+                val resId = Resources.getSystem()
+                    .getIdentifier("navigation_bar_height", "dimen", "android")
+                if (resId != 0) Resources.getSystem().getDimensionPixelSize(resId) else 0
+            } catch (_: Exception) {
+                0
+            }
+        }
+
+        val usableHeight = wm.currentWindowMetrics.bounds.height() - navBar
+        // SUGGESTION_BAR_HEIGHT_DP + 1dp divider
+        val barSlot = ((SUGGESTION_BAR_HEIGHT_DP + 1) * resources.displayMetrics.density + 0.5f).toInt()
+
+        return WindowGeometry(
+            navBarPx = navBar,
+            keyboardPx = (usableHeight * 0.20f).toInt() + navBar,
+            barSlotPx = barSlot,
+        )
     }
 
     /**
-     * Pixel height of the suggestion bar slot (chips row + hairline divider).
-     * Pre-computed from the dp constant so we never run density resolution on main thread
-     * from a background context.
+     * Re-measures the display into [windowGeometry]; `true` when the geometry actually changed.
+     * Only ever called from the main thread, never during composition.
      */
-    private val barSlotHeightPx: Int by lazy {
-        // SUGGESTION_BAR_HEIGHT_DP + 1dp divider = SUGGESTION_BAR_HEIGHT_DP + 1
-        val density = resources.displayMetrics.density
-        ((SUGGESTION_BAR_HEIGHT_DP + 1) * density + 0.5f).toInt()
+    private fun refreshGeometry(): Boolean {
+        val refreshed = computeGeometry()
+        if (refreshed == windowGeometry) return false
+        Log.d(TAG, "geometry refreshed: $windowGeometry -> $refreshed")
+        windowGeometry = refreshed
+        return true
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // A rotation or split-screen resize does not re-show the window, and the window keeps
+        // whatever height was last applied - so push the new size now instead of waiting for the
+        // next onWindowShown (which would leave the strip at the pre-rotation height until then).
+        if (refreshGeometry() && window?.window != null) {
+            applyWindowHeight(keyboardHeightPx + if (barVisible) barSlotHeightPx else 0)
+        }
     }
 
     /**
@@ -355,6 +404,18 @@ class OutspokeInputMethodService :
      * Drives [onWindowShown] restoring to the right size and the one-shot resize logic.
      */
     private var barVisible: Boolean = false
+
+    /**
+     * Whether the suggestion bar is showing *right now*, straight from the state the Compose
+     * layer renders. [barVisible] is a latch the composition drives, so after a hide/show cycle it
+     * can disagree with reality: a bar dismissed while the keyboard was closing had its shrink
+     * runnable cancelled by [onWindowHidden] and left the latch set. Restoring the window height
+     * from that latch made the window taller than its content - a blank band whose extra inset
+     * also pushed bottom-anchored hosts (chat lists) off their scroll position.
+     */
+    private fun suggestionBarShouldBeVisible(): Boolean =
+        keyboardViewModel.wordSuggestions.value.isNotEmpty() &&
+                !keyboardViewModel.suggestionBarDismissed.value
 
     /**
      * Resize the IME window to accommodate the suggestion bar slot.
@@ -410,45 +471,42 @@ class OutspokeInputMethodService :
     /**
      * Apply [height] to both the compose view layout params and the IME window attributes.
      *
-     * The [force] flag bypasses the equality guard on the view's layout params — necessary
-     * after the keyboard window is hidden and reshown, because the system may have silently
-     * overridden the actual window height while our [imeComposeView] still reports the old
-     * cached value in its [android.view.ViewGroup.LayoutParams].
+     * The write is skipped when the window attributes *and* the view's layout params already
+     * carry [height]. The attributes are what the host app sees, so they are the value worth
+     * comparing against: an unconditional write on every window show re-reported the IME inset
+     * after the show animation had already started, which is what made a bottom-anchored chat
+     * jump when the keyboard appeared. The view's layout params are checked as well because the
+     * framework can resize the window itself while the keyboard is hidden, leaving a stale
+     * cached value behind; either disagreement triggers the write.
      */
-    private fun applyWindowHeight(height: Int, force: Boolean = false) {
+    private fun applyWindowHeight(height: Int) {
+        val win = window?.window
         val view = imeComposeView
+        val attrsHeight = win?.attributes?.height
+        if (attrsHeight == height && (view == null || view.layoutParams?.height == height)) {
+            Log.d(TAG, "applyWindowHeight($height) - window already at height, nothing to do")
+            return
+        }
+
         if (view == null) {
             // The framework sometimes reuses the decor view without calling onCreateInputView
             // again (mViewsCreated=true path). In that case imeComposeView is null but the
             // window still exists and must be resized directly.
             Log.d(TAG, "applyWindowHeight($height) — imeComposeView null, applying to window only")
-            window?.window?.also { win ->
-                val attrs = win.attributes
-                if (!force && attrs.height == height) return
-                attrs.height = height
-                win.attributes = attrs
-            }
+            win?.also { it.attributes = it.attributes.apply { this.height = height } }
             return
         }
 
-        val currentHeight = view.layoutParams?.height ?: return
-        Log.d(TAG, "applyWindowHeight($height) force=$force currentHeight=$currentHeight")
-        if (!force && currentHeight == height) return
-
+        Log.d(TAG, "applyWindowHeight($height) currentHeight=${view.layoutParams?.height} attrs=$attrsHeight")
         view.layoutParams = view.layoutParams.also { it.height = height }
 
-        window?.window?.also { win ->
-            val attrs = win.attributes
-            attrs.height = height
-            win.attributes = attrs
-        }
+        win?.also { it.attributes = it.attributes.apply { this.height = height } }
 
         view.requestLayout()
     }
 
     override fun onCreateInputView(): View {
-        val currentlyVisible = keyboardViewModel.wordSuggestions.value.isNotEmpty() &&
-                !keyboardViewModel.suggestionBarDismissed.value
+        val currentlyVisible = suggestionBarShouldBeVisible()
         barVisible = currentlyVisible
         val initialHeight = keyboardHeightPx + (if (barVisible) barSlotHeightPx else 0)
         Log.d(TAG, "onCreateInputView barVisible=$barVisible initialHeight=$initialHeight")
@@ -503,7 +561,11 @@ class OutspokeInputMethodService :
     override fun onFinishInputView(finishingInput: Boolean) {
         Log.d(TAG, "onFinishInputView finishingInput=$finishingInput barVisible=$barVisible")
         super.onFinishInputView(finishingInput)
-        imeComposeView = null
+        // Deliberately keep [imeComposeView]: the framework reuses the same input view across
+        // hide/show cycles without calling onCreateInputView again, and a null reference here
+        // forced every later resize down the "window attributes only" path - the window then grew
+        // or shrank while the retained view kept measuring at the old height, painting a blank
+        // band and reporting an inset that no content filled.
     }
 
     /**
