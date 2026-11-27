@@ -30,7 +30,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.brgr.outspoke.R
-import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.KeyboardUiState
 import dev.brgr.outspoke.ui.theme.LocalOutspokeStatusColors
 import dev.brgr.outspoke.ui.theme.MyIcons
@@ -44,7 +43,7 @@ import dev.brgr.outspoke.ui.theme.tabularFigures
  * Every state renders inside a [StatusPill]: one tonal pill whose colour carries the tone and
  * whose icon, spinner or word carries the meaning — colour is never the only signal.
  *
- * - [KeyboardUiState.Idle]          → neutral pill, ready dot, small mic icon (+ diagnostics badge if non-clean)
+ * - [KeyboardUiState.Idle]          → neutral pill, ready dot, small mic icon
  * - [KeyboardUiState.Listening]     → accent-toned pill with a pulsing dot and "Listening"
  * - [KeyboardUiState.Processing]    → accent-toned pill, spinner + partial transcript text
  * - [KeyboardUiState.Transcribing]  → neutral pill, spinner + "Transcribing…" label (mic off, engine busy)
@@ -60,10 +59,6 @@ import dev.brgr.outspoke.ui.theme.tabularFigures
  * leaving the keyboard. For errors that require external action (permission denied, engine load
  * failed) the "Open Outspoke" button is shown instead.
  *
- * @param diagnostics Pipeline counters from the most recent recording session. When non-clean
- *                    a compact summary (e.g. "2T · 1R") is shown next to the idle mic icon,
- *                    giving immediate visibility into whether any trims or alignment recoveries
- *                    fired - without opening logcat.
  * @param onOpenCompanionApp Called when the user taps the "Open Outspoke" action button shown
  *                           in [KeyboardUiState.Error] and [KeyboardUiState.EngineLoading] states.
  * @param onRetry Called when the user taps "Try again" for transient errors. Should trigger
@@ -73,7 +68,6 @@ import dev.brgr.outspoke.ui.theme.tabularFigures
 fun StatusIndicator(
     uiState: KeyboardUiState,
     modifier: Modifier = Modifier,
-    diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     onOpenCompanionApp: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
 ) {
@@ -85,7 +79,7 @@ fun StatusIndicator(
         modifier = modifier,
     ) { state ->
         when (state) {
-            is KeyboardUiState.Idle -> IdleIndicator(diagnostics = diagnostics)
+            is KeyboardUiState.Idle -> IdleIndicator()
             is KeyboardUiState.Listening -> ListeningIndicator()
             is KeyboardUiState.Processing -> ProcessingIndicator(partial = state.partial)
             is KeyboardUiState.Transcribing -> TranscribingIndicator()
@@ -140,7 +134,7 @@ private fun localizedLoadingMessage(state: KeyboardUiState.EngineLoading): Strin
     )
 
 @Composable
-private fun IdleIndicator(diagnostics: PipelineDiagnostics = PipelineDiagnostics()) {
+private fun IdleIndicator() {
     val statusColors = LocalOutspokeStatusColors.current
     StatusPill(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         // Success, not the accent: the accent means "the mic is live", this dot only says the
@@ -152,15 +146,6 @@ private fun IdleIndicator(diagnostics: PipelineDiagnostics = PipelineDiagnostics
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp),
         )
-        if (!diagnostics.isClean) {
-            // Counters move while the user watches them, so they get tabular figures.
-            Text(
-                text = diagnostics.summary(),
-                style = MaterialTheme.typography.labelSmall.tabularFigures,
-                color = statusColors.warning,
-                maxLines = 1,
-            )
-        }
     }
 }
 

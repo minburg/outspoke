@@ -68,8 +68,6 @@ private fun ImePreviewScaffold(
     uiState: KeyboardUiState,
     amplitude: Float = 0f,
     isContinuous: Boolean = false,
-    isWhisperEngine: Boolean = false,
-    whisperLanguage: String = "auto",
 ) {
     OutspokeKeyboardTheme {
         Box(modifier = Modifier.height(220.dp)) {
@@ -78,9 +76,6 @@ private fun ImePreviewScaffold(
                 amplitude = amplitude,
                 isContinuous = isContinuous,
                 triggerMode = "HOLD",
-                isWhisperEngine = isWhisperEngine,
-                whisperLanguage = whisperLanguage,
-                onWhisperLanguageSelected = {},
                 onRecordStart = {},
                 onRecordStop = {},
                 onContinuousModeEnabled = {},
@@ -123,16 +118,6 @@ private fun ImeProcessingPreview() {
 @Composable
 private fun ImeTranscribingPreview() {
     ImePreviewScaffold(uiState = KeyboardUiState.Transcribing)
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF111111, name = "IME · Whisper + Language Bar")
-@Composable
-private fun ImeWhisperPreview() {
-    ImePreviewScaffold(
-        uiState = KeyboardUiState.Idle,
-        isWhisperEngine = true,
-        whisperLanguage = "de",
-    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111, name = "IME · Engine Loading")

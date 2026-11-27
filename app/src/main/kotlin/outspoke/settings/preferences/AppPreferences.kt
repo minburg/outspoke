@@ -79,11 +79,11 @@ class AppPreferences(private val context: Context) {
     private val keyVadEnabled = booleanPreferencesKey("vad_enabled")
 
     /** Whether VAD (voice activity detection) is active. Defaults to `true`. */
-    val vadSensitivity: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val vadEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[keyVadEnabled] ?: true
     }
 
-    suspend fun setVadSensitivity(enabled: Boolean) {
+    suspend fun setVadEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[keyVadEnabled] = enabled }
     }
 
@@ -101,21 +101,6 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setSelectedModelId(modelId: ModelId) {
         context.dataStore.edit { prefs -> prefs[keySelectedModelId] = modelId.name }
-    }
-
-    private val keyWhisperLanguage = stringPreferencesKey("whisper_language")
-
-    /**
-     * BCP-47 language tag for Whisper decoding, or `"auto"` for automatic detection.
-     * Supported values: `"auto"`, `"en"`, `"de"`, `"nl"`.
-     * Defaults to `"auto"`.
-     */
-    val whisperLanguage: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[keyWhisperLanguage] ?: "auto"
-    }
-
-    suspend fun setWhisperLanguage(tag: String) {
-        context.dataStore.edit { prefs -> prefs[keyWhisperLanguage] = tag }
     }
 
     private val keyPostprocessingEnabled = booleanPreferencesKey("postprocessing_enabled")
@@ -136,20 +121,6 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[keyPostprocessingEnabled] = enabled }
     }
 
-    private val keyShowPipelineDiagnostics = booleanPreferencesKey("show_pipeline_diagnostics")
-
-    /**
-     * When `true`, the keyboard UI displays a live [PipelineDiagnostics] summary badge.
-     * Defaults to `false` - hidden by default to keep the UI clean.
-     */
-    val showPipelineDiagnostics: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[keyShowPipelineDiagnostics] ?: false
-    }
-
-    suspend fun setShowPipelineDiagnostics(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[keyShowPipelineDiagnostics] = enabled }
-    }
-
     private val keyKeyboardTutorialShown = booleanPreferencesKey("keyboard_tutorial_shown")
 
     /**
@@ -162,50 +133,6 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setKeyboardTutorialShown(shown: Boolean) {
         context.dataStore.edit { prefs -> prefs[keyKeyboardTutorialShown] = shown }
-    }
-
-    private val keyForcedLanguage = stringPreferencesKey("forced_language")
-
-    /**
-     * BCP-47 language tag to force on the active speech engine, or `null` for automatic detection.
-     *
-     * Supported values for Parakeet TDT 0.6B-v3:
-     *   `null` (auto), `"en"`, `"de"`, `"fr"`, `"es"`, `"it"`, `"pt"`, `"nl"`, `"pl"`,
-     *   `"zh"`, `"ja"`, `"ko"`.
-     *
-     * When non-null, `InferenceService` passes this tag to `SpeechEngine.setLanguage()` after
-     * loading the engine.  The language is also used by the post-processing pipeline
-     * (filler-word removal, number normalisation) to select the correct locale rules.
-     *
-     * Defaults to `null` (auto-detect) so existing installs are unaffected.
-     */
-    val forcedLanguage: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[keyForcedLanguage]   // null when key absent → auto-detect
-    }
-
-    suspend fun setForcedLanguage(tag: String?) {
-        context.dataStore.edit { prefs ->
-            if (tag == null) prefs.remove(keyForcedLanguage)
-            else prefs[keyForcedLanguage] = tag
-        }
-    }
-
-    private val keyFormatNumbersAsDigits = booleanPreferencesKey("format_numbers_as_digits")
-
-    /**
-     * When `true` (default), the post-processing pipeline converts number-word sequences
-     * such as "twelve", "two thousand and twenty five", or "zwölf" into their digit
-     * equivalents ("12", "2025", "12").
-     *
-     * Set to `false` to keep number words as spoken — useful when the user dictates
-     * text where the written form of numbers is preferred (e.g. legal or literary writing).
-     */
-    val formatNumbersAsDigits: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[keyFormatNumbersAsDigits] ?: true
-    }
-
-    suspend fun setFormatNumbersAsDigits(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[keyFormatNumbersAsDigits] = enabled }
     }
 
     private val keySuggestionBarEnabled = booleanPreferencesKey("suggestion_bar_enabled")
@@ -260,25 +187,6 @@ class AppPreferences(private val context: Context) {
                 prefs[keySuggestionBarLanguages] = (current + tag).joinToString(",")
             }
         }
-    }
-
-    private val keySuggestionBarDismissed = booleanPreferencesKey("suggestion_bar_dismissed")
-
-    /**
-     * `true` once the user has tapped the dismiss (×) button in the suggestion bar.
-     * The bar will not appear again until a new recording session starts.
-     *
-     * Reset to `false` automatically at the start of each new recording session so the
-     * bar can appear again if the user taps on a word in the new transcription.
-     *
-     * Defaults to `false` so the bar is shown on first use.
-     */
-    val suggestionBarDismissed: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[keySuggestionBarDismissed] ?: false
-    }
-
-    suspend fun setSuggestionBarDismissed(dismissed: Boolean) {
-        context.dataStore.edit { prefs -> prefs[keySuggestionBarDismissed] = dismissed }
     }
 
     private val keyPreferredMicId = intPreferencesKey("preferred_mic_id")

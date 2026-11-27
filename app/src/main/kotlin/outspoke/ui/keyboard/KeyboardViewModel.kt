@@ -12,10 +12,8 @@ import dev.brgr.outspoke.ime.TextInjector
 import dev.brgr.outspoke.ime.WordSuggestionProvider
 import dev.brgr.outspoke.inference.EngineState
 import dev.brgr.outspoke.inference.InferenceRepository
-import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.inference.TranscriptResult
 import dev.brgr.outspoke.settings.preferences.AppPreferences
-import dev.brgr.outspoke.ui.keyboard.components.WHISPER_LANGUAGE_OPTIONS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -23,6 +21,16 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 private const val TAG = "KeyboardViewModel"
+
+/**
+ * Language tags the engine may pick when the transcript language is auto-detected.
+ *
+ * Detection is narrowed to the two languages Outspoke actually supports end to end
+ * (post-processing rules + suggestion packs). Left at the model's full vocabulary, a
+ * neighbouring language routinely wins by a hair - ES (50262) beating EN (50259) - and the
+ * whole utterance comes back cleaned with the wrong locale's rules.
+ */
+private val DETECTED_LANGUAGE_TAGS = listOf("en", "de")
 
 /**
  * Bridges the IME lifecycle, audio capture, and inference pipeline into a stream of
@@ -82,38 +90,18 @@ class KeyboardViewModel(
      * Whether VAD (voice activity detection) is enabled. Collected eagerly so the value is
      * always available as a snapshot when recording starts - no suspend context required.
      */
-    val vadSensitivity: StateFlow<Boolean> = appPreferences.vadSensitivity
+    val vadEnabled: StateFlow<Boolean> = appPreferences.vadEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /**
-     * `true` when the currently selected model is a Whisper variant.
-     * Used to conditionally show the language selector in the keyboard UI.
-     */
-    val isWhisperEngine: StateFlow<Boolean> = appPreferences.selectedModelId
-        .map { it.name.startsWith("WHISPER") }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    /**
-     * Currently selected Whisper language tag: `"auto"`, `"en"`, `"de"`, or `"nl"`.
-     * Collected eagerly so the selector always reflects the saved value on first draw.
-     */
-    val whisperLanguage: StateFlow<String> = appPreferences.whisperLanguage
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "auto")
-
-    /**
      * The post-processing language used by the cleaning pipeline (filler removal, number
-     * normalisation, spurious-period handling). Mirrors [SpeechEngine.currentLanguage] for
-     * the active engine: the user's forced language, or `"en"` when set to `"auto"` / unset.
+     * normalisation, spurious-period handling). Always `"en"`.
      *
-     * Collected eagerly so [dev.brgr.outspoke.ime.TextInjector]'s display-cleaning lambda can
-     * read a synchronous snapshot when injecting text — this keeps the display path's
-     * language consistent with the engine's (e.g. so German noun capitalisation is
-     * preserved and German fillers are removed in the displayed text, not just in the
-     * stable-chunk tracking path).
+     * Exposed as a [StateFlow] so [dev.brgr.outspoke.ime.TextInjector]'s display-cleaning
+     * lambda can read a synchronous snapshot when injecting text — this keeps the display
+     * path's language consistent with the pipeline that produced the stable-chunk tracking.
      */
-    val currentLanguage: StateFlow<String> = appPreferences.forcedLanguage
-        .map { it ?: "en" }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "en")
+    val currentLanguage: StateFlow<String> = MutableStateFlow("en").asStateFlow()
 
     /**
      * `true` when the transcript post-processing pipeline (filler removal, stutter collapse,
@@ -122,25 +110,6 @@ class KeyboardViewModel(
      */
     val postprocessingEnabled: StateFlow<Boolean> = appPreferences.postprocessingEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    /**
-     * Pipeline diagnostic counters for the current or most recent recording session.
-     *
-     * Updated live during recording and kept visible after the session ends so the user
-     * can glance at the keyboard status bar to see if anything unusual happened (trims,
-     * alignment recoveries, blanks discarded) without needing logcat.
-     *
-     * Reset at the start of each new recording in [onRecordStart].
-     */
-    private val _diagnostics = MutableStateFlow(PipelineDiagnostics())
-    val diagnostics: StateFlow<PipelineDiagnostics> = _diagnostics.asStateFlow()
-
-    /**
-     * Whether the pipeline diagnostics badge is visible on the keyboard.
-     * Collected eagerly so the UI always reflects the saved preference on first draw.
-     */
-    val showPipelineDiagnostics: StateFlow<Boolean> = appPreferences.showPipelineDiagnostics
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
      * `true` when the word-suggestion bar feature is enabled in preferences.
@@ -259,23 +228,6 @@ class KeyboardViewModel(
     }
 
     /**
-     * When `true` (default), number-word sequences in the transcript are converted to
-     * digit form by [dev.brgr.outspoke.inference.NumberNormaliser] as part of the
-     * post-processing pipeline.
-     */
-    val formatNumbersAsDigits: StateFlow<Boolean> = appPreferences.formatNumbersAsDigits
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    /**
-     * Persists [tag] to preferences and immediately forwards it to the loaded engine.
-     * Safe to call at any time - the engine's [setLanguage] is thread-safe.
-     */
-    fun setWhisperLanguage(tag: String) {
-        inferenceRepository?.setLanguage(tag)
-        viewModelScope.launch { appPreferences.setWhisperLanguage(tag) }
-    }
-
-    /**
      * Whether the first-run keyboard tutorial should currently be visible.
      * Resolves to `true` on the very first keyboard opening and `false` permanently
      * after [dismissTutorial] is called.
@@ -326,14 +278,11 @@ class KeyboardViewModel(
     /** Set by [OutspokeInputMethodService] when the service binding is established. */
     fun setInferenceRepository(repo: InferenceRepository?) {
         inferenceRepository = repo
-        // Apply the persisted language tag immediately.
-        repo?.setLanguage(whisperLanguage.value)
-        // Constrain auto-detection to only the languages shown in the selector.
-        // "Auto" then means "detect from EN/DE/ES" instead of "any of ~100 languages",
-        // which eliminates false picks like ES (50262) beating EN (50259) by a tiny margin.
-        repo?.setLanguageConstraints(
-            WHISPER_LANGUAGE_OPTIONS.filter { (tag, _) -> tag != "auto" }.map { (tag, _) -> tag }
-        )
+        // Narrow the engine's auto-detection vocabulary. Only Whisper honours this - Parakeet
+        // picks a per-token language and ignores the constraint - but when a Whisper build is
+        // enabled, the full ~100-language list produces false picks like ES (50262) beating
+        // EN (50259) by a hair, and the whole utterance is cleaned with the wrong locale rules.
+        repo?.setLanguageConstraints(DETECTED_LANGUAGE_TAGS)
     }
 
     private var textInjector: TextInjector? = null
@@ -474,7 +423,6 @@ class KeyboardViewModel(
         captureJob?.cancel()
         _isRecording.value = true
         _uiState.value = KeyboardUiState.Listening
-        _diagnostics.value = PipelineDiagnostics()
         _wordSuggestions.value = emptyList()
         // Dismissed flag is no longer set persistently — bar reappears on next word tap.
 
@@ -513,11 +461,10 @@ class KeyboardViewModel(
                 // TranscriptResult emissions drive both the UI and text injection.
                 repo.transcribe(
                     audio = audioCaptureManager.startCapture(
-                        vadEnabled = vadSensitivity.value,
+                        vadEnabled = vadEnabled.value,
                         rawSource = rawMicCapture.value,
                     ),
                     postprocessingEnabled = postprocessingEnabled.value,
-                    formatNumbersAsDigits = formatNumbersAsDigits.value,
                 ).collect { result ->
                     // Stale-session guard: if this job has been superseded (e.g. the field
                     // was cleared and a new session started), discard this result entirely
@@ -529,14 +476,6 @@ class KeyboardViewModel(
                             _uiState.value = if (_isRecording.value) KeyboardUiState.Processing(result.text)
                                 else KeyboardUiState.Transcribing
                             textInjector?.setPartial(result.text)
-                            // Update alignment recovery counter from the injector.
-                            val injector = textInjector
-                            if (injector != null) {
-                                val d = _diagnostics.value
-                                if (injector.alignmentRecoveryCount > d.alignmentRecoveries) {
-                                    _diagnostics.value = d.copy(alignmentRecoveries = injector.alignmentRecoveryCount)
-                                }
-                            }
                         }
 
                         is TranscriptResult.Final -> {
@@ -568,9 +507,6 @@ class KeyboardViewModel(
                                         if (result.stableWords.isNotEmpty()) " (stableWords=${result.stableWords.size}w)" else ""
                             )
                             textInjector?.resetAfterTrim(result.stableWords)
-                            _diagnostics.value = _diagnostics.value.copy(
-                                windowTrims = _diagnostics.value.windowTrims + 1
-                            )
                         }
 
                         // The model saw audio but couldn't resolve a word (weak

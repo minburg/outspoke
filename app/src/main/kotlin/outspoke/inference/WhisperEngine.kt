@@ -548,7 +548,7 @@ class WhisperEngine : SpeechEngine {
         //
         // Forced tag (e.g. "en", "de"): vocabulary lookup, no decoder pre-pass needed.
         //
-        // "auto" with constraints (the normal case when the LanguageSelector is visible):
+        // "auto" with constraints (the normal case: the caller narrows the tag set):
         //   - Resolve each constrained tag to a token ID once.
         //   - If the clip is < 2 s there is not enough phoneme signal for reliable detection;
         //     fall back to the first constrained option to avoid picking an adjacent token

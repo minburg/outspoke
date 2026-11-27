@@ -86,7 +86,7 @@ fun InputPreferencesScreen(
 fun SpeechPreferencesScreen(
     viewModel: PreferencesViewModel = viewModel(),
 ) {
-    val vadSensitivity by viewModel.vadSensitivity.collectAsState()
+    val vadEnabled by viewModel.vadEnabled.collectAsState()
     val postprocessingEnabled by viewModel.postprocessingEnabled.collectAsState()
     val suggestionBarEnabled by viewModel.suggestionBarEnabled.collectAsState()
     val suggestionBarLanguages by viewModel.suggestionBarLanguages.collectAsState()
@@ -94,8 +94,8 @@ fun SpeechPreferencesScreen(
 
     PreferencesColumn {
         VadSection(
-            vadSensitivity = vadSensitivity,
-            onVadSensitivityChange = viewModel::setVadSensitivity,
+            vadEnabled = vadEnabled,
+            onVadEnabledChange = viewModel::setVadEnabled,
         )
         HorizontalDivider()
         PostprocessingSection(
@@ -119,22 +119,14 @@ fun SpeechPreferencesScreen(
 /**
  * Category 3 — Tools.
  *
- * Keyboard tutorial replay and the pipeline diagnostics toggle.
- * Backed by [PreferencesViewModel] / DataStore.
+ * Keyboard tutorial replay. Backed by [PreferencesViewModel] / DataStore.
  */
 @Composable
 fun ToolsPreferencesScreen(
     viewModel: PreferencesViewModel = viewModel(),
 ) {
-    val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
-
     PreferencesColumn {
         TutorialSection(onResetTutorial = viewModel::resetTutorial)
-        HorizontalDivider()
-        DiagnosticsSection(
-            showPipelineDiagnostics = showPipelineDiagnostics,
-            onShowPipelineDiagnosticsChange = viewModel::setShowPipelineDiagnostics,
-        )
     }
 }
 
@@ -292,8 +284,8 @@ private fun DeleteButtonSection(
 
 @Composable
 private fun VadSection(
-    vadSensitivity: Boolean,
-    onVadSensitivityChange: (Boolean) -> Unit,
+    vadEnabled: Boolean,
+    onVadEnabledChange: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -311,14 +303,14 @@ private fun VadSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = if (vadSensitivity) stringResource(R.string.state_enabled)
+                text = if (vadEnabled) stringResource(R.string.state_enabled)
                 else stringResource(R.string.state_disabled),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Switch(
-                checked = vadSensitivity,
-                onCheckedChange = onVadSensitivityChange,
+                checked = vadEnabled,
+                onCheckedChange = onVadEnabledChange,
             )
         }
     }
@@ -472,40 +464,6 @@ private fun TutorialSection(
     }
 }
 
-@Composable
-private fun DiagnosticsSection(
-    showPipelineDiagnostics: Boolean,
-    onShowPipelineDiagnosticsChange: (Boolean) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.pref_diagnostics_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = stringResource(R.string.pref_diagnostics_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = if (showPipelineDiagnostics) stringResource(R.string.pref_diagnostics_visible)
-                else stringResource(R.string.pref_diagnostics_hidden),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Switch(
-                checked = showPipelineDiagnostics,
-                onCheckedChange = onShowPipelineDiagnosticsChange,
-            )
-        }
-    }
-}
-
 /**
  * Single row for a suggestion language: shows the language name, its download state,
  * and appropriate action controls.
@@ -645,7 +603,7 @@ private fun TriggerModeSectionTapTogglePreview() {
 private fun VadSectionPreview() {
     OutspokeTheme {
         PreferencesColumn {
-            VadSection(vadSensitivity = true, onVadSensitivityChange = {})
+            VadSection(vadEnabled = true, onVadEnabledChange = {})
         }
     }
 }
@@ -693,16 +651,6 @@ private fun TutorialSectionPreview() {
     OutspokeTheme {
         PreferencesColumn {
             TutorialSection(onResetTutorial = {})
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Prefs · Diagnostics Visible")
-@Composable
-private fun DiagnosticsSectionPreview() {
-    OutspokeTheme {
-        PreferencesColumn {
-            DiagnosticsSection(showPipelineDiagnostics = true, onShowPipelineDiagnosticsChange = {})
         }
     }
 }

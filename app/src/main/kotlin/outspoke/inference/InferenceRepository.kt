@@ -722,7 +722,6 @@ internal fun String.cleanTranscriptStructural(
 internal fun String.cleanTranscript(
     isContinuation: Boolean = false,
     language: String = "en",
-    formatNumbersAsDigits: Boolean = true,
     skipSpuriousPeriods: Boolean = false,
 ): String {
     if (isBlank()) {
@@ -746,15 +745,9 @@ internal fun String.cleanTranscript(
     val afterStutters = afterFillers.collapseStutters()
     if (afterStutters != afterFillers) Log.d(TAG, "[CLEAN:STUTTER]     ${afterFillers.length} → ${afterStutters.length} chars")
 
-    val afterNumbers = if (formatNumbersAsDigits) {
-        val words = afterStutters.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val normalised = NumberNormaliser.normalise(words, language)
-        val joined = normalised.joinToString(" ")
-        if (joined != afterStutters) Log.d(TAG, "[CLEAN:NUMBERS]     ${afterStutters.length} → ${joined.length} chars")
-        joined
-    } else {
-        afterStutters
-    }
+    val numberWords = afterStutters.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val afterNumbers = NumberNormaliser.normalise(numberWords, language).joinToString(" ")
+    if (afterNumbers != afterStutters) Log.d(TAG, "[CLEAN:NUMBERS]     ${afterStutters.length} → ${afterNumbers.length} chars")
 
     val afterDedup = afterNumbers.collapseRepeatedPhrases()
     if (afterDedup != afterStutters) Log.d(TAG, "[CLEAN:PHRASES]     ${afterStutters.length} → ${afterDedup.length} chars")
@@ -1289,12 +1282,6 @@ class InferenceRepository(
     val acousticCache: AcousticCandidateCache = AcousticCandidateCache()
 
     /**
-     * Forwards a language tag to the underlying engine.
-     * No-op for engines that do not support language selection (Parakeet, Voxtral).
-     */
-    fun setLanguage(tag: String) = engine.setLanguage(tag)
-
-    /**
      * Forwards a language constraint set to the underlying engine.
      * No-op for engines that do not support language selection (Parakeet, Voxtral).
      */
@@ -1367,18 +1354,16 @@ class InferenceRepository(
     fun transcribe(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
-        formatNumbersAsDigits: Boolean = true,
     ): Flow<TranscriptResult> = flow {
         sessionMutex.withLock {
             check(!closed) { "Speech model is no longer available. Open the keyboard again to reload it." }
-            emitAll(transcribeSession(audio, postprocessingEnabled, formatNumbersAsDigits))
+            emitAll(transcribeSession(audio, postprocessingEnabled))
         }
     }
 
     private fun transcribeSession(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean = true,
-        formatNumbersAsDigits: Boolean = true,
     ): Flow<TranscriptResult> = channelFlow<TranscriptResult> {
         // The chunked-TDT streaming path requires the [ChunkStreamingEngine] stateful
         // decode primitives (implemented by ParakeetEngine). If a non-streaming engine is
@@ -1386,7 +1371,7 @@ class InferenceRepository(
         // below) so the repository stays functional.
         val streaming = engine as? ChunkStreamingEngine
         if (streaming == null) {
-            legacyTranscribe(audio, postprocessingEnabled, formatNumbersAsDigits).collect { send(it) }
+            legacyTranscribe(audio, postprocessingEnabled).collect { send(it) }
             return@channelFlow
         }
 
@@ -1708,10 +1693,7 @@ class InferenceRepository(
             val raw = streaming.detokenizeTokens(allTokens)
             if (raw.isBlank()) return
             val cleaned = if (postprocessingEnabled)
-                raw.cleanTranscript(
-                    language = engine.currentLanguage,
-                    formatNumbersAsDigits = formatNumbersAsDigits,
-                )
+                raw.cleanTranscript(language = engine.currentLanguage)
             else raw
             if (cleaned.isBlank()) return
             val confidence = utteranceConfidence()
@@ -1856,7 +1838,7 @@ class InferenceRepository(
             }
             val (raw, confidence) = checkNotNull(result)
             val cleaned = if (postprocessingEnabled)
-                raw.cleanTranscript(language = engine.currentLanguage, formatNumbersAsDigits = formatNumbersAsDigits)
+                raw.cleanTranscript(language = engine.currentLanguage)
             else raw
             val finalText = if (cleaned.isBlank()) raw else cleaned
             // Mirror the legacy path's raw-vs-cleaned logcat pairing so on-device triage
@@ -1934,7 +1916,6 @@ class InferenceRepository(
     private fun legacyTranscribe(
         audio: Flow<AudioChunk>,
         postprocessingEnabled: Boolean,
-        formatNumbersAsDigits: Boolean,
     ): Flow<TranscriptResult> = channelFlow<TranscriptResult> {
         val window = ArrayDeque<ShortArray>()
         var windowSamples = 0
@@ -2177,11 +2158,7 @@ class InferenceRepository(
                 val structuralTextRaw = if (postprocessingEnabled)
                     rawText.cleanTranscriptStructural(isContinuation) else rawText
                 val fullCleanedTextRaw = if (postprocessingEnabled)
-                    rawText.cleanTranscript(
-                        isContinuation,
-                        language = engine.currentLanguage,
-                        formatNumbersAsDigits = formatNumbersAsDigits
-                    ) else rawText
+                    rawText.cleanTranscript(isContinuation, language = engine.currentLanguage) else rawText
 
                 // E3: soft script-hallucination handling. Instead of discarding an entire
                 // partial when a single warm-up artefact token lands outside the

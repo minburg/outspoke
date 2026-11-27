@@ -268,14 +268,14 @@ class NumberNormaliserTest {
         assertEquals(listOf("20", "and", "some"), result)
     }
 
-    // ── 12. Disabled toggle passes through unchanged ──────────────────────────
+    // ── 12. Normaliser purity on ordinary and empty input ─────────────────────
 
     @Test
-    fun `disabled toggle leaves number words unchanged`() {
+    fun `normaliser converts number words and leaves other words untouched`() {
         val words = listOf("I", "have", "twelve", "apples")
-        // When formatNumbersAsDigits=false the pipeline skips NumberNormaliser entirely.
-        // We verify the object itself is pure by calling with a known input and checking
-        // it returns the expected conversion; toggling is handled at the pipeline level.
+        // The pipeline always runs NumberNormaliser over the token list; this checks the
+        // object itself is pure — a known input maps to the expected conversion and
+        // non-number words pass through unchanged.
         val normalised = NumberNormaliser.normalise(words, "en")
         assertEquals(listOf("I", "have", "12", "apples"), normalised)
         // Confirm that passing an empty list also works.

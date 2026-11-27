@@ -68,7 +68,7 @@ private fun KeyboardPreviewRoot(state: String, contentHeightDp: Int = KEYBOARD_C
                     .fillMaxWidth()
                     .height((contentHeightDp + if (suggestionsVisible) SUGGESTION_BAR_HEIGHT_DP else 0).dp),
             ) {
-                val (uiState, amplitude, isContinuous, whisper, language) = stateSpec(state)
+                val (uiState, amplitude, isContinuous) = stateSpec(state)
                 // The emulator has no live microphone, so the meter is driven by the synthetic
                 // one (real SpectrumAnalyzer, synthesised speech) whenever the canned state is
                 // "recording". Other states leave it null: quiet fallback row.
@@ -79,9 +79,6 @@ private fun KeyboardPreviewRoot(state: String, contentHeightDp: Int = KEYBOARD_C
                     spectrum = syntheticSpectrum,
                     isContinuous = isContinuous,
                     triggerMode = "HOLD",
-                    isWhisperEngine = whisper,
-                    whisperLanguage = language,
-                    onWhisperLanguageSelected = {},
                     onRecordStart = {},
                     onRecordStop = {},
                     onContinuousModeEnabled = {},
@@ -107,36 +104,33 @@ private fun KeyboardPreviewRoot(state: String, contentHeightDp: Int = KEYBOARD_C
 
 /** Canned keyboard states for screenshotting; mirrors the previews in KeyboardScreen.kt. */
 private fun stateSpec(state: String): KeyboardPreviewSpec = when (state) {
-    "listening" -> KeyboardPreviewSpec(KeyboardUiState.Listening, 0.6f, false, false, "auto")
-    "continuous" -> KeyboardPreviewSpec(KeyboardUiState.Listening, 0.35f, true, false, "auto")
-    "processing" -> KeyboardPreviewSpec(KeyboardUiState.Processing("the quick brown"), 0f, false, false, "auto")
-    "no_speech" -> KeyboardPreviewSpec(KeyboardUiState.NoSpeech, 0f, false, false, "auto")
+    "listening" -> KeyboardPreviewSpec(KeyboardUiState.Listening, 0.6f, false)
+    "continuous" -> KeyboardPreviewSpec(KeyboardUiState.Listening, 0.35f, true)
+    "processing" -> KeyboardPreviewSpec(KeyboardUiState.Processing("the quick brown"), 0f, false)
+    "no_speech" -> KeyboardPreviewSpec(KeyboardUiState.NoSpeech, 0f, false)
     "error" -> KeyboardPreviewSpec(
-        KeyboardUiState.Error(KeyboardUiState.ErrorReason.TranscriptionFailed), 0f, false, false, "auto",
+        KeyboardUiState.Error(KeyboardUiState.ErrorReason.TranscriptionFailed), 0f, false,
     )
     "mic_busy" -> KeyboardPreviewSpec(
-        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicBusy), 0f, false, false, "auto",
+        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicBusy), 0f, false,
     )
     "loading" -> KeyboardPreviewSpec(
-        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting), 0f, false, false, "auto",
+        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.EngineStarting), 0f, false,
     )
     "no_model" -> KeyboardPreviewSpec(
-        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.ModelNotDownloaded), 0f, false, false, "auto",
+        KeyboardUiState.EngineLoading(KeyboardUiState.LoadingReason.ModelNotDownloaded), 0f, false,
     )
     "mic_permission" -> KeyboardPreviewSpec(
-        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied), 0f, false, false, "auto",
+        KeyboardUiState.Error(KeyboardUiState.ErrorReason.MicPermissionDenied), 0f, false,
     )
-    "whisper" -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false, true, "de")
-    "suggestions" -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false, false, "auto")
-    else -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false, false, "auto")
+    "suggestions" -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false)
+    else -> KeyboardPreviewSpec(KeyboardUiState.Idle, 0f, false)
 }
 
 private data class KeyboardPreviewSpec(
     val uiState: KeyboardUiState,
     val amplitude: Float,
     val isContinuous: Boolean,
-    val isWhisperEngine: Boolean,
-    val whisperLanguage: String,
 )
 
 /** Stand-in for whatever app the keyboard is typing into, so contrast is judged in context. */

@@ -137,7 +137,7 @@ class StreamingParityTest {
             // display cleaning the streaming final applies. The only remaining difference
             // between this and the streaming field is the encoder context (full audio vs
             // the 2 s left / 2 s right window) — the actual pipeline delta.
-            val reference = oneShotRaw.cleanTranscript(language = "en", formatNumbersAsDigits = true)
+            val reference = oneShotRaw.cleanTranscript(language = "en")
 
             // Repository-level streaming final.
             val repoFinal = InferenceRepository(engine)
@@ -161,7 +161,6 @@ class StreamingParityTest {
                     text.cleanTranscript(
                         isContinuation = !isSentenceStart,
                         language = "en",
-                        formatNumbersAsDigits = true,
                         skipSpuriousPeriods = true,
                     )
                 },

@@ -376,15 +376,6 @@ class InferenceService : LifecycleService() {
                 loadingEngine = engine
                 engine.load(modelDir)
 
-                // Apply forced-language preference so post-processing uses the correct locale.
-                // For Parakeet TDT, this does not affect ONNX inference (no language tensor in
-                // the current export) but controls filler removal and number normalisation.
-                val lang = AppPreferences(applicationContext).forcedLanguage.first()
-                if (lang != null) {
-                    engine.setLanguage(lang)
-                    Log.d(TAG, "Forced language '$lang' applied to engine for $modelId")
-                }
-
                 loadedModelId = modelId
                 currentEngine = engine
                 currentRepository = InferenceRepository(engine, grammarCorrector)

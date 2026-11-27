@@ -2,6 +2,7 @@ package dev.brgr.outspoke.ui.keyboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -18,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.brgr.outspoke.R
 import dev.brgr.outspoke.ime.EnterAction
-import dev.brgr.outspoke.inference.PipelineDiagnostics
 import dev.brgr.outspoke.ui.keyboard.components.*
 import dev.brgr.outspoke.ui.theme.MyIcons
 import dev.brgr.outspoke.audio.SpectrumFrame
@@ -31,10 +31,13 @@ private val TopSectionGap = 4.dp
  * Root composable for the keyboard input view.
  *
  * Layout (top → bottom):
- *  1. [StatusIndicator] - crossfades between Idle / Listening / Processing / Error states.
- *  2. [WaveformBar]     - level meter: mirrored frequency bands while capturing.
- *  3. Bottom row (left → right):
- *       [Delete All] · [Delete Word] · [TalkButton] · [Delete Char] · [Switch Keyboard]
+ *  1. Hairline separating the strip from the host app.
+ *  2. Suggestion-bar slot (sibling of the keyboard, never an overlay).
+ *  3. [StatusIndicator] - crossfades between Idle / Listening / Processing / Error states,
+ *     with [Insert Space] and [Switch Keyboard] at the right of the same row.
+ *  4. [WaveformBar]     - level meter: mirrored frequency bands while capturing.
+ *  5. Bottom row (left → right):
+ *       [Delete All] · [Delete Word] · [TalkButton] · [Delete Char] · [Enter / context action]
  *     The outer pair is pinned to each edge; the TalkButton stays centred with equal
  *     weight on both sides.
  *
@@ -45,10 +48,6 @@ private val TopSectionGap = 4.dp
  *                               whose capture path has no spectrum.
  * @param isContinuous           `true` when continuous (locked) recording mode is active.
  * @param triggerMode            `"HOLD"` (default) or `"TAP_TOGGLE"`.
- * @param isWhisperEngine        `true` when the active engine is a Whisper variant - controls
- *                               visibility of the language selector row.
- * @param whisperLanguage        Currently selected Whisper language tag (`"auto"`, `"en"`, …).
- * @param onWhisperLanguageSelected Called when the user taps a language pill.
  * @param onRecordStart          Callback fired when the user presses the talk button.
  * @param onRecordStop           Callback fired when the user releases / stops recording.
  * @param onContinuousModeEnabled Callback fired when the drag-up lock threshold is crossed.
@@ -59,7 +58,6 @@ private val TopSectionGap = 4.dp
  * @param enterAction            The semantic action for the Enter key in the current editor.
  * @param onSwitchKeyboard       Switches the active IME back to the previous keyboard.
  * @param onOpenCompanionApp     Opens the Outspoke companion app (e.g. to grant permission or download the model).
- * @param diagnostics            Pipeline counters from the most recent recording session.
  * @param wordSuggestions        Alternative word candidates for the word under the cursor.
  * @param suggestionBarDismissed `true` after the user dismissed the bar; suppresses it.
  * @param onSuggestionTapped     Called when the user taps a word suggestion chip.
@@ -72,9 +70,6 @@ fun KeyboardScreen(
     spectrum: SpectrumFrame? = null,
     isContinuous: Boolean,
     triggerMode: String,
-    isWhisperEngine: Boolean,
-    whisperLanguage: String,
-    onWhisperLanguageSelected: (String) -> Unit,
     onRecordStart: () -> Unit,
     onRecordStop: () -> Unit,
     onContinuousModeEnabled: () -> Unit,
@@ -88,7 +83,6 @@ fun KeyboardScreen(
     onSwitchKeyboard: () -> Unit,
     onOpenCompanionApp: () -> Unit,
     modifier: Modifier = Modifier,
-    diagnostics: PipelineDiagnostics = PipelineDiagnostics(),
     previewForceLockHint: Boolean = false,
     wordSuggestions: List<String> = emptyList(),
     suggestionBarDismissed: Boolean = false,
@@ -122,12 +116,6 @@ fun KeyboardScreen(
     // Explicit nav bar bottom padding — authoritative service-level value, same pattern
     // as KeyboardTutorialOverlay. 0 on gesture nav, real height on button-nav devices.
     val navBarPaddingDp = with(density) { navBarHeightPx.toDp() }
-    // Whisper language chips are shown only when the engine is ready and not recording.
-    val showLanguageChips = isWhisperEngine && uiState.let {
-        it !is KeyboardUiState.EngineLoading && it !is KeyboardUiState.Error &&
-            it !is KeyboardUiState.Listening && it !is KeyboardUiState.Processing &&
-            it !is KeyboardUiState.Transcribing
-    }
 
     // The IME window is a fixed size (keyboard + suggestion bar slot). The bar animates by
     // translating its own content, and the keyboard below it takes the remaining height, so
@@ -147,6 +135,15 @@ fun KeyboardScreen(
         // `keyboardContentHeightPx` and the real window height pushed the status row under the
         // bar shelf - visible as a dark band with the status pill cut in half.
         Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+            // Hairline at the window's top edge, so the strip reads as a separate surface rather
+            // than a continuation of the page above it: with the keyboard background close to a
+            // messaging app's own background the boundary otherwise disappears. Same token and
+            // weight as the suggestion bar's own divider, so the two lines never disagree.
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
             // Suggestion bar — reserves its height while visible, collapses (after its slide-out
             // animation) once hidden, so the keyboard below always gets the rest of the window.
             SuggestionBar(
@@ -223,21 +220,10 @@ fun KeyboardScreen(
                                 ) {
                                     StatusIndicator(
                                         uiState = uiState,
-                                        diagnostics = diagnostics,
                                         onOpenCompanionApp = onOpenCompanionApp,
                                         onRetry = onRetry ?: onRecordStart,
                                         modifier = Modifier.weight(1f, fill = false),
                                     )
-                                    // Language chips for Whisper models - on the same line as the status
-                                    // pill, and only while the engine is idle: mid-recording they are
-                                    // useless, and the row has no room for both chips and a long message.
-                                    if (showLanguageChips) {
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        LanguageSelector(
-                                            selectedLanguage = whisperLanguage,
-                                            onLanguageSelected = onWhisperLanguageSelected,
-                                        )
-                                    }
                                 }
                             }
                             // Both trailing keys of the status row are chrome-matched: one bare icon
@@ -248,7 +234,11 @@ fun KeyboardScreen(
                                     contentDescription = stringResource(R.string.cd_insert_space),
                                     onClick = onInsertSpace,
                                     repeatEnabled = false,
-                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .onGloballyPositioned { lc ->
+                                            tutorialPositions?.record(TutorialButtonId.SPACE, lc)
+                                        },
                                 )
                             }
 
@@ -333,7 +323,7 @@ fun KeyboardScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Right group: [Delete Char]  [Switch Keyboard]
+                    // Right group: [Delete Char]  [Enter / context action]
                     Box(modifier = Modifier.weight(1f)) {
                         // Adjacent-right: delete single character
                         KeyboardActionButton(
@@ -400,17 +390,10 @@ fun KeyboardScreen(
     val spectrum by viewModel.spectrum.collectAsState()
     val isContinuous by viewModel.isContinuousMode.collectAsState()
     val triggerMode by viewModel.triggerMode.collectAsState()
-    val isWhisperEngine by viewModel.isWhisperEngine.collectAsState()
-    val whisperLanguage by viewModel.whisperLanguage.collectAsState()
-    val rawDiagnostics by viewModel.diagnostics.collectAsState()
-    val showPipelineDiagnostics by viewModel.showPipelineDiagnostics.collectAsState()
     val enterAction by viewModel.enterAction.collectAsState()
     val showTutorial by viewModel.showTutorial.collectAsState()
     val wordSuggestions by viewModel.wordSuggestions.collectAsState()
     val suggestionBarDismissed by viewModel.suggestionBarDismissed.collectAsState()
-
-    // Only surface real diagnostics counters when the user has enabled the badge in settings.
-    val diagnostics = if (showPipelineDiagnostics) rawDiagnostics else PipelineDiagnostics()
 
     // Shared state that records each button's LayoutCoordinates for the tutorial spotlight.
     // Created once and kept alive so positions are ready the moment the overlay appears.
@@ -427,9 +410,6 @@ fun KeyboardScreen(
             spectrum = spectrum,
             isContinuous = isContinuous,
             triggerMode = triggerMode,
-            isWhisperEngine = isWhisperEngine,
-            whisperLanguage = whisperLanguage,
-            onWhisperLanguageSelected = viewModel::setWhisperLanguage,
             onRecordStart = viewModel::onRecordStart,
             onRecordStop = viewModel::onRecordStop,
             onContinuousModeEnabled = viewModel::onContinuousModeEnabled,
@@ -442,7 +422,6 @@ fun KeyboardScreen(
             enterAction = enterAction,
             onSwitchKeyboard = onSwitchKeyboard,
             onOpenCompanionApp = onOpenCompanionApp,
-            diagnostics = diagnostics,
             wordSuggestions = wordSuggestions,
             suggestionBarDismissed = suggestionBarDismissed,
             onSuggestionTapped = viewModel::replaceWordAtCursor,
@@ -454,7 +433,12 @@ fun KeyboardScreen(
         )
 
         // Tutorial overlay covers the keyboard on first launch.
-        if (showTutorial) {
+        // Held back while the engine is loading or missing: step one spotlights the talk button
+        // and says "hold to record", which is a lie while that button is disabled - and on the
+        // literal first open (no model downloaded yet) that is exactly the state the user meets.
+        // The flag is only cleared on dismiss, so the walk-through appears as soon as the model
+        // is ready instead of teaching a dead control.
+        if (showTutorial && uiState !is KeyboardUiState.EngineLoading) {
             KeyboardTutorialOverlay(
                 positions = tutorialPositions,
                 onDismiss = viewModel::dismissTutorial,
@@ -470,8 +454,6 @@ private fun KeyboardScreenPreviewScaffold(
     uiState: KeyboardUiState,
     amplitude: Float = 0f,
     isContinuous: Boolean = false,
-    isWhisperEngine: Boolean = false,
-    whisperLanguage: String = "auto",
     showLockHint: Boolean = false,
     enterAction: EnterAction = EnterAction.DONE,
     wordSuggestions: List<String> = emptyList(),
@@ -489,9 +471,6 @@ private fun KeyboardScreenPreviewScaffold(
                 amplitude = amplitude,
                 isContinuous = isContinuous,
                 triggerMode = "HOLD",
-                isWhisperEngine = isWhisperEngine,
-                whisperLanguage = whisperLanguage,
-                onWhisperLanguageSelected = {},
                 onRecordStart = {},
                 onRecordStop = {},
                 onContinuousModeEnabled = {},
@@ -514,17 +493,6 @@ private fun KeyboardScreenPreviewScaffold(
 @Composable
 private fun KeyboardScreenIdlePreview() {
     KeyboardScreenPreviewScaffold(uiState = KeyboardUiState.Idle, showLockHint = false)
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF111111)
-@Composable
-private fun KeyboardScreenWhisperIdlePreview() {
-    KeyboardScreenPreviewScaffold(
-        uiState = KeyboardUiState.Idle,
-        isWhisperEngine = true,
-        whisperLanguage = "de",
-        showLockHint = true,
-    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF111111)

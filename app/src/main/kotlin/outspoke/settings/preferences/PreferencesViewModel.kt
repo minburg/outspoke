@@ -54,14 +54,14 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { prefs.setRawMicCapture(enabled) }
     }
 
-    val vadSensitivity: StateFlow<Boolean> = prefs.vadSensitivity.stateIn(
+    val vadEnabled: StateFlow<Boolean> = prefs.vadEnabled.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = true,
     )
 
-    fun setVadSensitivity(enabled: Boolean) {
-        viewModelScope.launch { prefs.setVadSensitivity(enabled) }
+    fun setVadEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setVadEnabled(enabled) }
     }
 
     val postprocessingEnabled: StateFlow<Boolean> = prefs.postprocessingEnabled.stateIn(
@@ -72,16 +72,6 @@ class PreferencesViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setPostprocessingEnabled(enabled: Boolean) {
         viewModelScope.launch { prefs.setPostprocessingEnabled(enabled) }
-    }
-
-    val showPipelineDiagnostics: StateFlow<Boolean> = prefs.showPipelineDiagnostics.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = false,
-    )
-
-    fun setShowPipelineDiagnostics(enabled: Boolean) {
-        viewModelScope.launch { prefs.setShowPipelineDiagnostics(enabled) }
     }
 
     /** Resets the tutorial-shown flag so it plays again the next time the keyboard opens. */

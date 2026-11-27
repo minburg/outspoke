@@ -82,12 +82,6 @@
         diagnosing whether cleaning is responsible for dropped or altered words.
     </string>
     <string name="pref_postprocessing_disabled_raw">Disabled (raw output)</string>
-    <string name="pref_diagnostics_title">Pipeline Diagnostics</string>
-    <string name="pref_diagnostics_subtitle">Shows a live badge on the keyboard with counters for window trims,
-        alignment recoveries, and discarded blank strides. Useful for diagnosing pipeline issues; off by default.
-    </string>
-    <string name="pref_diagnostics_visible">Visible</string>
-    <string name="pref_diagnostics_hidden">Hidden</string>
     <string name="pref_tutorial_title">Keyboard Tutorial</string>
     <string name="pref_tutorial_subtitle">Replay the step-by-step button guide the next time you open the keyboard.
     </string>
@@ -156,13 +150,16 @@
     <string name="status_error_engine_load">Engine failed to load</string>
 
     <!-- First-run keyboard tutorial -->
-    <string name="tutorial_title">How to use Outspoke</string>
     <string name="tutorial_talk_button_title">Talk Button (centre)</string>
-    <string name="tutorial_talk_button_desc">Hold to record, release to transcribe. In Tap-to-Toggle mode, tap once to
-        start and again to stop.
+    <string name="tutorial_talk_button_desc">Hold to record, release to transcribe. Drag up and release to keep
+        recording hands-free. In Tap-to-Toggle mode, tap once to start and again to stop.
     </string>
     <string name="tutorial_switch_keyboard_title">Switch Keyboard (top right)</string>
     <string name="tutorial_switch_keyboard_desc">Returns to your previous keyboard.</string>
+    <string name="tutorial_space_title">Space (next to it)</string>
+    <string name="tutorial_space_desc">Inserts a space - this keyboard has no space bar. A recording keeps running
+        while you press it.
+    </string>
     <string name="tutorial_delete_all_title">Delete (far left)</string>
     <string name="tutorial_delete_all_desc">Deletes the last sentence - or the whole field, depending on the Delete Button setting.</string>
     <string name="tutorial_delete_word_title">Delete Word (left of mic)</string>
