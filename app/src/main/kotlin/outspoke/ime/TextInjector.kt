@@ -47,22 +47,12 @@ private const val TAIL_COMMIT_WORDS = 12
  */
 private const val FIELD_SCAN_CHARS = 800
 
-/**
- * Hard ceiling on what one press of the delete button may remove in last-sentence mode.
- *
- * Without it, a field that holds dictated text with no sentence-ending punctuation (a Note app
- * with a page of comma-spliced prose, a pasted log) counts as "one big sentence" and a single
- * press wipes the whole page - and a second press would take the page before it. 400 characters
- * is far above anything one dictation utterance can produce (the inference window caps at 30 s),
- * so a real sentence is always removable while the page in front of it cannot be.
- */
+/** Hard ceiling on what one press of the delete button may remove in last-sentence mode. */
 private const val MAX_SENTENCE_DELETE_CHARS = 400
 
 /**
- * A dictated fragment of at most this many words is treated as an *insertion* rather than a
- * sentence, so a model-emitted trailing period can be dropped when the caret sits mid-sentence
- * (see [outspoke.ime.TextInjector]). Three words covers word replacement and short phrase
- * insertion while leaving real dictated sentences alone.
+ * A dictated fragment of at most this many words is treated as an insertion rather than a
+ * sentence, so a model-emitted trailing period can be dropped when the caret sits mid-sentence.
  */
 private const val SHORT_FRAGMENT_MAX_WORDS = 3
 
@@ -212,14 +202,8 @@ class TextInjector(
      * Removes a sentence-final period from a short [text] when the caret is mid-sentence, and
      * removes any terminator that would sit directly on top of the host text's own.
      *
-     * Rule 1 is deliberately narrow: only a single trailing `.` is touched (never `...`, never a
-     * decimal like `3.5`, never `!` or `?` which carry intent a period does not), and only for a
-     * fragment of at most [SHORT_FRAGMENT_MAX_WORDS] words. A genuinely dictated sentence keeps its
-     * punctuation - dropping it there would silently merge two sentences instead of separating them.
-     *
-     * Rule 2 has no length limit and no mid-sentence requirement: replacing a selection that did
-     * not include its own period would otherwise leave `Red.. Beta`, and a doubled dot is wrong
-     * however long the dictated text is.
+     * The first case covers only a single trailing `.` (not `!` or `?`, not a decimal) on a
+     * fragment of at most [SHORT_FRAGMENT_MAX_WORDS] words; the second has no length limit.
      */
     private fun dropMidSentencePeriod(text: String): String {
         if (text.isBlank()) return text
@@ -903,10 +887,6 @@ class TextInjector(
         }
     }
 
-    /**
-     * Insert a newline character at the current cursor position, replacing any
-     * active selection.
-     */
     /** Preserve the composing words before inserting an explicit separator. */
     fun insertSpace() {
         inputConnection.finishComposingText()
@@ -922,6 +902,7 @@ class TextInjector(
         if (addSpace && supportsComposing) ensureSeparatorSpace()
     }
 
+    /** Insert a newline character at the current cursor position, replacing any active selection. */
     fun sendNewline() {
         lastPartial = ""
         inputConnection.commitText("\n", 1)
@@ -1038,23 +1019,10 @@ class TextInjector(
 
     /**
      * Deletes the last sentence from the text before the cursor, up to [MAX_SENTENCE_DELETE_CHARS].
-     *
-     * A sentence boundary is a sentence-ending punctuation (`.`, `!`, `?`)
-     * followed by one or more whitespace characters; the next sentence starts after
-     * that whitespace run. Whitespace behind the caret is *not* part of the sentence
-     * body, so a field ending in `"Hello. Second. "` still reports `Second.` as its
-     * last sentence - otherwise a second press would look at an empty stretch between
-     * two periods, find no sentence, and appear dead. The whitespace separating the
-     * deleted sentence from the older text is kept verbatim; the whitespace behind the
-     * deleted sentence is consumed, so the field never ends on a doubled gap.
-     *
-     * Only the last [MAX_SENTENCE_DELETE_CHARS] characters are ever examined, so text that has no
-     * sentence-ending punctuation anywhere (a page of prose in a Note app) cannot be swallowed: the
-     * deletion stops at the window edge instead of at the start of the field. When the window is
-     * full and no boundary was found inside it, the cut snaps forward to the next word start so a
-     * word is never sliced in half - the partial word left behind belongs to the older text.
-     *
-     * Text after the cursor is never touched.
+     * A sentence boundary is `.`, `!` or `?` followed by one or more whitespace characters; the
+     * whitespace behind the caret belongs to the deletion rather than to the sentence body, and
+     * the whitespace run in front of the sentence is kept verbatim. Text after the cursor is never
+     * touched. With the window full and no boundary inside it, the cut snaps to the next word start.
      */
     fun deleteLastSentence() {
         val before = inputConnection.getTextBeforeCursor(MAX_SENTENCE_DELETE_CHARS, 0)?.toString()
@@ -1079,10 +1047,7 @@ class TextInjector(
             }
         }
 
-        // The whole whitespace run after that punctuation separates the two sentences and stays
-        // where it is - a paragraph break must not be flattened to a single space. The sentence
-        // body starts after it, and everything from there to the caret goes: body plus the gap that
-        // trailed it, so no double space is left behind.
+        // The whitespace run after that punctuation is kept; the sentence body starts after it.
         var sentenceStart = gapStart
         while (sentenceStart < lastBodyChar && before[sentenceStart].isWhitespace()) sentenceStart++
 

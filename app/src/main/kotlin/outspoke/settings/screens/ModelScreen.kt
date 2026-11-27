@@ -45,9 +45,7 @@ fun ModelScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        // This Scaffold exists only to host the snackbar. Left on its defaults it re-applies the
-        // system-bar insets that the settings Scaffold already consumed, so the model list got the
-        // bottom inset twice - visible as a tall dead strip above the navigation bar.
+        // The settings Scaffold already consumes the system-bar insets, so this one sets none.
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         ModelListContent(
@@ -63,13 +61,7 @@ fun ModelScreen(
     }
 }
 
-/**
- * The model catalog as a pure function of its inputs: the catalog is read from [ModelRegistry]
- * inside, while the per-model [ModelState] map and the selection come from the caller. `internal`
- * rather than `private` so `UiScreenshotCapture` can render the two states the store listing shows
- * (nothing installed, and the default model installed and active) without fabricating model files
- * on disk, which Robolectric's shared app-data directory would make test-order dependent.
- */
+/** Pure-state variant of [ModelScreen], rendered by `UiScreenshotCapture` for store screenshots. */
 @Composable
 internal fun ModelListContent(
     modelStates: Map<ModelId, ModelState>,

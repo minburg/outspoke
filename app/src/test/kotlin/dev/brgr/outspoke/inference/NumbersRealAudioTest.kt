@@ -12,15 +12,10 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 
 /**
- * Real-audio regression anchor for number-sequence normalisation (PR "Keep countdowns
- * and number lists separate during formatting").
+ * Real-audio anchor for number handling: a paused countdown normalises to ten separate digits,
+ * and digit byte tokens survive detokenization into the committed text.
  *
- * `num-countdown2.wav` is a Piper-spoken countdown with inter-digit pauses. The decoder
- * emits the number words as separate tokens; before the phrase-gated normaliser they were
- * greedily accumulated into one run and arithmetically summed, collapsing the whole
- * countdown to "55". The digits must survive as individual digits.
- *
- * **Skipping:** like [RealAudioPipelineTest], skipped when the model directory is unavailable.
+ * Skipped when the model directory is unavailable, like [RealAudioPipelineTest].
  */
 class NumbersRealAudioTest {
 
@@ -70,10 +65,8 @@ class NumbersRealAudioTest {
     }
 
     /**
-     * Regression anchor for the detokenize digit-stripping bug: the model decodes dictated
-     * numbers as byte-level digit tokens ("2" + "0"), which the index-padding strip in
-     * `ParakeetEngine.detokenize` used to delete wholesale, producing "I was buying items."
-     * The digits must survive to the committed text as the digit run "20".
+     * The model decodes dictated numbers as byte-level digit tokens ("2" + "0"). The digits must
+     * survive to the committed text as the digit run "20".
      */
     @Test
     fun `dictated digits survive detokenization into the final text`() {
@@ -122,10 +115,9 @@ class NumbersRealAudioTest {
             ?: results.filterIsInstance<TranscriptResult.Partial>().lastOrNull()?.text
             ?: ""
 
-        // Model-independent contract (v0.4.0 regression): every countdown digit must
-        // survive individually, never summed into "55". Digit-sequence equality is
-        // asserted instead of spacing because punctuation between digits (e.g. "10, 9, …")
-        // is a model formatting choice, not part of the contract.
+        // Every countdown digit must survive individually, not summed into "55". Digit-sequence
+        // equality is asserted instead of spacing because punctuation between digits is a model
+        // formatting choice, not part of the contract.
         assertThat(finalText.filter { it.isDigit() })
             .describedAs("Countdown digits must survive individually (got '%s')", finalText)
             .isEqualTo("10987654321")

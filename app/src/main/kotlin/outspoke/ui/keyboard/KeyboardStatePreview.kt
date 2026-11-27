@@ -24,10 +24,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
  * off the window, the suggestion bar slot fighting the keyboard for height, a status pill that
  * stops fitting once a long message joins its row).
  *
- * Deliberately *not* multiplied across the matrix: `navBarHeightPx` (a pixel value resolved by the
- * service from `WindowManager`, so a fixed preview value would assert nothing), continuous mode and
- * the lock hint (both already previewed in [KeyboardScreen]). `enterAction` is the one axis worth a
- * second look, so it gets its own single preview function over Idle.
+ * `navBarHeightPx`, continuous mode and the lock hint are not multiplied across the matrix;
+ * `enterAction` gets its own single preview function over Idle.
  */
 
 /** Phone-class IME window width; the real strip is `fillMaxWidth`, so previews pin one. */

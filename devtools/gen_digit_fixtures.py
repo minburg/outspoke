@@ -8,8 +8,7 @@ how a user dictates digit strings ("one, two, eight, eight, five").
 
 Usage (from repo root):
 
-    PYTHONPATH=$HOME/.local/lib/python3.14/site-packages python3.14 \
-        devtools/gen_digit_fixtures.py [--voice /path/to/voice.onnx] [--out DIR]
+    python3 devtools/gen_digit_fixtures.py [--voice /path/to/voice.onnx] [--out DIR]
 
 Requires the `piper-tts` Python package. The Kotlin battery defines the
 EXPECTED digit output for each fixture; this script defines the audio.
@@ -43,7 +42,7 @@ VOICE_PASSES = [
 
 # Mic-condition passes: the baseline voice degraded like a phone microphone.
 # Each entry: (suffix, transform, cases). "noise" adds pink-ish noise at
-# SNR_NOISE_DB; "tel" band-limits through 8 kHz (downsample → upsample).
+# SNR_NOISE_DB; "tel" band-limits through 8 kHz (downsample -> upsample).
 NOISE_SNR_DB = 12.0
 DEGRADED_PASSES = [
     ("nz",  "noise",
@@ -166,7 +165,7 @@ def transform_noise(samples: list[float], seed: int = 1234) -> list[float]:
     acc = 0.0
     for i, s in enumerate(samples):
         white = rng.uniform(-1.0, 1.0)
-        prev = 0.7 * prev + 0.3 * white          # one-pole lowpass → pink-ish
+        prev = 0.7 * prev + 0.3 * white          # one-pole lowpass -> pink-ish
         acc += prev * prev
         out[i] = s + prev
     noise_rms = math.sqrt(acc / max(1, len(samples)))

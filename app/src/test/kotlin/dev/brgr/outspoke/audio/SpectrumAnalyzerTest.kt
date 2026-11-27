@@ -65,8 +65,7 @@ class SpectrumAnalyzerTest {
         val result = analyzer().processAll(List(3) { sineChunk(1_000.0, amplitude = 0.05) })
         val peak = result.max()
 
-        // Mirrored meter: the eye reads the outer bars for sibilants and the centre for bass, so a
-        // tone must not smear across the row. Three octaves away must be clearly below the peak.
+        // Bands three octaves away from the tone must stay below a quarter of the peak.
         (0 until 6).forEach { band ->
             assertTrue("low band $band = ${result[band]}, peak = $peak", result[band] < 0.25f * peak)
         }
@@ -77,8 +76,7 @@ class SpectrumAnalyzerTest {
 
     @Test
     fun `given a constant dc offset, when analysed, then the high-pass filter leaves the meter flat`() {
-        // Handling rumble and 50 Hz hum sit below the first band; in a mirrored meter they would
-        // otherwise pin the centre bars to full height.
+        // Near-DC energy must leave every band below 0.05.
         val result = analyzer().processAll(List(4) { constantChunk(12_000) })
 
         result.forEachIndexed { band, value ->

@@ -7,13 +7,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Outspoke type scale - system sans (Roboto) with Material 3 roles, tightened for a
- * utility app.
- *
- * Two decisions matter on a keyboard strip:
- *  - every role is defined, so nothing silently renders at an unspecified default size;
- *  - body/label sizes stay >= 12 sp, because the IME row is read at arm's length in a
- *    glance, not on a settings page.
+ * Outspoke type scale: system sans (Roboto) with Material 3 roles, tightened for a
+ * utility app. Every role is defined, so nothing renders at an unspecified default size,
+ * and body and label sizes stay >= 12 sp because the keyboard strip is read at arm's
+ * length in a glance.
  */
 val OutspokeTypography = Typography(
     headlineLarge = TextStyle(

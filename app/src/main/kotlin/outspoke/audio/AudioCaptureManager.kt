@@ -47,31 +47,13 @@ private const val NOISE_FLOOR_DB = -60f
  */
 private const val WAVEFORM_DISPLAY_GAIN = 1.5f
 
-/**
- * Minimum spacing between [spectrum] emissions. Every chunk is still fed to the analyzer (its
- * attack/release filter needs the full 33 Hz cadence to behave), but 33 Hz of recomposition is
- * wasted motion - the meter only needs ~20 Hz.
- */
+/** Minimum spacing between [spectrum] emissions (~20 Hz); every chunk is still fed to the analyzer. */
 private const val SPECTRUM_EMIT_INTERVAL_MS = 50L
 
-/**
- * How often the read loop asks the audio framework whether this session is still allowed to
- * hear the microphone ([android.media.AudioRecordingConfiguration.isClientSilenced]).
- *
- * A client-silenced `AudioRecord` is not an error: it keeps reporting `RECORDSTATE_RECORDING`
- * and keeps returning valid all-zero buffers, so capture looks healthy forever while the engine
- * decodes silence. Only the audio framework knows, so the loop has to ask - see
- * [MicrophoneBusyException]. 300 ms is well above the ~30 ms chunk cadence (the poll is two
- * binder-free field reads off the cached configuration) and well below the point where the user
- * has started to wonder why nothing is being written down.
- */
+/** How often the read loop reads [android.media.AudioRecordingConfiguration.isClientSilenced]: every 300 ms. */
 private const val MIC_SILENCED_POLL_MS = 300L
 
-/**
- * Consecutive silenced observations required before capture is abandoned, so that a single
- * blip during audio-policy handover (an incoming call settling, a device switch) does not kill
- * a recording that is about to be handed back. Worst-case detection delay: ~600 ms.
- */
+/** Consecutive silenced observations required before capture is abandoned; worst-case detection delay ~600 ms. */
 private const val MIC_SILENCED_CONFIRMATIONS = 2
 
 // Capture source: MediaRecorder.AudioSource.DEFAULT — the vendor-recommended source.
@@ -148,7 +130,7 @@ class AudioCaptureManager(private val context: Context) {
     /**
      * Starts microphone capture and emits each 30 ms [AudioChunk] downstream.
      *
-     * **Prerequisites:** [PermissionHelper.hasRecordPermission] must return `true` before
+     * Prerequisite: [PermissionHelper.hasRecordPermission] must return `true` before
      * calling this. If the permission is absent a [SecurityException] is thrown immediately
      * so the caller can transition the UI to an error state.
      *
@@ -229,9 +211,7 @@ class AudioCaptureManager(private val context: Context) {
                 while (currentCoroutineContext().isActive && !stopRequested.get()) {
                     val nowMs = SystemClock.elapsedRealtime()
 
-                    // Microphone arbitration check (see MIC_SILENCED_POLL_MS): a silenced recorder
-                    // reads as valid silence forever, so this is the only thing that can turn the
-                    // "keyboard works but nothing arrives" state into a visible error.
+                    // A silenced recorder reads as valid silence, so only this poll detects it (see MIC_SILENCED_POLL_MS).
                     if (nowMs - lastSilenceCheckMs >= MIC_SILENCED_POLL_MS) {
                         lastSilenceCheckMs = nowMs
                         silencedObservations =
@@ -256,9 +236,9 @@ class AudioCaptureManager(private val context: Context) {
                             val rms = calculateRms(chunk.samples)
                             _amplitude.value = normaliseAmplitude(rms)
 
-                            // Analysis runs on every chunk so its time constants stay honest;
-                            // publication is decimated (see SPECTRUM_EMIT_INTERVAL_MS). The
-                            // copy keeps the reused analyzer buffer away from the UI thread.
+                            // Analysis runs on every chunk; publication is decimated (see
+                            // SPECTRUM_EMIT_INTERVAL_MS). The copy keeps the reused analyzer
+                            // buffer away from the UI thread.
                             val bands = analyzer.process(chunk.samples)
                             if (nowMs - lastSpectrumEmitMs >= SPECTRUM_EMIT_INTERVAL_MS) {
                                 lastSpectrumEmitMs = nowMs
@@ -326,8 +306,7 @@ class AudioCaptureManager(private val context: Context) {
             } finally {
                 vad?.flush()
                 vad?.close()
-                // Skipped when startRecording() was refused: stopping a recorder that never started
-                // only logs a framework warning and muddies the busy-capture trace.
+                // Stopping a recorder that never started only logs a framework warning.
                 if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
                 recorder.release()
                 _amplitude.value = 0f
@@ -339,16 +318,10 @@ class AudioCaptureManager(private val context: Context) {
     }
 
     /**
-     * Starts [recorder] and refuses to continue if the platform did not actually give this
-     * session the microphone.
-     *
-     * The existing `AudioRecord.state == STATE_INITIALIZED` check upstream only proves the
-     * object was built; a recorder can be initialised and still be denied capture. Both
-     * documented shapes of that refusal end the session here or in the read loop:
-     *  - `startRecording()` throws, or the object stays in `RECORDSTATE_STOPPED` (contention,
-     *    an exclusive-mic holder such as a call, a torn-down audio HAL);
-     *  - the start succeeds but the session is **client-silenced**, which is invisible to the
-     *    start handshake and is caught by the [MIC_SILENCED_POLL_MS] poll in the read loop.
+     * Starts [recorder] and refuses to continue if the platform did not give this session the
+     * microphone: `startRecording()` throws, or `recordingState` ends up outside
+     * `RECORDSTATE_RECORDING`. Client-silencing is invisible here, so the
+     * [MIC_SILENCED_POLL_MS] poll in the read loop catches it.
      *
      * @throws MicrophoneBusyException if the recorder is not capturing audio afterwards.
      */

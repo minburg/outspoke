@@ -22,12 +22,8 @@ private const val HARMONICS = 30
 
 /**
  * Debug-only fake microphone for the level meter: synthesises voiced chunks with moving formants
- * plus a periodic sibilant burst, pushes them through the **real** [SpectrumAnalyzer], and emits
+ * plus a periodic sibilant burst, pushes them through the real [SpectrumAnalyzer], and emits
  * frames on the capture cadence (30 ms).
- *
- * The point is to make the mirrored meter observable - screenshots, band-floor tuning and the
- * treble-bloom behaviour for `s`/`f`/`th` can all be checked without a human talking into the
- * emulator microphone.
  */
 @Composable
 fun rememberSyntheticSpectrum(active: Boolean): SpectrumFrame? {

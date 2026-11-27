@@ -29,9 +29,8 @@ import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /** How many dp upward the user must drag to engage continuous mode. */
 /**
- * Diameter of the talk button. Also the value the keyboard's content area reserves above
- * the button row, so [dev.brgr.outspoke.ui.keyboard.KeyboardScreen] must never hardcode a
- * taller clearance than this.
+ * Diameter of the talk button. [dev.brgr.outspoke.ui.keyboard.KeyboardScreen] uses the same
+ * value as the clearance it reserves above the button row.
  */
 // Budget note: the IME window is 20 % of the screen height (~160 dp on a 1080p phone),
 // and the status row + waveform + key row all live in it. Status row (42) + gap (4) +

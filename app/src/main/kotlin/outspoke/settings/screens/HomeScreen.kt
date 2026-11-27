@@ -102,13 +102,7 @@ fun HomeScreen(
     )
 }
 
-/**
- * The pure-state half of [HomeScreen]: the three setup rows plus the navigation list, with the
- * system probes hoisted out by the caller. `internal` rather than `private` so
- * `UiScreenshotCapture` can render the configured (IME enabled, microphone granted) setup state -
- * under Robolectric there is no way to make the real `InputMethodManager` report our service as
- * enabled, and the unconfigured state is the least informative thing to show a store visitor.
- */
+/** Pure-state variant of [HomeScreen], rendered by `UiScreenshotCapture` for store screenshots. */
 @Composable
 internal fun HomeScreenContent(
     isImeEnabled: Boolean,
@@ -207,8 +201,8 @@ private fun isOutspokeImeEnabled(context: Context): Boolean {
 
 /**
  * A tappable navigation row in the Configuration section of the home screen: leading
- * icon, row title, hairline card chrome. The whole row is the touch target, so it meets
- * the 48 dp minimum without extra padding games.
+ * icon, row title, hairline card chrome. The whole row is the touch target, which meets
+ * the 48 dp minimum.
  */
 @Composable
 private fun ConfigurationButton(

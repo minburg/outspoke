@@ -7,7 +7,7 @@ import org.junit.Test
  * Unit tests for the pure [detokenizeNeMoTokens] against a synthetic NeMo-style
  * vocabulary (no model required): word-boundary markers, index-padding slots, and
  * the digit/currency word-boundary repair that keeps dictated numbers off the
- * preceding word ("is5551212" → "is 5551212").
+ * preceding word ("is5551212" becomes "is 5551212").
  */
 class DetokenizeNeMoTokensTest {
 
@@ -85,14 +85,14 @@ class DetokenizeNeMoTokensTest {
 
     @Test
     fun `index-padding slots still resolve to their letter suffix`() {
-        // Marker + digit-prefixed slot → new word; bare slot → continues previous word.
+        // A marker plus digit-prefixed slot starts a new word; a bare slot continues the previous word.
         assertThat(d(24)).isEqualTo("ess")
         assertThat(d(28, 25)).isEqualTo("aess")
     }
 
     @Test
     fun `pure padded index slot is preserved as digits`() {
-        // Regression guard for the 29619d7 fix: pure-digit tokens are real emissions.
+        // Pure-digit tokens are real emissions, not index padding.
         assertThat(d(7, 18, 19, 17)).isEqualTo("Dial 786")
     }
 

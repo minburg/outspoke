@@ -39,7 +39,7 @@ private const val MIN_BAR_FRACTION = 0.06f
 internal val WaveformBarHeight = 18.dp
 
 /**
- * The microphone level meter: one bar per frequency band, **mirrored about the centre** -
+ * The microphone level meter: one bar per frequency band, mirrored about the centre -
  * bass in the middle, treble at both edges. Vowels swell at the centre; sibilants (`s`, `f`,
  * `th`) bloom at both ends, which is the feedback a dictation user actually wants.
  *

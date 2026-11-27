@@ -53,20 +53,16 @@ private val SuggestionBarShowEasing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 private val SuggestionBarHideEasing = CubicBezierEasing(0.4f, 0f, 1f, 1f)
 
 /**
- * How long the slot keeps its layout height after the bar is told to hide.
- *
- * The collapse must land *before* the service shrinks the IME window
- * (`OutspokeInputMethodService.SUGGESTION_BAR_HIDE_DELAY_MS`), otherwise the still-reserved
- * slot overlaps the top of the keyboard content for the remainder of the animation - the
- * shelf background paints over the status row and clips it. Collapsing slightly early only
- * costs the last few percent of the slide-out, which [clipToBounds] trims away anyway.
+ * How long the slot keeps its layout height after the bar is told to hide. The collapse must
+ * land before `OutspokeInputMethodService.SUGGESTION_BAR_HIDE_DELAY_MS` shrinks the window, or
+ * the still-reserved slot overlaps the top of the keyboard content for the rest of the animation.
  */
 private const val SLOT_COLLAPSE_DELAY_MS = 250L
 
 /**
  * Horizontal strip of word-suggestion chips with a visual divider and a dismiss button.
  *
- * The bar sits on a `surfaceContainerLow` shelf — one step lighter than the strip, no shadow —
+ * The bar sits on a `surfaceContainerLow` shelf, one step lighter than the strip, with no shadow,
  * and closes with a 1 dp `outlineVariant` hairline above the keys.  Candidates are tonal pills:
  * the top-ranked word in `primaryContainer`, the rest in `surfaceVariant`.
  *
@@ -129,9 +125,9 @@ fun SuggestionBar(
         label = "suggestionBarTranslation",
     )
 
-    // The slot holds its height for the whole animation — the keyboard content below is never
-    // displaced mid-flight — then collapses to 0, because a hidden bar must not keep reserving
-    // height the window no longer has. clipToBounds hides the bar while it is translated away.
+    // The slot holds its height for the whole animation, so the keyboard content below is not
+    // displaced mid-flight, then collapses to 0: a hidden bar must not keep reserving height the
+    // window no longer has. clipToBounds hides the bar while it is translated away.
     var slotOccupied by remember { mutableStateOf(visible) }
     LaunchedEffect(visible) {
         if (visible) {
@@ -165,8 +161,8 @@ fun SuggestionBar(
             ) {
                 // Dismiss button — leading edge so it is visually separated from the
                 // switch-keyboard icon that lives in the keyboard row directly below.
-                // The target spans the whole row height: at 28 dp it was the smallest touch
-                // target in the strip, and the extra height is free inside the 36 dp slot.
+                // The target spans the whole row height; a 28 dp square would be the smallest
+                // touch target in the strip, and the extra height is free inside the 36 dp slot.
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxHeight().width(36.dp),
@@ -209,7 +205,7 @@ fun SuggestionBar(
  *
  * The first entry is the spell-checker's top-ranked candidate, so it carries the selected-pill
  * tone (`primaryContainer`); the alternatives stay neutral `surfaceVariant`. Both are ordinary
- * taps — the tone marks the recommended word, it does not mean "already applied".
+ * taps: the tone marks the recommended word, it does not mean "already applied".
  */
 @Composable
 private fun WordSuggestionChip(

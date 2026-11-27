@@ -551,10 +551,8 @@ class KeyboardViewModel(
                     reason = KeyboardUiState.ErrorReason.MicPermissionDenied,
                 )
             } catch (e: MicrophoneBusyException) {
-                // Permission is fine and the recorder was built; another app owns the mic. Without
-                // the capture-side detection this surfaced as an endless "Listening" state fed by
-                // digital silence. The detail is left out of the pill - both causes ask for the same
-                // user action, and the exception message is in logcat.
+                // Permission is granted and the recorder built: another app owns the mic, and
+                // Android signals that by feeding digital silence. The exception message is in logcat.
                 Log.e(TAG, "Microphone is in use by another app", e)
                 _isContinuousMode.value = false
                 _uiState.value = KeyboardUiState.Error(

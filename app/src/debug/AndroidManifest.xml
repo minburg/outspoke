@@ -2,7 +2,8 @@
 <!--
   Debug-only screen harness for visual verification (not packaged in release builds).
   Keyboard strip: KeyboardPreviewActivity with string extra "state" =
-      idle | listening | suggestions | whisper | error
+      idle | listening | continuous | processing | no_speech | error | mic_busy |
+      mic_permission | loading | no_model | suggestions
   App screens: CompanionPreviewActivity with string extra "screen" =
       home | model | pref_input | pref_speech | tools | calibration
 -->

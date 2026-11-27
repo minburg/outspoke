@@ -15,9 +15,10 @@ import kotlin.math.sqrt
  * One frame of log-spaced band energies for the keyboard level meter.
  *
  * [bands] is always `SpectrumAnalyzer.bandCount` long, ordered low frequency first, each value
- * dB-mapped to `[0.0, 1.0]` exactly like [AudioCaptureManager.amplitude]. The array is a private
- * copy owned by the receiver: the analyzer reuses its own buffer internally, so publishing it
- * directly would let the capture thread mutate what the UI is drawing.
+ * dB-mapped to `[0.0, 1.0]`. Bands and [AudioCaptureManager.amplitude] share the mapping shape
+ * but each has its own floor and display gain. The array is a private copy owned by the
+ * receiver: the analyzer reuses its own buffer internally, so publishing it directly would let
+ * the capture thread mutate what the UI is drawing.
  */
 class SpectrumFrame(val bands: FloatArray)
 
@@ -26,7 +27,7 @@ class SpectrumFrame(val bands: FloatArray)
  * capture read loop next to [AudioCaptureManager.calculateRms].
  *
  * Pipeline per chunk: one-pole DC blocker (removes handling rumble and 50 Hz hum, which would
- * otherwise dominate the *centre* of the mirrored meter), Hann window, in-place radix-2 FFT of
+ * otherwise dominate the centre of the mirrored meter), Hann window, in-place radix-2 FFT of
  * [fftSize] samples (480-sample chunks are zero-padded), then band energies summed from the FFT
  * bins and dB-mapped with a floor and display gain tuned for band means (see `METER_FLOOR_DB`).
  *
@@ -37,7 +38,7 @@ class SpectrumFrame(val bands: FloatArray)
  * @param highPassHz  DC-blocker corner; energy below this is filtered out before the FFT.
  * @param fftSize     FFT length; a power of two >= the chunk size (512 covers 480-sample chunks).
  * @param smooth      Applies a per-band attack/release filter so the meter falls slowly instead
- *                    of flickering with every chunk. This is signal conditioning, not decoration.
+ *                    of flickering with every chunk.
  */
 class SpectrumAnalyzer(
     val bandCount: Int = DEFAULT_BAND_COUNT,
@@ -212,20 +213,10 @@ class SpectrumAnalyzer(
     private companion object {
         const val INTEGER_BITS = 32
 
-        /**
-         * Band level that reads 0.0 on the meter.
-         *
-         * Deliberately *above* the RMS meter's -60 dBFS floor: a band is the **mean** power of its
-         * bins, so it sits ~10 dB below the whole-signal RMS the level meter uses. Reusing -60 put
-         * a quiet room at half bar height; -50 keeps idle flat while speech still climbs.
-         */
+        /** dBFS band level that reads 0.0; above the RMS meter's floor because a band is mean bin power. */
         const val METER_FLOOR_DB = -50f
 
-        /**
-         * Display gain on top of the dB mapping. Typical speech (-45..-20 dBFS per band) otherwise
-         * lands at ~0.1..0.6, which reads as "barely moving"; 1.6x puts conversational speech in
-         * the upper half and shouting at full height. Same role as the RMS meter's display gain.
-         */
+        /** Display gain after the dB mapping; lifts conversational speech (-45..-20 dBFS per band) to the upper half. */
         const val METER_DISPLAY_GAIN = 1.6f
         const val ATTACK = 0.5f
         const val RELEASE = 0.15f

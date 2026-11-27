@@ -1146,22 +1146,17 @@ private val DETOK_CURRENCY_SYMBOLS = setOf('$', '€', '£', '¥')
  * Converts token IDs to a string using [vocabulary] (NeMo SentencePiece layout).
  * Handles word-boundary markers (U+2581 `▁`).
  *
- * NeMo SentencePiece exports fill unused vocabulary slots with their own index as
- * the token string (e.g. `"7883"`, `"▁1980ess"`, `"▁7880over"`). We handle these
- * by stripping any leading digit run from the bare token and using only the
- * alphabetic/punctuation suffix:
- *   - `"7865"`    → effective = ""     → skip entirely
- *   - `"▁3402a"`  → effective = "a"    → emit with word-boundary space
- *   - `"▁7880over"` → effective = "over" → emit with word-boundary space
- *   - `"1980ess"` → effective = "ess"  → append directly (no space; continues prev word)
+ * NeMo SentencePiece exports fill unused vocabulary slots with their own index as the token
+ * string (e.g. `"7883"`, `"▁1980ess"`, `"▁7880over"`). A leading digit run is stripped from the
+ * bare token and only the alphabetic/punctuation suffix is used: `"7865"` yields an empty
+ * effective token and is skipped, `"▁3402a"` yields "a" and `"▁7880over"` yields "over", both
+ * emitted with a word-boundary space, and `"1980ess"` yields "ess" appended to the previous word.
  *
- * Word-boundary repair for dictated numbers: digits and currency symbols reach the
- * output as *bare* byte tokens (no `▁` marker, e.g. `"5"`), which used to glue onto
- * the preceding word - "My number is" + "5","5",… committed as `is5551212`, and
- * "born in" + "1","9","8","4" as `in1984`. A digit or currency symbol directly
- * after a letter is never a genuine spelling in dictation output, so a space is
- * inserted there. Digits continue to run together (`5551212` stays one number) and
- * bare-letter continuations (the `"ess"` case above) are untouched.
+ * Word-boundary repair for dictated numbers: digits and currency symbols reach the output as
+ * bare byte tokens (no `▁` marker, e.g. `"5"`). A digit or currency symbol directly after a
+ * letter is not a genuine spelling in dictation output, so a space is inserted there. Digits
+ * continue to run together (`5551212` stays one number) and bare-letter continuations (the
+ * `"ess"` case above) are untouched.
  *
  * A post-processing pass collapses any double-spaces that arise from removed
  * digit-only tokens and moves spaces that ended up before punctuation.
@@ -1178,12 +1173,8 @@ internal fun detokenizeNeMoTokens(
             val token = vocabulary[id]
             // Remove the SentencePiece word-boundary marker before processing.
             val bare = token.removePrefix("▁")
-            // Strip any leading digit run when it prefixes a letter - NeMo fills unused
-            // slots with their index (e.g. "▁1980ess" → bare = "1980ess" → effective =
-            // "ess"). A pure-digit token ("0".."9", SentencePiece byte tokens) is a real
-            // emission - dictated numbers arrive as one byte token per digit - so it must
-            // pass through untouched. Stripping those silently deleted every digit the
-            // model decoded (numbers vanished from "buying twenty items" output).
+            // Strip a leading digit run only when it prefixes a letter ("1980ess" -> "ess").
+            // Pure-digit tokens are real emissions: dictated digits arrive one byte token per digit.
             val digitsStripped = bare.dropWhile { it.isDigit() }
             val effective = if (bare.firstOrNull()?.isDigit() == true && digitsStripped.firstOrNull()?.isLetter() == true)
                 digitsStripped
@@ -1196,9 +1187,8 @@ internal fun detokenizeNeMoTokens(
                 }
 
                 else -> {
-                    // See "Word-boundary repair" in the KDoc: split "is"+"5…"/"in"+"1…"/
-                    // "is"+"$…" into separate words; keep digit runs and letter
-                    // continuations glued.
+                    // Word-boundary repair (see the KDoc): a digit or currency symbol after a
+                    // letter starts a new word; digit runs and letter continuations stay glued.
                     if (isNotEmpty() && last().isLetter() &&
                         (effective.first().isDigit() || effective.first() in DETOK_CURRENCY_SYMBOLS)
                     ) {

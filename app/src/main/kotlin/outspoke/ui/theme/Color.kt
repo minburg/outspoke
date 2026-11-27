@@ -7,15 +7,14 @@ import androidx.compose.ui.graphics.Color
  *
  * Cool graphite neutrals with a faint green cast, one teal accent used only for the
  * primary action and the live recording state. Every Material 3 role is defined
- * explicitly for both themes: leaving a role unset would fall back to the Material
- * baseline purple, which is exactly what the keyboard's waveform and status badge
- * used to render.
+ * explicitly for both themes: an unset role falls back to the Material baseline
+ * purple.
  *
  * Contrast (WCAG): normal text >= 7:1 on both themes, `primary` >= 4.5:1 against its
  * own surface in both directions, `error` >= 4.5:1 in both directions.
  */
 
-// ── Companion app · light ─────────────────────────────────────────────────────
+// Companion app, light
 internal val AppPrimaryLight = Color(0xFF00695C)
 internal val AppOnPrimaryLight = Color(0xFFFFFFFF)
 internal val AppPrimaryContainerLight = Color(0xFFB9EFE1)
@@ -45,7 +44,7 @@ internal val AppInverseSurfaceLight = Color(0xFF26312F)
 internal val AppInverseOnSurfaceLight = Color(0xFFEDEFEC)
 internal val AppInversePrimaryLight = Color(0xFF6FDBBE)
 
-// ── Companion app · dark ──────────────────────────────────────────────────────
+// Companion app, dark
 internal val AppPrimaryDark = Color(0xFF6FDDC0)
 internal val AppOnPrimaryDark = Color(0xFF00382F)
 internal val AppPrimaryContainerDark = Color(0xFF174E43)
@@ -75,7 +74,7 @@ internal val AppInverseSurfaceDark = Color(0xFFE0E9E5)
 internal val AppInverseOnSurfaceDark = Color(0xFF26312F)
 internal val AppInversePrimaryDark = Color(0xFF00695C)
 
-// ── Keyboard · light ──────────────────────────────────────────────────────────
+// Keyboard, light
 // The keyboard floats above arbitrary host apps, so it keeps its own, slightly
 // stronger neutral ramp: keys must separate from the strip without shadows.
 internal val KeyboardPrimaryLight = Color(0xFF00695C)
@@ -104,7 +103,7 @@ internal val KeyboardSurfaceContainerLight = Color(0xFFECEFEE)
 internal val KeyboardSurfaceHighLight = Color(0xFFE6EBEA)
 internal val KeyboardSurfaceHighestLight = Color(0xFFE0E6E5)
 
-// ── Keyboard · dark ───────────────────────────────────────────────────────────
+// Keyboard, dark
 internal val KeyboardPrimaryDark = Color(0xFF5FDBBE)
 internal val KeyboardOnPrimaryDark = Color(0xFF00382F)
 internal val KeyboardPrimaryContainerDark = Color(0xFF174E43)
@@ -129,11 +128,9 @@ internal val KeyboardSurfaceHighDark = Color(0xFF1C2322)
 internal val KeyboardSurfaceHighestDark = Color(0xFF232A29)
 
 /**
- * Semantic status colour for "this step is done".
- *
- * Success is deliberately *not* the accent: on the keyboard the accent means "the mic
- * is live", so a done state must not compete with it. Tinted neutrals + a check glyph
- * carry it instead (colour is never the only signal).
+ * Semantic status colour for "this step is done". Success is a separate colour from the
+ * accent, which on the keyboard marks the live recording state. Tinted neutrals plus a
+ * check glyph carry it, so colour is never the only signal.
  */
 internal val SuccessLight = Color(0xFF0F5C3F)
 internal val SuccessContainerLight = Color(0xFFD6ECDF)
@@ -141,9 +138,9 @@ internal val OnSuccessContainerLight = Color(0xFF052A1C)
 internal val SuccessDark = Color(0xFF86D9AC)
 internal val SuccessContainerDark = Color(0xFF1D4231)
 internal val OnSuccessContainerDark = Color(0xFFC8F2D9)
-// Container-grade red for the live talk button. The Material `error` role is a *foreground*
-// colour in dark mode (pastel #FFB4AB) so it stays legible as text; on a 72 dp filled control
-// that same pastel reads as disabled rather than recording.
+// Container-grade red for the live talk button. The Material `error` role is a foreground
+// colour in dark mode (pastel #FFB4AB), which on a 72 dp filled control reads as disabled
+// rather than recording.
 internal val StopLight = Color(0xFFB3261E)
 internal val OnStopLight = Color(0xFFFFFFFF)
 internal val StopDark = Color(0xFFD93C30)

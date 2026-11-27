@@ -648,8 +648,8 @@ class TextInjectorTest {
     }
 
     /**
-     * A page of dictated prose with no sentence-ending punctuation is NOT one giant sentence:
-     * one press may remove at most the delete window, and the cut lands on a word boundary.
+     * An unpunctuated page is not treated as one sentence: one press removes at most the
+     * delete window, and the cut lands on a word boundary.
      */
     @Test
     fun `deleteLastSentence stops at the window limit instead of wiping an unpunctuated page`() {
@@ -662,7 +662,7 @@ class TextInjectorTest {
         assertThat(deleted).isGreaterThan(0)
         assertThat(deleted).isLessThanOrEqualTo(400)
         assertThat(ic.fieldText).startsWith("word1 ")
-        // The window edge cut mid-word, so the partial word is kept: the page ends on a whole word.
+        // The window edge cut mid-word, so the field ends on a whole word.
         assertThat(ic.fieldText.trimEnd().substringAfterLast(' ')).matches("word\\d+")
     }
 
@@ -698,9 +698,7 @@ class TextInjectorTest {
         assertThat(ic.fieldText).startsWith("Erster Satz. wort1 ")
     }
 
-    /**
-     * Empty field: no-op, no exception.
-     */
+    /** Empty field: no-op, no exception. */
     @Test
     fun `deleteLastSentence on empty field is a no-op`() {
         injector.deleteLastSentence()

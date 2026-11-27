@@ -32,7 +32,7 @@ private val TopSectionGap = 4.dp
  *
  * Layout (top → bottom):
  *  1. Hairline separating the strip from the host app.
- *  2. Suggestion-bar slot (sibling of the keyboard, never an overlay).
+ *  2. Suggestion-bar slot (sibling of the keyboard, not an overlay).
  *  3. [StatusIndicator] - crossfades between Idle / Listening / Processing / Error states,
  *     with [Insert Space] and [Switch Keyboard] at the right of the same row.
  *  4. [WaveformBar]     - level meter: mirrored frequency bands while capturing.
@@ -113,7 +113,7 @@ fun KeyboardScreen(
     navBarHeightPx: Int = 0,
 ) {
     val density = LocalDensity.current
-    // Explicit nav bar bottom padding — authoritative service-level value, same pattern
+    // Explicit nav bar bottom padding: authoritative service-level value, same pattern
     // as KeyboardTutorialOverlay. 0 on gesture nav, real height on button-nav devices.
     val navBarPaddingDp = with(density) { navBarHeightPx.toDp() }
 
@@ -129,11 +129,8 @@ fun KeyboardScreen(
         // Read the incoming constraints here: the Compose compiler plugin will not let a
         // BoxWithConstraintsScope receiver be captured by a nested composable lambda.
         val fillsHostHeight = constraints.hasBoundedHeight
-        // The suggestion-bar slot and the keyboard divide the window height as siblings.
-        // They must never overlap: the keyboard used to be a fixed-height box pinned to the
-        // bottom of the window with the bar *overlaid* on top of it, so any mismatch between
-        // `keyboardContentHeightPx` and the real window height pushed the status row under the
-        // bar shelf - visible as a dark band with the status pill cut in half.
+        // The suggestion-bar slot and the keyboard divide the window height as siblings and
+        // do not overlap.
         Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             // Hairline at the window's top edge, so the strip reads as a separate surface rather
             // than a continuation of the page above it: with the keyboard background close to a
@@ -144,8 +141,9 @@ fun KeyboardScreen(
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
 
-            // Suggestion bar — reserves its height while visible, collapses (after its slide-out
-            // animation) once hidden, so the keyboard below always gets the rest of the window.
+            // Suggestion bar: reserves its height while visible, collapses (after its
+            // slide-out animation) once hidden, so the keyboard below always gets the rest
+            // of the window.
             SuggestionBar(
                 suggestions = wordSuggestions,
                 dismissed = suggestionBarDismissed,
@@ -156,7 +154,7 @@ fun KeyboardScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // Main keyboard content — takes whatever height is left below the bar slot.
+            // Main keyboard content: takes whatever height is left below the bar slot.
             // Inside, the button row is anchored to the bottom edge and the top section
             // (status + waveform) is centred in the remaining space, which prevents the dead
             // whitespace a SpaceBetween Column leaves on tall keyboard windows (tablets).
@@ -200,13 +198,8 @@ fun KeyboardScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // Status pill (plus Whisper chips) share one weighted cell in front of the two
-                            // fixed keys. Weighted, because an unweighted status block is measured at its
-                            // full desired width *before* the keys are placed: a long error string such as
-                            // "Microphone in use - close the other recording app" then slid both trailing
-                            // keys off the right edge of the window. Errors stay centred - which is what the
-                            // dummy spacer pair this replaces achieved - every other state stays
-                            // left-aligned, exactly as before.
+                            // The status pill and chips share one weighted cell, so a long error
+                            // string cannot push the two fixed keys off the right edge.
                             Box(modifier = Modifier.weight(1f)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -433,11 +426,9 @@ fun KeyboardScreen(
         )
 
         // Tutorial overlay covers the keyboard on first launch.
-        // Held back while the engine is loading or missing: step one spotlights the talk button
-        // and says "hold to record", which is a lie while that button is disabled - and on the
-        // literal first open (no model downloaded yet) that is exactly the state the user meets.
-        // The flag is only cleared on dismiss, so the walk-through appears as soon as the model
-        // is ready instead of teaching a dead control.
+        // Held back while the engine is loading or missing, because step one spotlights the talk
+        // button and tells the user to hold it while that button is disabled. The flag is cleared
+        // only on dismiss, so the walk-through starts once the model is ready.
         if (showTutorial && uiState !is KeyboardUiState.EngineLoading) {
             KeyboardTutorialOverlay(
                 positions = tutorialPositions,

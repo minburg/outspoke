@@ -1841,10 +1841,7 @@ class InferenceRepository(
                 raw.cleanTranscript(language = engine.currentLanguage)
             else raw
             val finalText = if (cleaned.isBlank()) raw else cleaned
-            // Mirror the legacy path's raw-vs-cleaned logcat pairing so on-device triage
-            // can tell acoustic word loss (absent from `raw`) from formatting loss
-            // (present in `raw`, gone in `clean`). Debug builds only: these lines carry
-            // transcribed text, which must never reach logcat in a release build.
+            // Debug builds only: these lines carry transcribed text.
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "[FINAL] raw   = Final(\"$raw\")")
                 Log.d(TAG, "[FINAL] clean = Final(\"$finalText\")")

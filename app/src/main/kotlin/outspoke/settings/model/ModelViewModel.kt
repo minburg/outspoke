@@ -63,10 +63,7 @@ class ModelViewModel(application: Application) : AndroidViewModel(application) {
                         _errorMessage.emit("Download failed for ${ModelRegistry[id].displayName}")
                     }
                 }
-                // Auto-activate a model as soon as its download completes if it is the
-                // only model on disk: for a fresh install the first download *is* the
-                // activation, so the manual select click would only be friction. With
-                // several models present the choice stays explicitly the user's.
+                // Activate a finished download when it is the only model on disk.
                 for ((id, state) in serviceStates) {
                     if (state is ModelState.Ready && previousStates[id] !is ModelState.Ready &&
                         _selectedModelId.value != id

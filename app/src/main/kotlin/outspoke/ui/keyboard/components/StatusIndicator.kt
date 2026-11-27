@@ -38,18 +38,10 @@ import dev.brgr.outspoke.ui.theme.OutspokeShapes
 import dev.brgr.outspoke.ui.theme.tabularFigures
 
 /**
- * Crossfades between six distinct visual states driven by [uiState].
+ * Crossfades between the visual states driven by [uiState].
  *
- * Every state renders inside a [StatusPill]: one tonal pill whose colour carries the tone and
- * whose icon, spinner or word carries the meaning — colour is never the only signal.
- *
- * - [KeyboardUiState.Idle]          → neutral pill, ready dot, small mic icon
- * - [KeyboardUiState.Listening]     → accent-toned pill with a pulsing dot and "Listening"
- * - [KeyboardUiState.Processing]    → accent-toned pill, spinner + partial transcript text
- * - [KeyboardUiState.Transcribing]  → neutral pill, spinner + "Transcribing…" label (mic off, engine busy)
- * - [KeyboardUiState.Error]         → error-toned pill: warning icon + error message + recovery action(s)
- * - [KeyboardUiState.NoSpeech]      → warning-toned pill (audio heard, nothing recognised)
- * - [KeyboardUiState.EngineLoading] → neutral pill, spinner + loading message + "Open Outspoke" action
+ * Every state renders inside a [StatusPill], where colour is not the only signal: each state
+ * also carries text and, where relevant, an action.
  *
  * For transient errors ([KeyboardUiState.ErrorReason.TranscriptionFailed],
  * [KeyboardUiState.ErrorReason.AudioCaptureFailed],
@@ -231,7 +223,7 @@ private fun ErrorIndicator(
     onRetry: (() -> Unit)? = null,
 ) {
     // One pill, one line: the action sits inside it, because a second row would not fit
-    // the fixed-height keyboard window and used to be clipped off its top edge.
+    // the fixed-height keyboard window.
     StatusPill(containerColor = MaterialTheme.colorScheme.errorContainer) {
         // No leading dot here: the warning glyph already carries the state, and a dot
         // next to it is three signals for one message.

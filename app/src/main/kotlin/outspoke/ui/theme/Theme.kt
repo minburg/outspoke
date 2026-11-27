@@ -20,13 +20,12 @@ import androidx.compose.ui.unit.dp
  *
  * Both the companion app and the keyboard use the same "Graphite" tokens; the keyboard
  * gets its own slightly stronger neutral ramp because it floats above arbitrary host
- * apps and must separate its keys without shadows. Material You (dynamic colour) is
- * deliberately not used: a dictation keyboard has exactly one signal colour - teal for
- * "the mic is live" - and wallpaper-derived palettes destroy that, which is also how the
- * old purple `tertiary` default ended up painting the waveform.
+ * apps and must separate its keys without shadows. Material You (dynamic colour) is not
+ * used: a dictation keyboard has one signal colour, teal for "the mic is live", and
+ * wallpaper-derived palettes would change it.
  */
 
-// ── Companion app ─────────────────────────────────────────────────────────────
+// Companion app
 
 private val AppLightColorScheme = lightColorScheme(
     primary = AppPrimaryLight, onPrimary = AppOnPrimaryLight,
@@ -74,7 +73,7 @@ private val AppDarkColorScheme = darkColorScheme(
     scrim = Color(0xFF000000),
 )
 
-// ── Keyboard ──────────────────────────────────────────────────────────────────
+// Keyboard
 
 private val KeyboardLightColorScheme = lightColorScheme(
     primary = KeyboardPrimaryLight, onPrimary = KeyboardOnPrimaryLight,
@@ -114,12 +113,12 @@ private val KeyboardDarkColorScheme = darkColorScheme(
     scrim = Color(0xFF000000),
 )
 
-// ── Status colours beyond the Material role set ───────────────────────────────
+// Status colours beyond the Material role set
 
 /**
- * "This is done / healthy" colour. Separate from [androidx.compose.material3.ColorScheme.primary]
- * because on the keyboard the accent is reserved for the live recording state; a done
- * badge must never look like the mic is hot.
+ * "This is done / healthy" colours, separate from [androidx.compose.material3.ColorScheme.primary]:
+ * the success colour is distinct from the accent, which the keyboard reserves for the
+ * live recording state.
  */
 @Immutable
 data class OutspokeStatusColors(
@@ -151,14 +150,12 @@ private val StatusDark = OutspokeStatusColors(
  */
 val LocalOutspokeStatusColors = staticCompositionLocalOf { StatusLight }
 
-// ── Surface roles ─────────────────────────────────────────────────────────────
+// Surface roles
 
 /**
- * Surfaces that have no single Material role, because "card" and "page" want to move in
- * opposite directions in the two schemes: on the light background (#F3F6F5) a card has to
- * be *lighter* than the page, while on the dark background it has to be *lighter* out of a
- * surface that equals the page. Picking a stock container per screen is how the two
- * screens ended up disagreeing, so the pair is named once here.
+ * Card and page fills for each scheme. These have no single Material role: on the light
+ * background (#F3F6F5) a card is lighter than the page, while on the dark background the
+ * page surface equals the background.
  */
 @Immutable
 data class OutspokeSurfaceRoles(
@@ -174,11 +171,11 @@ private val KeyboardSurfacesDark = OutspokeSurfaceRoles(card = KeyboardSurfaceDa
 /** Read it with `LocalOutspokeSurfaceRoles.current.card`. */
 val LocalOutspokeSurfaceRoles = staticCompositionLocalOf { SurfacesLight }
 
-// ── Shapes ────────────────────────────────────────────────────────────────────
+// Shapes
 
 /**
- * One radius scale for the whole product:
- * [KeyRadius] keyboard keys · [CardRadius] list rows and cards · [DialogRadius] dialogs.
+ * One radius scale for the whole product: [OutspokeShapes.key] keyboard keys,
+ * [OutspokeShapes.card] list rows and cards, [OutspokeShapes.dialog] dialogs.
  */
 object OutspokeShapes {
     val key: RoundedCornerShape = RoundedCornerShape(12.dp)
@@ -195,7 +192,7 @@ private val OutspokeShapeScheme = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
-// ── Themes ────────────────────────────────────────────────────────────────────
+// Themes
 
 /** Theme for the companion (settings) app. Follows the system light/dark setting. */
 @Composable

@@ -29,18 +29,17 @@ import dev.brgr.outspoke.ui.keyboard.components.SUGGESTION_BAR_HEIGHT_DP
 import dev.brgr.outspoke.ui.theme.OutspokeKeyboardTheme
 
 /**
- * Debug-only host for the REAL [KeyboardScreen] composable.
+ * Debug-only host for the [KeyboardScreen] composable.
  *
  * The keyboard is an IME window, so it cannot be screenshotted through an ordinary
  * activity. This activity draws the production composable with canned state over a mock
- * host app, which is the cheapest way to review the shipped keyboard surface on a device.
- * It renders the production composable unmodified - no mocks of the keyboard UI itself.
+ * host app.
  *
  * Launch:
  * `adb shell am start -n dev.brgr.outspoke/dev.brgr.outspoke.devtools.KeyboardPreviewActivity
  * --es state listening`
  * with `state` in idle | listening | continuous | processing | no_speech | error | mic_busy
- * | mic_permission | loading | no_model | whisper | suggestions.
+ * | mic_permission | loading | no_model | suggestions.
  */
 class KeyboardPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
