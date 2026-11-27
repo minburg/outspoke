@@ -43,6 +43,9 @@ configure<ApplicationExtension> {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Real merged resources: required by the headless Compose rendering in
+        // UiScreenshotCapture (Robolectric's stub resources cannot back a Compose tree).
+        unitTests.isIncludeAndroidResources = true
     }
 
     splits {
@@ -187,6 +190,12 @@ dependencies {
     // Real-audio integration tests: JVM ONNX Runtime + Robolectric for android.util.Log shim
     testImplementation("com.microsoft.onnxruntime:onnxruntime:1.32.0")
     testImplementation("org.robolectric:robolectric:4.18.1")
+    // Headless Compose rendering (Robolectric native graphics): the screenshot capture in
+    // app/src/test/.../ui/UiScreenshotCapture.kt renders the real screens with no device.
+    testImplementation(platform("androidx.compose:compose-bom:2026.11.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test.ext:junit:1.3.0")
+    testImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.11.01"))
