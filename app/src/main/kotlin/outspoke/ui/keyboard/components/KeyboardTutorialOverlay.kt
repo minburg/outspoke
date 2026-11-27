@@ -30,7 +30,7 @@ import dev.brgr.outspoke.ui.theme.OutspokeShapes
 
 /** Identifies each keyboard button in the first-run tutorial walk-through. */
 enum class TutorialButtonId {
-    TALK, SWITCH_KEYBOARD, DELETE_ALL, DELETE_WORD, DELETE_CHAR, ENTER
+    TALK, SWITCH_KEYBOARD, SPACE, DELETE_ALL, DELETE_WORD, DELETE_CHAR, ENTER
 }
 
 /**
@@ -78,6 +78,11 @@ private val TUTORIAL_STEPS = listOf(
         R.string.tutorial_switch_keyboard_title,
         R.string.tutorial_switch_keyboard_desc
     ),
+    TutorialStep(
+        TutorialButtonId.SPACE,
+        R.string.tutorial_space_title,
+        R.string.tutorial_space_desc
+    ),
     TutorialStep(TutorialButtonId.DELETE_ALL, R.string.tutorial_delete_all_title, R.string.tutorial_delete_all_desc),
     TutorialStep(TutorialButtonId.DELETE_WORD, R.string.tutorial_delete_word_title, R.string.tutorial_delete_word_desc),
     TutorialStep(TutorialButtonId.DELETE_CHAR, R.string.tutorial_delete_char_title, R.string.tutorial_delete_char_desc),
@@ -99,7 +104,7 @@ internal const val TUTORIAL_SCRIM_ALPHA = 187 / 255f
  * An explanation card (`surfaceContainerHigh`, [OutspokeShapes.card], no shadow) appears in the
  * open area above (or below when the spotlight is in the upper half, e.g. the Switch Keyboard
  * button).
- * "Skip" dismisses immediately as a text button; "Next" advances through all six steps; on the
+ * "Skip" dismisses immediately as a text button; "Next" advances through all seven steps; on the
  * final step the button reads "Got it!" and dismisses the tutorial permanently.
  *
  * @param positions      Shared [TutorialPositions] populated by [KeyboardScreen]'s buttons.

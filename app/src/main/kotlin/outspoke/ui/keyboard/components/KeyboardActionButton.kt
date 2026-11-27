@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * switch keyboard).
  *
  * The key is drawn 40 dp wide as a `surface` panel with a 1 dp `outlineVariant` outline, so it
- * separates from the strip without a shadow; the touch target around it is 44 dp, the smallest
+ * separates from the strip without a shadow; the touch target around it is 42 dp, the smallest
  * tap target allowed inside a keyboard row.
  *
  * @param icon Glyph drawn in the key.

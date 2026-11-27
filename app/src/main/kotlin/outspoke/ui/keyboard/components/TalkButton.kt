@@ -161,9 +161,9 @@ fun TalkButton(
     val currentIsContinuous by rememberUpdatedState(isContinuous)
     val currentIsListening by rememberUpdatedState(isListening)
 
-    //  Root container: fixed 72dp, handles all gestures
+    //  Root container: fixed 68dp, handles all gestures
     // Box does NOT clip children by default, which lets the LockHint render
-    // above the 72dp bounds without affecting layout measurement.
+    // above the 68dp bounds without affecting layout measurement.
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -293,7 +293,7 @@ fun TalkButton(
                             animationSpec = tween(120),
                         ),
                 modifier = Modifier.layout { measurable, constraints ->
-                    // Allow the hint to be taller than the 72dp button by measuring
+                    // Allow the hint to be taller than the 68dp button by measuring
                     // without a height cap.
                     val placeable = measurable.measure(
                         constraints.copy(

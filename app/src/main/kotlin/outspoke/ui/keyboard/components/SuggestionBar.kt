@@ -165,9 +165,11 @@ fun SuggestionBar(
             ) {
                 // Dismiss button — leading edge so it is visually separated from the
                 // switch-keyboard icon that lives in the keyboard row directly below.
+                // The target spans the whole row height: at 28 dp it was the smallest touch
+                // target in the strip, and the extra height is free inside the 36 dp slot.
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.fillMaxHeight().width(36.dp),
                 ) {
                     Icon(
                         imageVector = MyIcons.Close,

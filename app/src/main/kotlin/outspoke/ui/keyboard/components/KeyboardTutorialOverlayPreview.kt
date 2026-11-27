@@ -53,14 +53,20 @@ private fun FakeKeyboard(positions: TutorialPositions) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Box(
                 modifier = keyModifier
-                    .size(44.dp)
+                    .size(42.dp)
+                    .onGloballyPositioned { positions.record(TutorialButtonId.SPACE, it) },
+            )
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = keyModifier
+                    .size(42.dp)
                     .onGloballyPositioned { positions.record(TutorialButtonId.SWITCH_KEYBOARD, it) },
             )
         }
         Spacer(Modifier.weight(1f))
         Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(68.dp)
                 .align(Alignment.CenterHorizontally)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary)
@@ -76,7 +82,7 @@ private fun FakeKeyboard(positions: TutorialPositions) {
             ).forEach { id ->
                 Box(
                     modifier = keyModifier
-                        .size(width = 72.dp, height = 44.dp)
+                        .size(42.dp)
                         .onGloballyPositioned { positions.record(id, it) },
                 )
             }
@@ -319,9 +325,6 @@ private fun TutorialFullPreview(step: TutorialPreviewStep) {
             amplitude = 0f,
             isContinuous = false,
             triggerMode = "HOLD",
-            isWhisperEngine = false,
-            whisperLanguage = "auto",
-            onWhisperLanguageSelected = {},
             onRecordStart = {},
             onRecordStop = {},
             onContinuousModeEnabled = {},
