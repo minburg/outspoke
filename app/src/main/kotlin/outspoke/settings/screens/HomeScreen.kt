@@ -102,8 +102,15 @@ fun HomeScreen(
     )
 }
 
+/**
+ * The pure-state half of [HomeScreen]: the three setup rows plus the navigation list, with the
+ * system probes hoisted out by the caller. `internal` rather than `private` so
+ * `UiScreenshotCapture` can render the configured (IME enabled, microphone granted) setup state -
+ * under Robolectric there is no way to make the real `InputMethodManager` report our service as
+ * enabled, and the unconfigured state is the least informative thing to show a store visitor.
+ */
 @Composable
-private fun HomeScreenContent(
+internal fun HomeScreenContent(
     isImeEnabled: Boolean,
     hasMicPermission: Boolean,
     isModelReady: Boolean,

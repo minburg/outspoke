@@ -63,8 +63,15 @@ fun ModelScreen(
     }
 }
 
+/**
+ * The model catalog as a pure function of its inputs: the catalog is read from [ModelRegistry]
+ * inside, while the per-model [ModelState] map and the selection come from the caller. `internal`
+ * rather than `private` so `UiScreenshotCapture` can render the two states the store listing shows
+ * (nothing installed, and the default model installed and active) without fabricating model files
+ * on disk, which Robolectric's shared app-data directory would make test-order dependent.
+ */
 @Composable
-private fun ModelListContent(
+internal fun ModelListContent(
     modelStates: Map<ModelId, ModelState>,
     selectedModel: ModelId?,
     onDownload: (ModelId) -> Unit,
