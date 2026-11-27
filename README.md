@@ -170,7 +170,7 @@ cd outspoke
 ./gradlew assembleRelease
 ```
 
-**Requirements:** JDK 17 to run the build (code targets Java 11; the Gradle wrapper is included), Android SDK 30–36.
+**Requirements:** JDK 17 to run the build (code targets Java 11; the Gradle wrapper is included), Android 11 (API 30) or later on device; the build compiles against API 37 (`compileSdk` 37 with `compileSdkMinor` 1, `minSdk` 30, `targetSdk` 37).
 
 A debug build for sideloading:
 
