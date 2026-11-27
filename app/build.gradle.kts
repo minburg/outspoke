@@ -20,8 +20,8 @@ configure<ApplicationExtension> {
         applicationId = "dev.brgr.outspoke"
         minSdk = 30
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.4.0"
+        versionCode = 13
+        versionName = "0.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

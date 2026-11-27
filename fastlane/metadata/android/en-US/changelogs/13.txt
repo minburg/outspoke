@@ -1,0 +1,3 @@
+Ninth patch (v0.4.1).
+
+Band-spectrum level meter shows your voice as frequency bands. New Space key, an optional space after dictation, and the screen stays awake while recording. A microphone held by another app now reports that it is busy instead of listening in silence. The keyboard resizes correctly after rotation and in split-screen. Fixed delete-last-sentence boundaries and doubled periods after dictation. Parakeet Ultra is the default model. German translation completed.

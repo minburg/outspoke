@@ -11,7 +11,7 @@ Android IME (keyboard) that does on-device speech-to-text via ONNX Runtime. No c
 ./gradlew connectedAndroidTest   # instrumented tests (requires device/emulator)
 ```
 
-Target SDK 36, min SDK 30, JDK 11, Kotlin official code style (`kotlin.code.style=official`).
+Target SDK 37 (`compileSdk` 37 with `compileSdkMinor` 1), min SDK 30, JDK 11, Kotlin official code style (`kotlin.code.style=official`).
 
 ## Package Structure
 
@@ -27,7 +27,7 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 | `settings/preferences` | `AppPreferences`, `PreferencesViewModel` | DataStore-backed user preferences |
 | `settings/screens` | `HomeScreen`, `ModelScreen`, `PreferencesScreen`, `MicCalibrationScreen` | Settings Compose UI |
 | `ui/keyboard` | `KeyboardViewModel`, `KeyboardUiState`, `KeyboardScreen`, `ImeComposeView`, `WordAtCursor` | IME Compose hosting, UI state |
-| `ui/keyboard/components` | `TalkButton`, `SuggestionBar`, `WaveformBar`, `StatusIndicator`, `KeyboardActionButton`, `KeyboardTutorialOverlay`, `LanguageSelector` | Keyboard UI sub-components |
+|`ui/keyboard/components`|`TalkButton`, `SuggestionBar`, `WaveformBar`, `StatusIndicator`, `KeyboardActionButton`, `KeyboardTutorialOverlay`|Keyboard UI sub-components|
 | `ui/theme` | `Theme`, `Color`, `Type`, `MyIcons` | Fixed palette (app + keyboard schemes), status/surface locals, shapes, type ramp |
 
 ## Architecture — What Isn't Obvious from Single Files
@@ -50,11 +50,11 @@ All source lives under `app/src/main/kotlin/` (package root `dev.brgr.outspoke`)
 
 **Number formatting:** `NumberNormaliser` combines only grammatically valid number phrases. Punctuation and separate counting words end a phrase; the countdown from ten to one must remain ten separate numbers, never their sum. Stutter and phrase cleanup preserve number-only repetitions such as dictated codes.
 
-**The keyboard strip is a fixed-height box that clips.** The IME window is 20 % of the usable screen height (~160 dp on a 1080 p phone), so the vertical budget is exactly: status row (42 dp) + 4 + waveform (22) + talk button (68) + 4 top + 20 bottom gesture-pill clearance. Nothing may add a row: `StatusPill` is a fixed 32 dp single line with ellipsized text, error / engine-loading actions live *inside* the pill (`PillAction`), and the Whisper language chips sit in the status row (hidden while recording). The 20 dp bottom floor is not decoration — gesture-nav devices report a 0 px nav bar while the system gesture pill still covers the bottom ~14 dp of the window.
+**The keyboard strip is a fixed-height box that clips.** The IME window is 20 % of the usable screen height (~160 dp on a 1080 p phone), so the vertical budget is exactly: status row (42 dp) + 4 + waveform (18) + talk button (68) + 4 top + 20 bottom gesture-pill clearance. Nothing may add a row: `StatusPill` is a fixed 32 dp single line with ellipsized text, error / engine-loading actions live *inside* the pill (`PillAction`), and the suggestion bar takes a slot above the strip rather than a row inside it (the window grows by exactly the bar height). The 20 dp bottom floor is not decoration — gesture-nav devices report a 0 px nav bar while the system gesture pill still covers the bottom ~14 dp of the window.
 
 **Never fake a colour role with `colorScheme.x.copy(alpha=…)`.** States that Material has no role for go through `LocalOutspokeStatusColors` (success / warning / `stop` red for the live talk button) or `LocalOutspokeSurfaceRoles` (card / raised fills — in dark mode `surfaceContainer` is *lighter* than the page, so cards need the explicit role). Material dynamic colour is deliberately off: wallpaper-derived purples clashed with the brand teal.
 
-**Visual check without a mic:** debug-only activities render the real screens — `am start -n dev.brgr.outspoke/dev.brgr.outspoke.devtools.KeyboardPreviewActivity --es state idle|listening|suggestions|whisper|error` and `…/CompanionPreviewActivity --es screen home|model|pref_input|pref_speech|tools|calibration`; toggle dark mode with `cmd uimode night yes`. They live in `app/src/debug/` and are never packaged in release builds.
+**Visual check without a mic:** debug-only activities render the real screens — `am start -n dev.brgr.outspoke/dev.brgr.outspoke.devtools.KeyboardPreviewActivity --es state idle|listening|continuous|suggestions|loading|error|mic_busy|mic_permission|no_model` and `…/CompanionPreviewActivity --es screen home|model|pref_input|pref_speech|tools|calibration`; toggle dark mode with `cmd uimode night yes`. They live in `app/src/debug/` and are never packaged in release builds.
 
 **Recording completion:** the space key preserves composing text before inserting a space. `trailing_space` defaults to false and adds a separator once after successful flow completion, including when the last utterance ended at a silence boundary. The IME observes `KeyboardViewModel.isRecording` for `FLAG_KEEP_SCREEN_ON`, independently of transcript UI state.
 
